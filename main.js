@@ -113,7 +113,15 @@ const App = {
         document.getElementById('compare-modal-close').addEventListener('click', () => this.closeCompareModal());
         document.getElementById('compare-modal-backdrop').addEventListener('click', () => this.closeCompareModal());
 
+        // モバイルブラウザのUIバーによる高さのズレを修正するためのCSS変数をセット
+        const setMobileHeight = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+        setMobileHeight();
+
         window.addEventListener('resize', () => {
+            setMobileHeight();
             TradeMap.init();
             TradeMap.renderFlows();
         });
