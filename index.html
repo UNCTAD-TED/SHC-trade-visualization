@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-[#f0f4f8] text-[#1a2332] font-sans h-screen flex flex-col overflow-hidden">
+<body class="bg-[#f0f4f8] text-[#1a2332] font-sans h-[100dvh] flex flex-col overflow-hidden">
 
     <!-- UNCTAD-style header: dark navy with white text -->
     <header class="bg-[#004990] border-b border-[#003A75] p-3 z-30 shadow-md">
@@ -258,18 +258,18 @@
             </div>
 
             <!-- Mobile: Legend toggle FAB (hidden on md+) -->
-            <button id="mobile-legend-btn" class="md:hidden absolute bottom-4 left-3 z-20 bg-white border border-[#CBD5E0] shadow-lg rounded-xl px-3 py-2 flex items-center gap-1.5 text-xs font-bold text-[#1a2332] active:bg-[#E2E8F0] transition-colors">
+            <button id="mobile-legend-btn" class="md:hidden absolute bottom-4 left-3 mb-[env(safe-area-inset-bottom)] z-20 bg-white border border-[#CBD5E0] shadow-lg rounded-xl px-3 py-2 flex items-center gap-1.5 text-xs font-bold text-[#1a2332] active:bg-[#E2E8F0] transition-colors">
                 <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
                 Legend
             </button>
 
             <!-- Mobile: Fit to screen FAB -->
-            <button id="fit-screen-btn" class="md:hidden absolute bottom-16 right-3 z-20 bg-white border border-[#CBD5E0] shadow-lg rounded-full w-9 h-9 flex items-center justify-center text-[#4A5568] active:bg-[#E2E8F0] transition-colors" title="Fit to screen">
+            <button id="fit-screen-btn" class="md:hidden absolute bottom-16 right-3 mb-[env(safe-area-inset-bottom)] z-20 bg-white border border-[#CBD5E0] shadow-lg rounded-full w-9 h-9 flex items-center justify-center text-[#4A5568] active:bg-[#E2E8F0] transition-colors" title="Fit to screen">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
             </button>
 
             <!-- Mobile: Filters FAB -->
-            <button id="mobile-filter-btn" class="md:hidden absolute bottom-4 right-3 z-20 bg-[#004990] border border-[#003A75] shadow-lg rounded-xl px-3 py-2 flex items-center gap-1.5 text-xs font-bold text-white active:bg-[#003A75] transition-colors">
+            <button id="mobile-filter-btn" class="md:hidden absolute bottom-4 right-3 mb-[env(safe-area-inset-bottom)] z-20 bg-[#004990] border border-[#003A75] shadow-lg rounded-xl px-3 py-2 flex items-center gap-1.5 text-xs font-bold text-white active:bg-[#003A75] transition-colors">
                 <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                 Filters
                 <span id="mobile-filter-badge" class="hidden bg-white text-[#004990] text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none"></span>
