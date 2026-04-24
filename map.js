@@ -56,13 +56,14 @@ const TradeMap = {
             .attr("class", "map-2d-layer")
             .style("position", "absolute")
             .style("top", "0").style("left", "0")
-            .style("z-index", "1");
+            .style("z-index", "1")
+            .style("touch-action", "none"); // スマホでのブラウザスクロールを無効化し、地図のパン操作を可能にする
 
         this.svg.append("defs");
         this.g = this.svg.append("g");
 
         this.zoomBehavior = d3.zoom()
-            .scaleExtent([1, 8])
+            .scaleExtent([0.2, 8])
             .on("zoom", (event) => {
                 this.g.attr("transform", event.transform);
                 const k = event.transform.k;
@@ -73,7 +74,8 @@ const TradeMap = {
                 this.g.selectAll(".country-node").attr("r", function() {
                     return (+d3.select(this).attr("data-original-radius") || 3) / k;
                 }).attr("stroke-width", 1.5 / k);
-                this.g.selectAll(".map-label").attr("font-size", (10 / Math.sqrt(k)) + "px");
+                this.g.selectAll(".map-label").attr("font-size", (8.5 / Math.sqrt(k)) + "px")
+                    .attr("stroke-width", 2.5 / k);
             });
         this.svg.call(this.zoomBehavior);
     },
@@ -87,9 +89,20 @@ const TradeMap = {
     },
 
     updateProjection() {
+        // 1. 正距円筒図法の特性（横360度:縦180度）に合わせ、横・縦それぞれのベーススケールを計算
+        const baseScaleX = this.width / 6.28;
+        const baseScaleY = this.height / 3.14;
+
+        // 2. 画面が縦長か横長かを判定
+        const isPortrait = this.height > this.width;
+        
+        // 3. 縦長画面（スマホ）なら縦幅基準を採用し、横長画面（PC）なら横幅基準を採用する
+        const finalScale = isPortrait ? baseScaleY * 1.1 : baseScaleX;
+
         this.projection = d3.geoEquirectangular()
-            .scale(this.width / 6.5)
-            .translate([this.width / 2, this.height / 1.8]);
+            .scale(finalScale)
+            // 縦長画面の場合は地図の中心を少し上にずらしてUIと被らないように見やすく調整
+            .translate([this.width / 2, this.height / (isPortrait ? 2.2 : 1.8)]);
 
         this.path = d3.geoPath().projection(this.projection);
     },
@@ -101,12 +114,19 @@ const TradeMap = {
         if (!config) return;
 
         const [targetLon, targetLat] = config.center;
-        const targetScale = config.scale;
+        let targetScale = config.scale;
+
+        // Global表示かつスマホ（縦長画面）の場合、地図が横幅にすっぽり収まるまで縮小(k < 1)する
+        if (regionName === "Global" && this.height > this.width) {
+            const baseScaleX = this.width / 6.28;
+            const currentBaseScale = this.projection.scale();
+            targetScale = baseScaleX / currentBaseScale;
+        }
 
         const projectedPoint = this.projection([targetLon, targetLat]);
         if (!projectedPoint) return;
 
-        const k = targetScale;
+        const k = Math.max(0.2, targetScale); // 下限を0.2に制限
         const tx = (this.width / 2) - (projectedPoint[0] * k);
         const ty = (this.height / 2) - (projectedPoint[1] * k);
 
@@ -208,14 +228,18 @@ const TradeMap = {
         const p98NetBal     = d3.quantile(sortedNetBal, 0.98) || d3.max(sortedNetBal) || 1;
         const p98NetFlows   = d3.quantile(sortedNetFlows, 0.98) || d3.max(sortedNetFlows) || 1;
 
+        //need to adjust the size
+        const maxRadius    = Math.max(Math.min(this.width * 0.015, 28), 8);
+        const maxEdgeWidth = Math.max(Math.min(this.width * 0.008, 16), 6);
+
         const radiusScale = d3.scaleSqrt()
             .domain([0, p98Gross])
-            .range(isFocused ? [3, 30] : [1.5, 20])
+            .range(isFocused ? [3, maxRadius] : [1.5, maxRadius * 0.7])
             .clamp(true);
 
         const edgeWidthScale = d3.scaleSqrt()
             .domain([0, p98NetFlows])
-            .range(isFocused ? [1.5, 18.0] : [0.5, 12.0])
+            .range(isFocused ? [1.5, maxEdgeWidth] : [0.5, maxEdgeWidth * 0.7])
             .clamp(true);
 
         const opacityScale = d3.scaleLinear()
@@ -346,16 +370,22 @@ const TradeMap = {
         const labelsEnter = labels.enter()
             .append("text")
             .attr("class", "map-label map-label-unified")
+            .attr("font-family", "Inter, sans-serif")
+            .attr("font-weight", "600") // 少し太字にして視認性を高める
             .style("pointer-events", "none")
+            .style("paint-order", "stroke fill") // フチを文字の外側にだけ描画するモダンなCSS
             .style("opacity", 0);
 
         labelsEnter.merge(labels)
             .text(d => STATE.countryNames[d] || d)
-            .attr("fill", d => nodeStats[d].netBalance >= 0 ? "#e2e8f0" : "#f59e0b")
+            .attr("fill", "#4A5568") // 柔らかく読みやすいダークスレート色に統一
+            .attr("stroke", "#FAFAFA") // 背景や陸地と同じ色で白フチ（Halo）をつける
+            .attr("stroke-linejoin", "round")
             .transition().duration(750)
             .attr("x", d => this.getProjectedPoint(d)[0] + (radiusScale(nodeStats[d].grossVolume) / currentK) + 4)
             .attr("y", d => this.getProjectedPoint(d)[1] + 4)
-            .attr("font-size", (10 / Math.sqrt(currentK)) + "px")
+            .attr("font-size", (8.5 / Math.sqrt(currentK)) + "px") // 10pxから8.5pxへ少し縮小
+            .attr("stroke-width", 2.5 / currentK)
             .style("opacity", 1);
 
         if (this.renderLegend) this.renderLegend();
@@ -407,11 +437,11 @@ const TradeMap = {
             const valueStr = stat.count > 0 ? `$${fmtShort(stat.total)}` : '—';
             const countStr = stat.count > 0 ? `${stat.count}` : '0';
             return `
-                <div class="flex items-center gap-2" style="opacity:${opacity}">
-                    <span class="w-3 h-1 rounded-full flex-shrink-0" style="background:${CONFIG.flowColors[c.key]}"></span>
-                    <span class="flex-1 text-[10px] text-[#374151]">${c.label}</span>
-                    <span class="text-[9px] text-[#718096] font-mono">${countStr}</span>
-                    <span class="text-[9px] text-[#718096] font-mono w-12 text-right">${valueStr}</span>
+                <div class="flex items-center gap-1.5" style="opacity:${opacity}">
+                    <span class="w-3 h-[3px] rounded-full flex-shrink-0" style="background:${CONFIG.flowColors[c.key]}"></span>
+                    <span class="text-[9px] font-bold text-[#374151] w-8 flex-shrink-0">${c.abbr}</span>
+                    <span class="text-[9px] text-[#718096] font-mono flex-shrink-0">${countStr}</span>
+                    <span class="text-[9px] text-[#718096] font-mono text-right flex-1">${valueStr}</span>
                 </div>`;
         }).join('');
 
@@ -419,22 +449,22 @@ const TradeMap = {
             <div class="text-[9px] text-[#718096] italic mt-1">Arc width = net trade value</div>`;
 
         const nodeHtml = `
-            <div class="mt-3 pt-2 border-t border-[#E2E8F0]">
-                <div class="text-[10px] text-[#718096] font-bold uppercase mb-1.5 tracking-wider">Nodes</div>
-                <div class="flex items-center justify-center gap-0.5 my-2" style="height:28px">
-                    <div style="width:22px;height:22px;border-radius:50%;background:#e11d48" title="Strong net importer"></div>
-                    <div style="width:16px;height:16px;border-radius:50%;background:#fb7185" title="Net importer"></div>
-                    <div style="width:10px;height:10px;border-radius:50%;background:#f9a8d4" title="Slight net importer"></div>
-                    <div style="width:5px;height:5px;border-radius:50%;background:#9CA3AF;border:1px solid #CBD5E0" title="Balanced"></div>
-                    <div style="width:10px;height:10px;border-radius:50%;background:#7dd3fc" title="Slight net exporter"></div>
-                    <div style="width:16px;height:16px;border-radius:50%;background:#38bdf8" title="Net exporter"></div>
-                    <div style="width:22px;height:22px;border-radius:50%;background:#0284c7" title="Strong net exporter"></div>
+            <div class="mt-2 pt-2 border-t border-[#E2E8F0]">
+                <div class="text-[9px] text-[#718096] font-bold uppercase mb-1 tracking-wider">Nodes</div>
+                <div class="flex items-center justify-center gap-0.5" style="height:20px">
+                    <div style="width:16px;height:16px;border-radius:50%;background:#e11d48" title="Strong net importer"></div>
+                    <div style="width:11px;height:11px;border-radius:50%;background:#fb7185" title="Net importer"></div>
+                    <div style="width:7px;height:7px;border-radius:50%;background:#f9a8d4" title="Slight net importer"></div>
+                    <div style="width:4px;height:4px;border-radius:50%;background:#9CA3AF;border:1px solid #CBD5E0" title="Balanced"></div>
+                    <div style="width:7px;height:7px;border-radius:50%;background:#7dd3fc" title="Slight net exporter"></div>
+                    <div style="width:11px;height:11px;border-radius:50%;background:#38bdf8" title="Net exporter"></div>
+                    <div style="width:16px;height:16px;border-radius:50%;background:#0284c7" title="Strong net exporter"></div>
                 </div>
-                <div class="flex justify-between text-[9px] text-[#718096] font-mono">
-                    <span>← Net importer</span>
-                    <span>Net exporter →</span>
+                <div class="flex justify-between text-[9px] text-[#718096] font-mono mt-0.5">
+                    <span>← Importer</span>
+                    <span>Exporter →</span>
                 </div>
-                <div class="text-[9px] text-[#718096] italic mt-1">Color = net balance · Size = gross volume</div>
+                <div class="text-[9px] text-[#718096] italic mt-0.5">Color = balance · Size = volume</div>
             </div>`;
 
         // --- 4. Visibility Threshold ---
@@ -450,11 +480,11 @@ const TradeMap = {
             const isGroupFocused   = totalSelected > 5;
             const isRegionFocused  = STATE.region && STATE.region !== 'Global';
             if (isCountryFocused) {
-                currentThreshold = 10000;  autoZoomLevel = 'Country';
+                currentThreshold = 10000;   autoZoomLevel = 'Country';
             } else if (isGroupFocused || isRegionFocused) {
-                currentThreshold = 100000; autoZoomLevel = 'Group';
+                currentThreshold = 100000;  autoZoomLevel = 'Group';
             } else {
-                currentThreshold = 500000; autoZoomLevel = 'Global';
+                currentThreshold = 10000000; autoZoomLevel = 'Global';
             }
         }
 
@@ -466,7 +496,7 @@ const TradeMap = {
                 <div class="space-y-0.5 mt-1.5">
                     <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Global'  ? 'text-[#004990] font-bold' : 'text-[#718096]'}">
                         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Global'  ? 'bg-[#004990]' : 'bg-[#CBD5E0]'}"></span>
-                        <span class="flex-1">Global</span><span class="font-mono">$500k</span>
+                        <span class="flex-1">Global</span><span class="font-mono">$10M</span>
                     </div>
                     <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Group'   ? 'text-[#004990] font-bold' : 'text-[#718096]'}">
                         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Group'   ? 'bg-[#004990]' : 'bg-[#CBD5E0]'}"></span>
@@ -480,100 +510,23 @@ const TradeMap = {
 
         const thresholdHtml = `
             <div class="mt-2 pt-2 border-t border-[#E2E8F0]">
-                <div class="flex items-center justify-between mb-1.5">
-                    <div class="text-[10px] text-[#718096] font-bold uppercase tracking-wider">Threshold</div>
+                <div class="flex items-center justify-between mb-1">
+                    <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider">Threshold</div>
                     ${modeBadge}
                 </div>
-                <div class="flex items-center justify-between text-[10px]">
-                    <span class="text-[#374151]">Min. flow</span>
-                    <span class="text-[#1a2332] font-bold font-mono">$${fmtShort(currentThreshold)}</span>
+                <div class="flex items-center justify-between">
+                    <span class="text-[9px] text-[#374151]">Min. flow</span>
+                    <span class="text-[10px] text-[#1a2332] font-bold font-mono">$${fmtShort(currentThreshold)}</span>
                 </div>
                 ${autoTiersHtml}
             </div>`;
 
-        // --- 5. Active filter context ---
-        const countryCount = Object.keys(nodeStats).length;
-        const flowCount    = netFlows.length;
-        const regionLabel  = STATE.region && STATE.region !== 'Global' ? STATE.region : 'Global';
-        const focusLabel   = STATE.selectedExporters.size > 0 || STATE.selectedImporters.size > 0
-            ? `${STATE.selectedExporters.size} exp / ${STATE.selectedImporters.size} imp`
-            : 'All';
-
-        const contextHtml = `
-            <div class="mt-2 pt-2 border-t border-[#E2E8F0]">
-                <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px]">
-                    <span class="text-[#718096]">Region</span><span class="text-[#374151] font-mono text-right">${regionLabel}</span>
-                    <span class="text-[#718096]">Selection</span><span class="text-[#374151] font-mono text-right">${focusLabel}</span>
-                    <span class="text-[#718096]">Countries</span><span class="text-[#374151] font-mono text-right">${countryCount}</span>
-                    <span class="text-[#718096]">Trade flows</span><span class="text-[#374151] font-mono text-right">${fmt(flowCount)}</span>
-                </div>
-            </div>`;
-
-        // --- Distribution Histogram ---
-        const histHtml = (() => {
-            if (netFlows.length === 0) return '';
-
-            const LOG_MIN = 3, LOG_MAX = 10, BINS = 14;
-            const counts = new Array(BINS).fill(0);
-            const catPrimary = new Array(BINS).fill(null);
-            const catCounts  = Array.from({ length: BINS }, () => ({}));
-
-            netFlows.forEach(d => {
-                const v = d.netValue;
-                if (v <= 0) return;
-                const log = Math.log10(v);
-                let b = Math.floor((log - LOG_MIN) / (LOG_MAX - LOG_MIN) * BINS);
-                b = Math.max(0, Math.min(BINS - 1, b));
-                counts[b]++;
-                catCounts[b][d.flowCategory] = (catCounts[b][d.flowCategory] || 0) + 1;
-            });
-            counts.forEach((_, b) => {
-                const best = Object.entries(catCounts[b]).sort((a, b2) => b2[1] - a[1])[0];
-                catPrimary[b] = best ? best[0] : 'north-north';
-            });
-
-            const maxCount = Math.max(...counts, 1);
-            const W = 220, H = 36, gap = 1;
-            const bw = (W - gap * (BINS - 1)) / BINS;
-
-            const threshLog = Math.log10(Math.max(currentThreshold, 1));
-            const threshX   = Math.max(0, Math.min(W, (threshLog - LOG_MIN) / (LOG_MAX - LOG_MIN) * W));
-
-            const bars = counts.map((c, i) => {
-                const h  = Math.max(1, (c / maxCount) * H);
-                const x  = i * (bw + gap);
-                const col = c > 0 ? (CONFIG.flowColors[catPrimary[i]] || '#CBD5E0') : '#E5E7EB';
-                return `<rect x="${x.toFixed(1)}" y="${(H - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1" fill="${col}" opacity="0.75"/>`;
-            }).join('');
-
-            const xLabels = [4, 6, 8, 10].map(exp => {
-                const x = (exp - LOG_MIN) / (LOG_MAX - LOG_MIN) * W;
-                return `<text x="${x.toFixed(1)}" y="${H + 11}" text-anchor="middle" font-size="6.5" fill="#9CA3AF" font-family="Inter,monospace">${['$10k','$100k','$1M','$10M'][exp - 4] || ''}</text>`;
-            }).join('');
-
-            return `
-            <div class="mt-3 pt-2 border-t border-[#E2E8F0]">
-                <div class="flex items-center justify-between mb-1">
-                    <div class="text-[10px] text-[#718096] font-bold uppercase tracking-wider">Flow Distribution</div>
-                    <div class="text-[9px] text-[#9CA3AF] font-mono">${netFlows.length} flows</div>
-                </div>
-                <svg width="${W}" height="${H + 14}" class="w-full overflow-visible">
-                    ${bars}
-                    <line x1="${threshX.toFixed(1)}" y1="0" x2="${threshX.toFixed(1)}" y2="${H}" stroke="#D97706" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.9"/>
-                    <text x="${(threshX + 2).toFixed(1)}" y="8" font-size="6.5" fill="#D97706" font-family="Inter,monospace">min</text>
-                    ${xLabels}
-                </svg>
-                <div class="text-[8.5px] text-[#9CA3AF] italic mt-0.5">Bar color = dominant flow type · dashed = threshold</div>
-            </div>`;
-        })();
 
         container.innerHTML = `
-            <div class="space-y-1.5 mt-1">${catHtml}</div>
+            <div class="space-y-1 mt-1">${catHtml}</div>
             ${widthHtml}
             ${nodeHtml}
-            ${histHtml}
             ${thresholdHtml}
-            ${contextHtml}
         `;
 
         // Total stats

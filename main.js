@@ -53,13 +53,21 @@ const App = {
         // Year
         const yearSelect = document.getElementById('year-select');
         if (yearSelect) {
-            yearSelect.addEventListener('change', (e) => {
-                STATE.year = +e.target.value;
-
-                this.exporterSelector.setCountries([]);
-                this.importerSelector.setCountries([]);
-
-                this.updateDashboard();
+            yearSelect.addEventListener('change', async (e) => {
+                const year = +e.target.value;
+                const loader = document.getElementById('loader');
+                loader.classList.remove('hidden');
+                try {
+                    await DataLoader.loadYear(year);
+                    STATE.year = year;
+                    this.exporterSelector.setCountries([]);
+                    this.importerSelector.setCountries([]);
+                    this.updateDashboard();
+                } catch (err) {
+                    console.error('Failed to load year data:', err);
+                } finally {
+                    loader.classList.add('hidden');
+                }
             });
         }
 
@@ -83,24 +91,6 @@ const App = {
             });
         });
 
-        // Exporter label toggle
-        const expLabelToggle = document.getElementById('toggle-exp-labels');
-        if (expLabelToggle) {
-            expLabelToggle.addEventListener('change', (e) => {
-                STATE.showExporterLabels = e.target.checked;
-                TradeMap.renderFlows();
-            });
-        }
-
-        // Importer label toggle
-        const impLabelToggle = document.getElementById('toggle-imp-labels');
-        if (impLabelToggle) {
-            impLabelToggle.addEventListener('change', (e) => {
-                STATE.showImporterLabels = e.target.checked;
-                TradeMap.renderFlows();
-            });
-        }
-
         // Dropdown Logic (Exporter & Importer)
         this.setupHierarchicalDropdown('exp', this.exporterSelector);
         this.setupHierarchicalDropdown('imp', this.importerSelector);
@@ -108,6 +98,12 @@ const App = {
         // Insight panel close button
         const panelCloseBtn = document.getElementById('panel-close-btn');
         if (panelCloseBtn) panelCloseBtn.addEventListener('click', () => this.closeInsightPanel());
+
+        // Mobile legend toggle
+        const mobileLegendBtn = document.getElementById('mobile-legend-btn');
+        if (mobileLegendBtn) mobileLegendBtn.addEventListener('click', () => this.toggleMobileLegend());
+        const mobileBackdrop = document.getElementById('mobile-legend-backdrop');
+        if (mobileBackdrop) mobileBackdrop.addEventListener('click', () => this.toggleMobileLegend());
 
         // Arc detail modal
         document.getElementById('arc-modal-close').addEventListener('click', () => this.closeArcModal());
@@ -121,24 +117,72 @@ const App = {
             TradeMap.init();
             TradeMap.renderFlows();
         });
+
+        // ── Mobile Filter Panel ───────────────────────────────
+        document.getElementById('mobile-filter-btn')?.addEventListener('click', () => this.toggleMobileFilter());
+        document.getElementById('mobile-filter-close')?.addEventListener('click', () => this.toggleMobileFilter());
+        document.getElementById('mobile-filter-backdrop')?.addEventListener('click', () => this.toggleMobileFilter());
+
+        // Mobile fit to screen button
+        document.getElementById('fit-screen-btn')?.addEventListener('click', () => {
+            TradeMap.zoomToRegion("Global");
+        });
+
+        // Mobile country backdrop closes any open country menu
+        document.getElementById('mobile-country-backdrop')?.addEventListener('click', () => {
+            ['exp', 'imp'].forEach(p => {
+                document.getElementById(`${p}-menu`).classList.add('hidden');
+                document.getElementById(`${p}-menu`).classList.remove('mobile-menu-fixed');
+            });
+            document.getElementById('mobile-country-backdrop').classList.add('hidden');
+        });
+
+        // Mobile year select syncs to desktop handler
+        document.getElementById('m-year-select')?.addEventListener('change', async (e) => {
+            const desktopSelect = document.getElementById('year-select');
+            desktopSelect.value = e.target.value;
+            desktopSelect.dispatchEvent(new Event('change'));
+        });
+
+        // Sync initial active state to mobile panel buttons
+        this.syncMobileFilterState();
     },
 
     setupHierarchicalDropdown(prefix, selector) {
-        const btn = document.getElementById(`${prefix}-btn`);
+        const btn  = document.getElementById(`${prefix}-btn`);
+        const mBtn = document.getElementById(`m-${prefix}-btn`);
         const menu = document.getElementById(`${prefix}-menu`);
-        const search = document.getElementById(`${prefix}-search`);
+        const search   = document.getElementById(`${prefix}-search`);
         const clearAll = document.getElementById(`${prefix}-clear-all`);
+
+        const closeOtherMenu = () => {
+            const otherPrefix = prefix === 'exp' ? 'imp' : 'exp';
+            const otherMenu = document.getElementById(`${otherPrefix}-menu`);
+            otherMenu.classList.add('hidden');
+            otherMenu.classList.remove('mobile-menu-fixed');
+        };
 
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const otherPrefix = prefix === 'exp' ? 'imp' : 'exp';
-            document.getElementById(`${otherPrefix}-menu`).classList.add('hidden');
+            closeOtherMenu();
             menu.classList.toggle('hidden');
         });
 
+        if (mBtn) {
+            mBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeOtherMenu();
+                menu.classList.remove('hidden');
+                menu.classList.add('mobile-menu-fixed');
+                document.getElementById('mobile-country-backdrop')?.classList.remove('hidden');
+            });
+        }
+
         document.addEventListener('click', (e) => {
-            if (!menu.contains(e.target) && !btn.contains(e.target)) {
+            const isOutside = !menu.contains(e.target) && !btn.contains(e.target) && (!mBtn || !mBtn.contains(e.target));
+            if (isOutside) {
                 menu.classList.add('hidden');
+                menu.classList.remove('mobile-menu-fixed');
             }
         });
 
@@ -162,9 +206,17 @@ const App = {
         document.querySelectorAll(selector).forEach(b => {
             b.classList.remove('bg-[#004990]', 'text-white');
             b.classList.add('text-[#4A5568]');
+            if (b.closest('#mobile-filter-panel')) {
+                b.style.backgroundColor = '';
+                b.style.color = '';
+            }
         });
         activeEl.classList.remove('text-[#4A5568]');
         activeEl.classList.add('bg-[#004990]', 'text-white');
+        if (activeEl.closest('#mobile-filter-panel')) {
+            activeEl.style.backgroundColor = '#004990';
+            activeEl.style.color = 'white';
+        }
     },
 
     updateKPIBar() {
@@ -216,6 +268,9 @@ const App = {
     // ── P1: Insight Side Panel ──────────────────────────────────────
 
     openInsightPanel(iso) {
+        if (document.getElementById('mobile-filter-panel')?.classList.contains('open')) {
+            this.toggleMobileFilter();
+        }
         const name = STATE.countryNames[iso] || iso;
         const stats = STATE.nodeStats[iso];
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
@@ -238,7 +293,10 @@ const App = {
 
     // ── P2-A: Arc Detail Modal ──────────────────────────────────────
 
-    openArcModal(expIso, impIso) {
+    async openArcModal(expIso, impIso) {
+        if (!STATE.bilateralHistory) {
+            await STATE._bilateralPromise;
+        }
         const expName = STATE.countryNames[expIso] || expIso;
         const impName = STATE.countryNames[impIso] || impIso;
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
@@ -263,13 +321,21 @@ const App = {
         const yearData = {};
         for (let y = 2015; y <= 2024; y++) yearData[y] = { aToB: 0, bToA: 0 };
 
-        STATE.data.forEach(d => {
-            if (!yearData[d.year]) return;
-            const val = d.value;
-            if (val <= 0) return;
-            if (d.exporter === expIso && d.importer === impIso) yearData[d.year].aToB += val;
-            else if (d.exporter === impIso && d.importer === expIso) yearData[d.year].bToA += val;
-        });
+        // Resolve bilateral history from pre-computed JSON
+        const a = [expIso, impIso].sort()[0];
+        const b = [expIso, impIso].sort()[1];
+        const pairKey = `${a}|${b}`;
+        const expIsA = expIso === a;
+        const hist = STATE.bilateralHistory ? STATE.bilateralHistory[pairKey] : null;
+        if (hist) {
+            Object.entries(hist).forEach(([yStr, entry]) => {
+                const y = +yStr;
+                if (yearData[y]) {
+                    yearData[y].aToB = expIsA ? entry.aToB : entry.bToA;
+                    yearData[y].bToA = expIsA ? entry.bToA : entry.aToB;
+                }
+            });
+        }
 
         const years = Object.keys(yearData).map(Number).sort();
         const nets  = years.map(y => yearData[y].aToB - yearData[y].bToA);
@@ -401,13 +467,9 @@ const App = {
         const regB = RegionConfig.getRegion(isoB) || '—';
 
         const getYearlyTotals = (iso) => {
+            const isoData = STATE.trendSummary[iso] || {};
             const t = {};
-            for (let y = 2015; y <= 2024; y++) t[y] = 0;
-            STATE.data.forEach(d => {
-                if (d.exporter !== iso && d.importer !== iso) return;
-                const val = d.value;
-                if (val > 0) t[d.year] = (t[d.year] || 0) + val;
-            });
+            for (let y = 2015; y <= 2024; y++) t[y] = isoData[String(y)] || 0;
             return t;
         };
         const totA = getYearlyTotals(isoA);
@@ -519,19 +581,14 @@ const App = {
 
     _buildPanelContent(iso, stats, mf) {
         const partnerExports = {}, partnerImports = {};
-        const yearlyTotals = {};
-        for (let y = 2015; y <= 2024; y++) yearlyTotals[y] = 0;
-
         STATE.filteredData.forEach(d => {
             if (d.exporter === iso) partnerExports[d.importer] = (partnerExports[d.importer] || 0) + d.netValue;
             else if (d.importer === iso) partnerImports[d.exporter] = (partnerImports[d.exporter] || 0) + d.netValue;
         });
-        STATE.data.forEach(d => {
-            if (d.exporter === iso || d.importer === iso) {
-                const val = d.value;
-                if (val > 0) yearlyTotals[d.year] = (yearlyTotals[d.year] || 0) + val;
-            }
-        });
+
+        const yearlyTotals = {};
+        const isoTrend = STATE.trendSummary[iso] || {};
+        for (let y = 2015; y <= 2024; y++) yearlyTotals[y] = isoTrend[String(y)] || 0;
 
         let html = '';
 
@@ -652,13 +709,10 @@ const App = {
             const role = isExp ? 'net exporter' : 'net importer';
 
             const globalVols = {};
-            STATE.data.forEach(d => {
-                if (d.year !== STATE.year) return;
-                const val = d.value;
-                if (val > 0) {
-                    if (d.exporter) globalVols[d.exporter] = (globalVols[d.exporter] || 0) + val;
-                    if (d.importer) globalVols[d.importer] = (globalVols[d.importer] || 0) + val;
-                }
+            const _yearStr = String(STATE.year);
+            Object.entries(STATE.trendSummary).forEach(([isoKey, yearData]) => {
+                const val = yearData[_yearStr];
+                if (val > 0) globalVols[isoKey] = val;
             });
             const sortedGlobal = Object.entries(globalVols).sort((a, b) => b[1] - a[1]);
             const globalRank = sortedGlobal.findIndex(([k]) => k === iso) + 1;
@@ -852,13 +906,8 @@ const App = {
         }
 
         const yearlyTotals = {};
-        for (let y = 2015; y <= 2024; y++) yearlyTotals[y] = 0;
-        STATE.data.forEach(d => {
-            if (d.exporter === iso || d.importer === iso) {
-                const val = d.value;
-                if (val > 0) yearlyTotals[d.year] = (yearlyTotals[d.year] || 0) + val;
-            }
-        });
+        const _isoTrend = STATE.trendSummary[iso] || {};
+        for (let y = 2015; y <= 2024; y++) yearlyTotals[y] = _isoTrend[String(y)] || 0;
 
         const years = Object.keys(yearlyTotals).map(Number).sort();
         const yVals = years.map(y => yearlyTotals[y]);
@@ -929,21 +978,73 @@ const App = {
     _positionTooltip(tooltip, event) {
         tooltip.style.display = 'block';
         const pad = 15;
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        let x = event.pageX + pad;
-        let y = event.pageY - pad;
+        
+        // ツールチップの親コンテナ（マップの枠）のサイズと位置を取得
+        const container = tooltip.parentElement;
+        const rect = container.getBoundingClientRect();
+        
+        // コンテナ内でのマウスの相対座標を計算
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
         const tw = tooltip.offsetWidth;
         const th = tooltip.offsetHeight;
-        if (x + tw > vw - pad) x = event.pageX - tw - pad;
-        if (y + th > vh - pad) y = vh - th - pad;
+        
+        // 基本はマウスカーソルの右下に配置
+        let x = mouseX + pad;
+        let y = mouseY + pad;
+
+        // 右にはみ出る場合はマウスの左側に反転
+        if (x + tw > rect.width - pad) x = mouseX - tw - pad;
+        
+        // 下にはみ出る場合はマウスの上側に反転
+        if (y + th > rect.height - pad) y = mouseY - th - pad;
+        
+        // コンテナの左や上にはみ出さないための最終安全措置
+        if (x < pad) x = pad;
         if (y < pad) y = pad;
+
         tooltip.style.left = x + 'px';
         tooltip.style.top = y + 'px';
     },
 
     hideTooltip() {
         document.getElementById('tooltip').style.display = 'none';
+    },
+
+    toggleMobileLegend() {
+        const panel = document.getElementById('legend-panel');
+        const backdrop = document.getElementById('mobile-legend-backdrop');
+        const isOpen = panel.classList.contains('mobile-open');
+        if (isOpen) {
+            panel.classList.remove('mobile-open');
+            backdrop.classList.add('hidden');
+        } else {
+            panel.classList.add('mobile-open');
+            backdrop.classList.remove('hidden');
+        }
+    },
+
+    toggleMobileFilter() {
+        const panel = document.getElementById('mobile-filter-panel');
+        const backdrop = document.getElementById('mobile-filter-backdrop');
+        if (!panel) return;
+        const isOpen = panel.classList.contains('open');
+        if (isOpen) {
+            panel.classList.remove('open');
+            backdrop.classList.add('hidden');
+        } else {
+            panel.classList.add('open');
+            backdrop.classList.remove('hidden');
+        }
+    },
+
+    syncMobileFilterState() {
+        const activeRegion = document.querySelector(`.region-btn[data-region="${STATE.region || 'Global'}"]`);
+        if (activeRegion) this.updateUIClasses('.region-btn', activeRegion);
+        const threshVal = (STATE.thresholdMode === 'auto' || STATE.thresholdMode === undefined) ? 'auto' : String(STATE.thresholdMode);
+        const activeThreshold = document.querySelector(`.threshold-btn[data-threshold="${threshVal}"]`);
+        if (activeThreshold) this.updateUIClasses('.threshold-btn', activeThreshold);
     }
 };
 

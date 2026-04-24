@@ -192,6 +192,20 @@ class CountrySelector {
             btn.classList.toggle('border-[#004990]', count > 0);
             btn.classList.toggle('border-[#CBD5E0]', count === 0);
         }
+
+        // Sync mobile filter panel button
+        const mLabel = document.getElementById(`m-${this.elementId}-label`);
+        if (mLabel) mLabel.textContent = labelEl.textContent;
+        const mBadge = document.getElementById(`m-${this.elementId}-count`);
+        if (mBadge) {
+            mBadge.textContent = count;
+            mBadge.classList.toggle('hidden', count === 0);
+        }
+        const mBtn = document.getElementById(`m-${this.elementId}-btn`);
+        if (mBtn) {
+            mBtn.classList.toggle('border-[#004990]', count > 0);
+            mBtn.classList.toggle('border-[#CBD5E0]', count === 0);
+        }
     }
 
     updateSelection() {

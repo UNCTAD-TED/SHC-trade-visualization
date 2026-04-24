@@ -1,6 +1,4 @@
 const CONFIG = {
-    // Files
-    csvFile: 'data/BACI.csv',
     geoJsonUrl: 'assets/worldmap-economies-4326.topo.json',
 
     thresholds: {
@@ -37,11 +35,6 @@ const CONFIG = {
     }
 };
 
-// Returns the active metric value from a raw data row
-function getMetricValue(d) {
-    return d.value;
-}
-
 // Metric display formatting (used by tooltips and legends)
 const METRIC_FORMAT = {
     value: {
@@ -58,7 +51,16 @@ const METRIC_FORMAT = {
 };
 
 const STATE = {
-    data: [],
+    // Per-year pre-computed net flows, keyed by year number
+    yearCache: {},
+
+    // Gross trade volume per country per year: { iso: { "YYYY": value } }
+    trendSummary: {},
+
+    // Raw bilateral flows per country pair across all years (lazy-loaded)
+    bilateralHistory: null,
+    _bilateralPromise: null,
+
     geoData: null,
     filteredData: [],
     nodeStats: {},
