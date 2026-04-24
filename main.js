@@ -139,8 +139,13 @@ const App = {
         // Mobile country backdrop closes any open country menu
         document.getElementById('mobile-country-backdrop')?.addEventListener('click', () => {
             ['exp', 'imp'].forEach(p => {
-                document.getElementById(`${p}-menu`).classList.add('hidden');
-                document.getElementById(`${p}-menu`).classList.remove('mobile-menu-fixed');
+                const menu = document.getElementById(`${p}-menu`);
+                const btn = document.getElementById(`${p}-btn`);
+                menu.classList.add('hidden');
+                menu.classList.remove('mobile-menu-fixed');
+                if (menu.parentElement !== btn.parentElement) {
+                    btn.parentElement.appendChild(menu);
+                }
             });
             document.getElementById('mobile-country-backdrop').classList.add('hidden');
         });
@@ -163,16 +168,25 @@ const App = {
         const search   = document.getElementById(`${prefix}-search`);
         const clearAll = document.getElementById(`${prefix}-clear-all`);
 
+        const originalParent = btn.parentElement;
+
         const closeOtherMenu = () => {
             const otherPrefix = prefix === 'exp' ? 'imp' : 'exp';
             const otherMenu = document.getElementById(`${otherPrefix}-menu`);
+            const otherBtn = document.getElementById(`${otherPrefix}-btn`);
             otherMenu.classList.add('hidden');
             otherMenu.classList.remove('mobile-menu-fixed');
+            if (otherMenu.parentElement !== otherBtn.parentElement) {
+                otherBtn.parentElement.appendChild(otherMenu);
+            }
         };
 
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             closeOtherMenu();
+            if (menu.parentElement !== originalParent) {
+                originalParent.appendChild(menu);
+            }
             menu.classList.toggle('hidden');
         });
 
@@ -180,6 +194,10 @@ const App = {
             mBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 closeOtherMenu();
+                
+                // モバイル表示用に body 直下に移動 (親要素の hidden の影響を避ける)
+                document.body.appendChild(menu);
+                
                 menu.classList.remove('hidden');
                 menu.classList.add('mobile-menu-fixed');
                 document.getElementById('mobile-country-backdrop')?.classList.remove('hidden');
@@ -191,6 +209,9 @@ const App = {
             if (isOutside) {
                 menu.classList.add('hidden');
                 menu.classList.remove('mobile-menu-fixed');
+                if (menu.parentElement !== originalParent) {
+                    originalParent.appendChild(menu);
+                }
             }
         });
 
