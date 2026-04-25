@@ -146,6 +146,7 @@ const App = {
                 if (menu.parentElement !== btn.parentElement) {
                     btn.parentElement.appendChild(menu);
                 }
+                btn.parentElement.style.zIndex = '50'; // リセット
             });
             document.getElementById('mobile-country-backdrop').classList.add('hidden');
         });
@@ -179,15 +180,22 @@ const App = {
             if (otherMenu.parentElement !== otherBtn.parentElement) {
                 otherBtn.parentElement.appendChild(otherMenu);
             }
+            otherBtn.parentElement.style.zIndex = '50'; // 閉じた方はリセット
         };
 
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             closeOtherMenu();
+            
+            // PC版（横長）で開くときは、必ずモバイル用の固定設定を外す
+            menu.classList.remove('mobile-menu-fixed');
             if (menu.parentElement !== originalParent) {
                 originalParent.appendChild(menu);
             }
             menu.classList.toggle('hidden');
+            
+            // 開いたメニューが他のボタン（下の要素）に隠れないように z-index を高くする
+            originalParent.style.zIndex = menu.classList.contains('hidden') ? '50' : '60';
         });
 
         if (mBtn) {
@@ -212,6 +220,7 @@ const App = {
                 if (menu.parentElement !== originalParent) {
                     originalParent.appendChild(menu);
                 }
+                originalParent.style.zIndex = '50'; // 画面外クリックで閉じた時にリセット
             }
         });
 
