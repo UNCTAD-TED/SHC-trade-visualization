@@ -676,6 +676,32 @@ const App = {
                 const aColor = isExportTo ? '#38bdf8' : '#f87171';
                 const arcExpIso = isExportTo ? iso : pIso;
                 const arcImpIso = isExportTo ? pIso : iso;
+
+                // Bilateral asymmetry: what share of gross bilateral trade flows in the dominant direction?
+                // Source: bilateralHistory (pre-threshold, gross flows) for accuracy.
+                let asymBadge = '';
+                if (STATE.bilateralHistory) {
+                    const a = [iso, pIso].sort()[0], b = [iso, pIso].sort()[1];
+                    const hist = STATE.bilateralHistory[a + '|' + b];
+                    const entry = hist ? hist[String(STATE.year)] : null;
+                    if (entry) {
+                        const isoIsA = iso === a;
+                        const isoOut = isoIsA ? entry.aToB : entry.bToA;
+                        const isoIn  = isoIsA ? entry.bToA : entry.aToB;
+                        const tot = isoOut + isoIn;
+                        if (tot > 0) {
+                            const domPct = Math.round(Math.max(isoOut, isoIn) / tot * 100);
+                            const expDom = isoOut >= isoIn;
+                            // Strong asymmetry (≥75%): colored. Moderate (<75%): gray.
+                            const badgeCol = domPct >= 75 ? (expDom ? '#0284c7' : '#e11d48') : '#94a3b8';
+                            const tip = expDom
+                                ? `${domPct}% of gross bilateral trade flows from ${STATE.countryNames[iso] || iso}`
+                                : `${domPct}% of gross bilateral trade flows from ${STATE.countryNames[pIso] || pIso}`;
+                            asymBadge = `<span class="text-[9px] font-mono font-bold flex-shrink-0 w-10 text-right" style="color:${badgeCol}" title="${tip}">${expDom ? '→' : '←'}${domPct}%</span>`;
+                        }
+                    }
+                }
+
                 return `<div class="flex items-center gap-2 text-[11px] group">
                     <span class="text-[#9CA3AF] w-4 text-right flex-shrink-0 font-mono">${idx + 1}</span>
                     <span style="color:${aColor}" class="flex-shrink-0 font-bold text-xs">${arrow}</span>
@@ -683,6 +709,7 @@ const App = {
                     <div class="w-10 h-[5px] bg-[#E5E7EB] rounded-full overflow-hidden flex-shrink-0">
                         <div class="h-full rounded-full" style="width:${barPct}%;background:${aColor};opacity:0.7"></div>
                     </div>
+                    ${asymBadge}
                     <span class="text-[#6B7280] font-mono text-[10px] w-12 text-right flex-shrink-0">${mf.fmt(val)}</span>
                     <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onclick="App.openArcModal('${arcExpIso}','${arcImpIso}')" class="text-[8px] px-1.5 py-0.5 rounded bg-[#E5E7EB] hover:bg-[#004990] text-[#4B5563] hover:text-white transition" title="Bilateral history">↗</button>
@@ -691,7 +718,10 @@ const App = {
                 </div>`;
             }).join('');
             html += `<div>
-                <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-2">Trading Partners</div>
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider">Trading Partners</div>
+                    <div class="text-[8px] text-[#94a3b8] italic">split = gross bilateral share</div>
+                </div>
                 <div class="space-y-1.5">${rows}</div>
             </div>`;
         }
@@ -747,9 +777,10 @@ const App = {
     // HHI computed from pre-threshold raw data to avoid zoom-level distortion.
     _buildConcentrationGauge(iso, mf) {
         const rawFlows = STATE.yearCache[STATE.year] || [];
+        const isRegional = STATE.region && STATE.region !== 'Global';
         const combined = {};
         rawFlows.forEach(d => {
-            if (!STATE.region || STATE.region === 'Global' ||
+            if (!isRegional ||
                 (RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region)) {
                 if (d.exporter === iso) combined[d.importer] = (combined[d.importer] || 0) + d.netValue;
                 else if (d.importer === iso) combined[d.exporter] = (combined[d.exporter] || 0) + d.netValue;
@@ -757,6 +788,7 @@ const App = {
         });
         const total = Object.values(combined).reduce((s, v) => s + v, 0);
         if (total === 0) return '';
+        const scopeNote = isRegional ? `${STATE.region} intra-regional · pre-threshold` : 'All net bilateral flows · pre-threshold';
 
         const shares = Object.values(combined).map(v => v / total);
         const hhi = shares.reduce((s, sh) => s + sh * sh, 0);
@@ -793,7 +825,7 @@ const App = {
 
         return `<div>
             <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Partner Concentration (HHI)</div>
-            <div class="text-[8px] text-[#94a3b8] italic mb-2">All net bilateral flows · pre-threshold</div>
+            <div class="text-[8px] text-[#94a3b8] italic mb-2">${scopeNote}</div>
             <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3">
                 <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height:130px" preserveAspectRatio="xMidYMid meet">
                     <path d="${arcPath(startA, endA)}" stroke="#E2E8F0" stroke-width="9" fill="none" stroke-linecap="round"/>
@@ -848,8 +880,9 @@ const App = {
         let anyData = false;
 
         const rawFlows = STATE.yearCache[STATE.year] || [];
+        const isRegional = STATE.region && STATE.region !== 'Global';
         rawFlows.forEach(d => {
-            if (!STATE.region || STATE.region === 'Global' ||
+            if (!isRegional ||
                 (RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region)) {
                 const isExport = d.exporter === iso, isImport = d.importer === iso;
                 if (!isExport && !isImport) return;
@@ -895,9 +928,10 @@ const App = {
         }
         parts.push(`<circle cx="${cx}" cy="${cy}" r="3.2" fill="#1a2332"/>`);
 
+        const scopeNote = isRegional ? `${STATE.region} intra-regional · pre-threshold` : 'All net bilateral flows · pre-threshold';
         return `<div>
             <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Trade Fingerprint</div>
-            <div class="text-[8px] text-[#94a3b8] italic mb-2">All net bilateral flows · pre-threshold</div>
+            <div class="text-[8px] text-[#94a3b8] italic mb-2">${scopeNote}</div>
             <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3 flex flex-col items-center">
                 <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-width:220px" preserveAspectRatio="xMidYMid meet">
                     ${parts.join('')}
