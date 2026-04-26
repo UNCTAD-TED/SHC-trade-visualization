@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"index: %{http_code}\\\\nmap.js: %{http_code}\\\\nmain.js: %{http_code}\\\\nstyle.css: %{http_code}\\\\n\" http://localhost:8080/ http://localhost:8080/map.js http://localhost:8080/main.js http://localhost:8080/style.css)",
+      "Bash(node --check map.js)",
+      "Bash(node --check main.js)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}
