@@ -668,8 +668,29 @@ const App = {
 
         if (sortedPartners.length > 0) {
             const maxPVal = sortedPartners[0][1];
+
+            // Build bilateral totals from yearCache (pre-threshold) once for rank lookups.
+            const bilatRaw = STATE.yearCache[STATE.year] || [];
+            const bilatTotals = {};
+            bilatRaw.forEach(d => {
+                if (!bilatTotals[d.exporter]) bilatTotals[d.exporter] = {};
+                bilatTotals[d.exporter][d.importer] = (bilatTotals[d.exporter][d.importer] || 0) + d.netValue;
+                if (!bilatTotals[d.importer]) bilatTotals[d.importer] = {};
+                bilatTotals[d.importer][d.exporter] = (bilatTotals[d.importer][d.exporter] || 0) + d.netValue;
+            });
+            // Returns 1-based rank of targetIso in forIso's partner list; 0 if not found.
+            const getPartnerRank = (targetIso, forIso) => {
+                const map = bilatTotals[forIso];
+                if (!map || !(targetIso in map)) return 0;
+                const targetVal = map[targetIso];
+                let rank = 1;
+                for (const k in map) { if (k !== targetIso && map[k] > targetVal) rank++; }
+                return rank;
+            };
+
             const rows = sortedPartners.map(([pIso, val], idx) => {
                 const pName = STATE.countryNames[pIso] || pIso;
+                const isoName = STATE.countryNames[iso] || iso;
                 const barPct = Math.round((val / maxPVal) * 100);
                 const isExportTo = !!partnerExports[pIso];
                 const arrow = isExportTo ? '→' : '←';
@@ -677,9 +698,20 @@ const App = {
                 const arcExpIso = isExportTo ? iso : pIso;
                 const arcImpIso = isExportTo ? pIso : iso;
 
-                // Bilateral asymmetry: what share of gross bilateral trade flows in the dominant direction?
-                // Source: bilateralHistory (pre-threshold, gross flows) for accuracy.
-                let asymBadge = '';
+                // Rank asymmetry: where does iso rank in pIso's own partner list? (pre-threshold)
+                const theirRank = getPartnerRank(iso, pIso);
+                const rankCol = theirRank <= 3 ? '#10b981' : theirRank <= 10 ? '#f59e0b' : '#94a3b8';
+                const rankTip = theirRank > 0 ? `${pName} ranks ${isoName} as their #${theirRank} trading partner (pre-threshold)` : '';
+                const rankDisplay = theirRank > 0
+                    ? `<div class="flex items-baseline gap-0.5 flex-shrink-0" title="${rankTip}">
+                            <span class="text-[#C0C8D4] text-[8px] font-mono leading-none">${idx + 1}</span>
+                            <span class="text-[#D1D5DB] text-[7px] leading-none">·</span>
+                            <span class="text-[9px] font-mono font-bold leading-none" style="color:${rankCol}">#${theirRank}</span>
+                        </div>`
+                    : `<span class="text-[#9CA3AF] text-[9px] font-mono flex-shrink-0">${idx + 1}</span>`;
+
+                // Bilateral flow split: share flowing in the dominant direction. (pre-threshold gross flows)
+                let splitBadge = '';
                 if (STATE.bilateralHistory) {
                     const a = [iso, pIso].sort()[0], b = [iso, pIso].sort()[1];
                     const hist = STATE.bilateralHistory[a + '|' + b];
@@ -692,24 +724,23 @@ const App = {
                         if (tot > 0) {
                             const domPct = Math.round(Math.max(isoOut, isoIn) / tot * 100);
                             const expDom = isoOut >= isoIn;
-                            // Strong asymmetry (≥75%): colored. Moderate (<75%): gray.
                             const badgeCol = domPct >= 75 ? (expDom ? '#0284c7' : '#e11d48') : '#94a3b8';
                             const tip = expDom
-                                ? `${domPct}% of gross bilateral trade flows from ${STATE.countryNames[iso] || iso}`
-                                : `${domPct}% of gross bilateral trade flows from ${STATE.countryNames[pIso] || pIso}`;
-                            asymBadge = `<span class="text-[9px] font-mono font-bold flex-shrink-0 w-10 text-right" style="color:${badgeCol}" title="${tip}">${expDom ? '→' : '←'}${domPct}%</span>`;
+                                ? `${domPct}% of gross bilateral trade flows from ${isoName}`
+                                : `${domPct}% of gross bilateral trade flows from ${pName}`;
+                            splitBadge = `<span class="text-[9px] font-mono font-bold flex-shrink-0 w-10 text-right" style="color:${badgeCol}" title="${tip}">${expDom ? '→' : '←'}${domPct}%</span>`;
                         }
                     }
                 }
 
                 return `<div class="flex items-center gap-2 text-[11px] group">
-                    <span class="text-[#9CA3AF] w-4 text-right flex-shrink-0 font-mono">${idx + 1}</span>
+                    ${rankDisplay}
                     <span style="color:${aColor}" class="flex-shrink-0 font-bold text-xs">${arrow}</span>
                     <span class="text-[#374151] flex-1 truncate">${pName}</span>
                     <div class="w-10 h-[5px] bg-[#E5E7EB] rounded-full overflow-hidden flex-shrink-0">
                         <div class="h-full rounded-full" style="width:${barPct}%;background:${aColor};opacity:0.7"></div>
                     </div>
-                    ${asymBadge}
+                    ${splitBadge}
                     <span class="text-[#6B7280] font-mono text-[10px] w-12 text-right flex-shrink-0">${mf.fmt(val)}</span>
                     <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onclick="App.openArcModal('${arcExpIso}','${arcImpIso}')" class="text-[8px] px-1.5 py-0.5 rounded bg-[#E5E7EB] hover:bg-[#004990] text-[#4B5563] hover:text-white transition" title="Bilateral history">↗</button>
@@ -720,11 +751,13 @@ const App = {
             html += `<div>
                 <div class="flex items-center justify-between mb-2">
                     <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider">Trading Partners</div>
-                    <div class="text-[8px] text-[#94a3b8] italic">split = gross bilateral share</div>
+                    <div class="text-[8px] text-[#94a3b8] italic">you·them rank · split</div>
                 </div>
                 <div class="space-y-1.5">${rows}</div>
             </div>`;
         }
+
+        html += this._buildChordDiagram(iso);
 
         html += this._buildPolarFingerprint(iso);
 
@@ -941,6 +974,101 @@ const App = {
                     <div class="flex items-center gap-1"><div style="width:10px;height:3px;background:#e11d48;border-radius:2px"></div><span class="text-[#374151]">Imports</span></div>
                 </div>
                 <div class="text-[9px] text-[#718096] italic mt-1 text-center">Bar direction = geographic bearing from this country</div>
+            </div>
+        </div>`;
+    },
+
+    // Chord diagram showing gross bilateral flows to/from top 6 partners.
+    // Uses bilateralHistory (gross flows) + yearCache (partner selection), both pre-threshold.
+    _buildChordDiagram(iso) {
+        if (!STATE.bilateralHistory) return '';
+
+        const rawFlows = STATE.yearCache[STATE.year] || [];
+        const isRegional = STATE.region && STATE.region !== 'Global';
+        const combined = {};
+        rawFlows.forEach(d => {
+            if (isRegional &&
+                !(RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region)) return;
+            if (d.exporter === iso) combined[d.importer] = (combined[d.importer] || 0) + d.netValue;
+            else if (d.importer === iso) combined[d.exporter] = (combined[d.exporter] || 0) + d.netValue;
+        });
+
+        const topPartnerIsos = Object.entries(combined)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6)
+            .map(([p]) => p);
+
+        if (topPartnerIsos.length === 0) return '';
+
+        // Matrix: row/col 0 = iso, 1..N = partners. matrix[i][j] = flow FROM i TO j.
+        const N = topPartnerIsos.length + 1;
+        const matrix = Array.from({length: N}, () => new Array(N).fill(0));
+
+        topPartnerIsos.forEach((pIso, j) => {
+            const a = [iso, pIso].sort()[0], b = [iso, pIso].sort()[1];
+            const hist = STATE.bilateralHistory[a + '|' + b];
+            const entry = hist ? hist[String(STATE.year)] : null;
+            if (entry) {
+                const isoIsA = iso === a;
+                matrix[0][j + 1] = isoIsA ? (entry.aToB || 0) : (entry.bToA || 0);
+                matrix[j + 1][0] = isoIsA ? (entry.bToA || 0) : (entry.aToB || 0);
+            } else {
+                matrix[0][j + 1] = combined[pIso] || 0;
+            }
+        });
+
+        const chords = d3.chord().padAngle(0.025)(matrix);
+        const W = 240, H = 240, innerR = 66, outerR = 80;
+        const arcGen = d3.arc().innerRadius(innerR).outerRadius(outerR);
+        const ribGen = d3.ribbon().radius(innerR - 1);
+
+        const partnerPalette = ['#0ea5e9', '#22d3ee', '#2dd4bf', '#4ade80', '#a78bfa', '#fb923c'];
+
+        const groupSvg = chords.groups.map((g, i) => {
+            const pathD = arcGen(g);
+            const color = i === 0 ? '#004990' : (partnerPalette[i - 1] || '#94a3b8');
+            let label = '';
+            if (i > 0) {
+                const midAngle = (g.startAngle + g.endAngle) / 2;
+                const labelR = outerR + 16;
+                const lx = (labelR * Math.sin(midAngle)).toFixed(1);
+                const ly = (-labelR * Math.cos(midAngle)).toFixed(1);
+                const anchor = Math.sin(midAngle) > 0.1 ? 'start' : Math.sin(midAngle) < -0.1 ? 'end' : 'middle';
+                const name = STATE.countryNames[topPartnerIsos[i - 1]] || topPartnerIsos[i - 1];
+                const shortName = name.length > 9 ? name.slice(0, 8) + '…' : name;
+                label = `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle" font-size="7.5" fill="#374151" font-family="Inter,sans-serif">${shortName}</text>`;
+            }
+            return `<path d="${pathD}" fill="${color}" stroke="#fff" stroke-width="0.5" opacity="0.88"/>${label}`;
+        }).join('');
+
+        const ribbonSvg = chords.map(ch => {
+            const pathD = ribGen(ch);
+            const pIdx = ch.source.index === 0 ? ch.target.index : ch.source.index;
+            const col = matrix[0][pIdx] >= matrix[pIdx][0] ? '#38bdf8' : '#f87171';
+            return `<path d="${pathD}" fill="${col}" stroke="${col}" stroke-width="0.4" fill-opacity="0.3" stroke-opacity="0.55"/>`;
+        }).join('');
+
+        const isoName = STATE.countryNames[iso] || iso;
+        const centerText = isoName.length > 7 ? isoName.slice(0, 6) + '…' : isoName;
+        const scopeNote = isRegional
+            ? `${STATE.region} · top 6 · pre-threshold`
+            : 'Top 6 partners · gross bilateral · pre-threshold';
+
+        return `<div>
+            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Partner Web</div>
+            <div class="text-[8px] text-[#94a3b8] italic mb-2">${scopeNote}</div>
+            <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3 flex flex-col items-center">
+                <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-width:240px" preserveAspectRatio="xMidYMid meet">
+                    <g transform="translate(${W / 2},${H / 2})">
+                        ${ribbonSvg}
+                        ${groupSvg}
+                        <text x="0" y="4" text-anchor="middle" font-size="9" font-weight="700" fill="#004990" font-family="Inter,sans-serif">${centerText}</text>
+                    </g>
+                </svg>
+                <div class="flex items-center gap-3 mt-1 text-[9px]">
+                    <div class="flex items-center gap-1"><div style="width:10px;height:6px;background:#38bdf8;border-radius:2px;opacity:0.7"></div><span class="text-[#374151]">Net exporter</span></div>
+                    <div class="flex items-center gap-1"><div style="width:10px;height:6px;background:#f87171;border-radius:2px;opacity:0.7"></div><span class="text-[#374151]">Net importer</span></div>
+                </div>
             </div>
         </div>`;
     },
