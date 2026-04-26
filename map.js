@@ -38,6 +38,9 @@ const TradeMap = {
     width: 0,
     height: 0,
 
+    // ── Focus mode state (insight panel spotlight)
+    focusedIso: null,
+
     // ── 1. Initialization
     init() {
         const container = document.getElementById("map-container");
@@ -282,9 +285,17 @@ const TradeMap = {
             .style("opacity", 0)
             .remove();
 
+        const focusedIso = this.focusedIso;
+        const arcOpacity = (d) => {
+            const base = opacityScale(d.netValue);
+            if (focusedIso && d.exporter !== focusedIso && d.importer !== focusedIso) return base * 0.08;
+            return base;
+        };
+
         const arcsEnter = arcs.enter()
             .append("path")
             .attr("class", "trade-arc")
+            .attr("id", d => `arc-${d.exporter}-${d.importer}`)
             .style("fill", "none")
             .style("mix-blend-mode", "multiply")
             .style("opacity", 0)
@@ -292,7 +303,9 @@ const TradeMap = {
             .on("click", (event, d) => { event.stopPropagation(); App.openArcModal(d.exporter, d.importer); });
 
         arcsEnter.merge(arcs)
+            .attr("id", d => `arc-${d.exporter}-${d.importer}`)
             .attr("data-original-width", d => edgeWidthScale(d.netValue))
+            .attr("data-base-opacity", d => opacityScale(d.netValue))
             .transition().duration(750).ease(d3.easeCubicOut)
             .attr("d", d => {
                 const s = STATE.countryCoords[d.exporter];
@@ -312,7 +325,7 @@ const TradeMap = {
             })
             .attr("stroke", d => CONFIG.flowColors[d.flowCategory])
             .attr("stroke-width", d => edgeWidthScale(d.netValue) / currentK)
-            .style("opacity", d => opacityScale(d.netValue));
+            .style("opacity", arcOpacity);
 
         // --- 2. Nodes (circles) ---
         const activeNodes = Object.keys(nodeStats).filter(d => this.isVisible(d));
@@ -335,6 +348,13 @@ const TradeMap = {
             .on("mouseout",  () => App.hideTooltip())
             .on("click",     (event, d) => { event.stopPropagation(); App.openInsightPanel(d); });
 
+        const nodeOpacity = (d) => {
+            if (!focusedIso) return 1;
+            if (d === focusedIso) return 1;
+            const isPartner = visibleFlows.some(f => (f.exporter === focusedIso && f.importer === d) || (f.importer === focusedIso && f.exporter === d));
+            return isPartner ? 0.95 : 0.18;
+        };
+
         nodesEnter.merge(nodes)
             .attr("data-original-radius", d => radiusScale(nodeStats[d].grossVolume))
             .transition().duration(750).ease(d3.easeElasticOut)
@@ -343,7 +363,7 @@ const TradeMap = {
             .attr("r", d => radiusScale(nodeStats[d].grossVolume) / currentK)
             .attr("fill", d => colorScale(nodeStats[d].netBalance))
             .attr("stroke-width", 1.5 / currentK)
-            .style("opacity", 1);
+            .style("opacity", nodeOpacity);
 
         // --- 3. Labels ---
         const sortedNodes = activeNodes.slice().sort((a, b) => nodeStats[b].grossVolume - nodeStats[a].grossVolume);
@@ -376,6 +396,13 @@ const TradeMap = {
             .style("paint-order", "stroke fill") // フチを文字の外側にだけ描画するモダンなCSS
             .style("opacity", 0);
 
+        const labelOpacity = (d) => {
+            if (!focusedIso) return 1;
+            if (d === focusedIso) return 1;
+            const isPartner = visibleFlows.some(f => (f.exporter === focusedIso && f.importer === d) || (f.importer === focusedIso && f.exporter === d));
+            return isPartner ? 0.85 : 0.2;
+        };
+
         labelsEnter.merge(labels)
             .text(d => STATE.countryNames[d] || d)
             .attr("fill", "#4A5568") // 柔らかく読みやすいダークスレート色に統一
@@ -386,9 +413,15 @@ const TradeMap = {
             .attr("y", d => this.getProjectedPoint(d)[1] + 4)
             .attr("font-size", (8.5 / Math.sqrt(currentK)) + "px") // 10pxから8.5pxへ少し縮小
             .attr("stroke-width", 2.5 / currentK)
-            .style("opacity", 1);
+            .style("opacity", labelOpacity);
 
         if (this.renderLegend) this.renderLegend();
+
+        // Re-apply focus visuals (halo + particles) after data join refresh
+        if (this.focusedIso) {
+            this._renderHalo(this.focusedIso);
+            this._renderParticles(this.focusedIso, visibleFlows);
+        }
     },
 
     getProjectedPoint(iso) {
@@ -399,6 +432,145 @@ const TradeMap = {
 
     isVisible(iso) {
         return !!STATE.countryCoords[iso];
+    },
+
+    // ── Focus mode (insight panel spotlight) ───────────────────────
+    setFocus(iso) {
+        if (!this.g) return;
+        this.focusedIso = iso;
+
+        const visibleFlows = (STATE.filteredData || []).filter(d =>
+            STATE.countryCoords[d.exporter] && STATE.countryCoords[d.importer]);
+
+        const partners = new Set();
+        visibleFlows.forEach(d => {
+            if (d.exporter === iso) partners.add(d.importer);
+            else if (d.importer === iso) partners.add(d.exporter);
+        });
+
+        const focusedIso = iso;
+        this.g.selectAll(".trade-arc")
+            .transition().duration(450)
+            .style("opacity", function(d) {
+                const base = +d3.select(this).attr("data-base-opacity") || 0.5;
+                if (d.exporter === focusedIso || d.importer === focusedIso) return base;
+                return base * 0.08;
+            });
+
+        this.g.selectAll(".country-node")
+            .transition().duration(450)
+            .style("opacity", function(d) {
+                if (d === focusedIso) return 1;
+                return partners.has(d) ? 0.95 : 0.18;
+            });
+
+        this.g.selectAll(".map-label-unified")
+            .transition().duration(450)
+            .style("opacity", function(d) {
+                if (d === focusedIso) return 1;
+                return partners.has(d) ? 0.85 : 0.2;
+            });
+
+        this.g.selectAll(".land")
+            .transition().duration(450)
+            .style("opacity", 0.6);
+
+        this._renderHalo(iso);
+        this._renderParticles(iso, visibleFlows);
+    },
+
+    clearFocus() {
+        if (!this.g) return;
+        this.focusedIso = null;
+
+        this.g.selectAll(".trade-arc")
+            .transition().duration(400)
+            .style("opacity", function() {
+                return +d3.select(this).attr("data-base-opacity") || 0.5;
+            });
+
+        this.g.selectAll(".country-node")
+            .transition().duration(400).style("opacity", 1);
+
+        this.g.selectAll(".map-label-unified")
+            .transition().duration(400).style("opacity", 1);
+
+        this.g.selectAll(".land")
+            .transition().duration(400).style("opacity", 1);
+
+        this._clearHalo();
+        this._clearParticles();
+    },
+
+    _renderHalo(iso) {
+        const coords = STATE.countryCoords[iso];
+        if (!coords) return;
+        const projected = this.projection(coords);
+        if (!projected) return;
+
+        let currentK = 1;
+        if (this.svg) currentK = d3.zoomTransform(this.svg.node()).k;
+
+        let halo = this.g.select(".focus-halo");
+        if (halo.empty()) {
+            halo = this.g.append("g").attr("class", "focus-halo");
+            halo.append("circle").attr("class", "halo-pulse halo-pulse-1");
+            halo.append("circle").attr("class", "halo-pulse halo-pulse-2");
+            halo.append("circle").attr("class", "halo-core");
+        }
+        const baseR = 14 / currentK;
+        halo.select(".halo-pulse-1").attr("cx", projected[0]).attr("cy", projected[1]).attr("r", baseR);
+        halo.select(".halo-pulse-2").attr("cx", projected[0]).attr("cy", projected[1]).attr("r", baseR);
+        halo.select(".halo-core").attr("cx", projected[0]).attr("cy", projected[1]).attr("r", 4 / currentK);
+        halo.raise();
+    },
+
+    _clearHalo() {
+        if (this.g) this.g.selectAll(".focus-halo").remove();
+    },
+
+    _renderParticles(iso, visibleFlows) {
+        this._clearParticles();
+        if (!this.g) return;
+
+        const focusedFlows = (visibleFlows || [])
+            .filter(d => d.exporter === iso || d.importer === iso)
+            .sort((a, b) => b.netValue - a.netValue)
+            .slice(0, 25);
+
+        if (focusedFlows.length === 0) return;
+        const maxVal = focusedFlows[0].netValue || 1;
+
+        const layer = this.g.append("g").attr("class", "particle-layer").style("pointer-events", "none");
+
+        focusedFlows.forEach(d => {
+            const arcId = `arc-${d.exporter}-${d.importer}`;
+            const intensity = Math.min(1, d.netValue / maxVal);
+            const count = 1 + Math.round(intensity * 2);
+            const dur = (4.5 - intensity * 2.3).toFixed(2) + "s";
+            const color = CONFIG.flowColors[d.flowCategory] || "#0284c7";
+
+            for (let i = 0; i < count; i++) {
+                const offset = i / count;
+                const particle = layer.append("circle")
+                    .attr("class", "trade-particle")
+                    .attr("r", 1.6).attr("fill", color)
+                    .attr("stroke", "#ffffff").attr("stroke-width", 0.4).attr("opacity", 0.95);
+
+                const motion = particle.append("animateMotion")
+                    .attr("dur", dur).attr("repeatCount", "indefinite")
+                    .attr("rotate", "auto")
+                    .attr("begin", (offset * parseFloat(dur)).toFixed(2) + "s");
+
+                motion.append("mpath")
+                    .attr("href", `#${arcId}`)
+                    .attr("xlink:href", `#${arcId}`);
+            }
+        });
+    },
+
+    _clearParticles() {
+        if (this.g) this.g.selectAll(".particle-layer").remove();
     },
 
     renderLegend() {

@@ -322,11 +322,13 @@ const App = {
         document.getElementById('insight-panel').classList.add('open');
         this._currentPanelIso = iso;
         this.hideTooltip();
+        if (TradeMap && TradeMap.setFocus) TradeMap.setFocus(iso);
     },
 
     closeInsightPanel() {
         document.getElementById('insight-panel').classList.remove('open');
         this._currentPanelIso = null;
+        if (TradeMap && TradeMap.clearFocus) TradeMap.clearFocus();
     },
 
     // ── P2-A: Arc Detail Modal ──────────────────────────────────────
@@ -657,6 +659,8 @@ const App = {
             </div>
         </div>`;
 
+        html += this._buildConcentrationGauge(iso, mf);
+
         const allPartners = {};
         Object.entries(partnerExports).forEach(([p, v]) => { allPartners[p] = (allPartners[p] || 0) + v; });
         Object.entries(partnerImports).forEach(([p, v]) => { allPartners[p] = (allPartners[p] || 0) + v; });
@@ -691,6 +695,8 @@ const App = {
                 <div class="space-y-1.5">${rows}</div>
             </div>`;
         }
+
+        html += this._buildPolarFingerprint(iso);
 
         const years = Object.keys(yearlyTotals).map(Number).sort();
         const yVals = years.map(y => yearlyTotals[y]);
@@ -736,6 +742,173 @@ const App = {
         }
 
         return html;
+    },
+
+    // HHI computed from pre-threshold raw data to avoid zoom-level distortion.
+    _buildConcentrationGauge(iso, mf) {
+        const rawFlows = STATE.yearCache[STATE.year] || [];
+        const combined = {};
+        rawFlows.forEach(d => {
+            if (!STATE.region || STATE.region === 'Global' ||
+                (RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region)) {
+                if (d.exporter === iso) combined[d.importer] = (combined[d.importer] || 0) + d.netValue;
+                else if (d.importer === iso) combined[d.exporter] = (combined[d.exporter] || 0) + d.netValue;
+            }
+        });
+        const total = Object.values(combined).reduce((s, v) => s + v, 0);
+        if (total === 0) return '';
+
+        const shares = Object.values(combined).map(v => v / total);
+        const hhi = shares.reduce((s, sh) => s + sh * sh, 0);
+
+        const sorted = Object.entries(combined).sort((a, b) => b[1] - a[1]);
+        const top1Pct = sorted[0] ? (sorted[0][1] / total * 100) : 0;
+        const top3Pct = sorted.slice(0, 3).reduce((s, e) => s + e[1], 0) / total * 100;
+        const top5Pct = sorted.slice(0, 5).reduce((s, e) => s + e[1], 0) / total * 100;
+        const top1Name = sorted[0] ? (STATE.countryNames[sorted[0][0]] || sorted[0][0]) : '—';
+
+        // Thresholds calibrated for trade (not market-competition DOJ levels).
+        let label, badge;
+        if (hhi < 0.20)      { label = 'Diversified';        badge = '#10b981'; }
+        else if (hhi < 0.40) { label = 'Moderate';           badge = '#f59e0b'; }
+        else                  { label = 'Highly concentrated'; badge = '#ef4444'; }
+
+        const W = 240, H = 110, cx = W / 2, cy = H - 12, r = 84;
+        const startA = Math.PI, endA = 2 * Math.PI;
+        const valA = startA + (endA - startA) * Math.min(hhi, 1);
+
+        const arcPath = (a1, a2) => {
+            const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+            const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+            return `M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${a2 - a1 > Math.PI ? 1 : 0},1 ${x2.toFixed(2)},${y2.toFixed(2)}`;
+        };
+        const tick = (v) => {
+            const a = startA + (endA - startA) * v;
+            const x1 = cx + (r + 3) * Math.cos(a), y1 = cy + (r + 3) * Math.sin(a);
+            const x2 = cx + (r - 7) * Math.cos(a), y2 = cy + (r - 7) * Math.sin(a);
+            return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#94a3b8" stroke-width="1"/>`;
+        };
+        const mx1 = cx + (r - 14) * Math.cos(valA), my1 = cy + (r - 14) * Math.sin(valA);
+        const mx2 = cx + (r + 6)  * Math.cos(valA), my2 = cy + (r + 6)  * Math.sin(valA);
+
+        return `<div>
+            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Partner Concentration (HHI)</div>
+            <div class="text-[8px] text-[#94a3b8] italic mb-2">All net bilateral flows · pre-threshold</div>
+            <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3">
+                <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height:130px" preserveAspectRatio="xMidYMid meet">
+                    <path d="${arcPath(startA, endA)}" stroke="#E2E8F0" stroke-width="9" fill="none" stroke-linecap="round"/>
+                    <path d="${arcPath(startA, valA)}" stroke="${badge}" stroke-width="9" fill="none" stroke-linecap="round"/>
+                    ${tick(0.20)}${tick(0.40)}
+                    <line x1="${mx1.toFixed(2)}" y1="${my1.toFixed(2)}" x2="${mx2.toFixed(2)}" y2="${my2.toFixed(2)}" stroke="#1a2332" stroke-width="2.5" stroke-linecap="round"/>
+                    <text x="${cx}" y="${cy - 36}" text-anchor="middle" font-size="22" font-weight="700" fill="#1a2332" font-family="Inter,monospace">${(hhi * 10000).toFixed(0)}</text>
+                    <text x="${cx}" y="${cy - 20}" text-anchor="middle" font-size="9" fill="#718096" font-family="Inter,sans-serif">HHI score (0–10000)</text>
+                </svg>
+                <div class="flex justify-center -mt-1">
+                    <span class="text-[10px] font-bold px-3 py-1 rounded-full" style="background:${badge}22;color:${badge}">${label}</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[#E2E8F0]">
+                    <div class="text-center">
+                        <div class="text-[8px] text-[#718096] uppercase font-bold">Top 1</div>
+                        <div class="text-xs font-bold font-mono text-[#1a2332]">${top1Pct.toFixed(0)}%</div>
+                        <div class="text-[8px] text-[#718096] truncate" title="${top1Name}">${top1Name}</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-[8px] text-[#718096] uppercase font-bold">Top 3</div>
+                        <div class="text-xs font-bold font-mono text-[#1a2332]">${top3Pct.toFixed(0)}%</div>
+                        <div class="text-[8px] text-[#718096]">share</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-[8px] text-[#718096] uppercase font-bold">Top 5</div>
+                        <div class="text-xs font-bold font-mono text-[#1a2332]">${top5Pct.toFixed(0)}%</div>
+                        <div class="text-[8px] text-[#718096]">share</div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    },
+
+    // Polar Fingerprint: geographic bearing computed via great-circle formula.
+    // Uses pre-threshold raw data so small-country partners are included.
+    _buildPolarFingerprint(iso) {
+        const myCoords = STATE.countryCoords[iso];
+        if (!myCoords) return '';
+        const [lon1, lat1] = myCoords;
+
+        const bearingTo = (lon2, lat2) => {
+            const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const y = Math.sin(Δλ) * Math.cos(φ2);
+            const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+            return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+        };
+
+        const SECTORS = 8, SECTOR_WIDTH = 45;
+        const sectorExp = new Array(SECTORS).fill(0);
+        const sectorImp = new Array(SECTORS).fill(0);
+        let anyData = false;
+
+        const rawFlows = STATE.yearCache[STATE.year] || [];
+        rawFlows.forEach(d => {
+            if (!STATE.region || STATE.region === 'Global' ||
+                (RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region)) {
+                const isExport = d.exporter === iso, isImport = d.importer === iso;
+                if (!isExport && !isImport) return;
+                const partnerIso = isExport ? d.importer : d.exporter;
+                const c = STATE.countryCoords[partnerIso];
+                if (!c) return;
+                const idx = Math.floor((bearingTo(c[0], c[1]) + SECTOR_WIDTH / 2) / SECTOR_WIDTH) % SECTORS;
+                if (isExport) sectorExp[idx] += d.netValue;
+                else          sectorImp[idx] += d.netValue;
+                anyData = true;
+            }
+        });
+        if (!anyData) return '';
+
+        const maxVal = Math.max(...sectorExp, ...sectorImp, 1);
+        const W = 220, H = 220, cx = W / 2, cy = H / 2, innerR = 16, maxBarLen = 78;
+        const labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        const parts = [];
+
+        [0.25, 0.5, 1].forEach(p => {
+            const rr = innerR + maxBarLen * p;
+            parts.push(`<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="#E2E8F0" stroke-width="0.6" ${p < 1 ? 'stroke-dasharray="2 3"' : ''}/>`);
+        });
+        parts.push(`<line x1="${cx}" y1="${cy - innerR - maxBarLen}" x2="${cx}" y2="${cy + innerR + maxBarLen}" stroke="#E2E8F0" stroke-width="0.5"/>`);
+        parts.push(`<line x1="${cx - innerR - maxBarLen}" y1="${cy}" x2="${cx + innerR + maxBarLen}" y2="${cy}" stroke="#E2E8F0" stroke-width="0.5"/>`);
+
+        for (let i = 0; i < SECTORS; i++) {
+            const centerRad = (i * SECTOR_WIDTH - 90) * Math.PI / 180;
+            const offsetRad = 9 * Math.PI / 180;
+            const expLen = (sectorExp[i] / maxVal) * maxBarLen;
+            const impLen = (sectorImp[i] / maxVal) * maxBarLen;
+            const drawBar = (len, angleRad, color) => {
+                if (len < 0.5) return;
+                const x1 = cx + innerR * Math.cos(angleRad), y1 = cy + innerR * Math.sin(angleRad);
+                const x2 = cx + (innerR + len) * Math.cos(angleRad), y2 = cy + (innerR + len) * Math.sin(angleRad);
+                parts.push(`<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${color}" stroke-width="6" stroke-linecap="round" opacity="0.88"/>`);
+            };
+            drawBar(expLen, centerRad + offsetRad, '#0284c7');
+            drawBar(impLen, centerRad - offsetRad, '#e11d48');
+
+            const labelR = innerR + maxBarLen + 14;
+            parts.push(`<text x="${(cx + labelR * Math.cos(centerRad)).toFixed(2)}" y="${(cy + labelR * Math.sin(centerRad) + 3).toFixed(2)}" text-anchor="middle" font-size="10" font-weight="700" fill="#94a3b8" font-family="Inter,sans-serif">${labels[i]}</text>`);
+        }
+        parts.push(`<circle cx="${cx}" cy="${cy}" r="3.2" fill="#1a2332"/>`);
+
+        return `<div>
+            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Trade Fingerprint</div>
+            <div class="text-[8px] text-[#94a3b8] italic mb-2">All net bilateral flows · pre-threshold</div>
+            <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3 flex flex-col items-center">
+                <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-width:220px" preserveAspectRatio="xMidYMid meet">
+                    ${parts.join('')}
+                </svg>
+                <div class="flex items-center gap-3 mt-1 text-[9px]">
+                    <div class="flex items-center gap-1"><div style="width:10px;height:3px;background:#0284c7;border-radius:2px"></div><span class="text-[#374151]">Exports</span></div>
+                    <div class="flex items-center gap-1"><div style="width:10px;height:3px;background:#e11d48;border-radius:2px"></div><span class="text-[#374151]">Imports</span></div>
+                </div>
+                <div class="text-[9px] text-[#718096] italic mt-1 text-center">Bar direction = geographic bearing from this country</div>
+            </div>
+        </div>`;
     },
 
     _generateNarrative(iso, stats, partnerExports, partnerImports, yearlyTotals, mf) {
