@@ -229,7 +229,7 @@ body {
     /* Insight panel: bottom sheet */
     #insight-panel {
         width: 100%;
-        height: 65vh;
+        height: 50vh;
         top: auto;
         bottom: 0;
         right: 0;
@@ -247,6 +247,12 @@ body {
     #kpi-bar .kpi-item,
     #kpi-bar .kpi-divider {
         flex-shrink: 0;
+    }
+
+    /* インサイトパネル展開時、地図を広く見せるために上部ヘッダーとKPIバーを隠す */
+    body.insight-open #main-header,
+    body.insight-open #kpi-bar {
+        display: none !important;
     }
 }
 

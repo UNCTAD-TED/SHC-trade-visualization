@@ -322,6 +322,13 @@ const App = {
         document.getElementById('panel-body').innerHTML = this._buildPanelContent(iso, stats, mf);
 
         document.getElementById('insight-panel').classList.add('open');
+        document.body.classList.add('insight-open');
+
+        // モバイルでヘッダーが消えて地図が広がるため、D3マップのサイズ再計算をトリガー
+        if (window.innerWidth <= 767) {
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
+        }
+
         this._currentPanelIso = iso;
         this.hideTooltip();
         if (TradeMap && TradeMap.setFocus) TradeMap.setFocus(iso);
@@ -329,6 +336,13 @@ const App = {
 
     closeInsightPanel() {
         document.getElementById('insight-panel').classList.remove('open');
+        document.body.classList.remove('insight-open');
+
+        // モバイルでヘッダーが再表示されて地図が縮むため、D3マップのサイズ再計算をトリガー
+        if (window.innerWidth <= 767) {
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
+        }
+
         this._currentPanelIso = null;
         if (TradeMap && TradeMap.clearFocus) TradeMap.clearFocus();
     },
@@ -759,7 +773,7 @@ const App = {
             </div>`;
         }
 
-        html += this._buildChordDiagram(iso);
+        html += this._buildButterflyChart(iso);
 
         html += this._buildPolarFingerprint(iso);
 
@@ -980,11 +994,10 @@ const App = {
         </div>`;
     },
 
-    // Chord diagram showing gross bilateral flows to/from top 6 partners.
-    // Uses bilateralHistory (gross flows) + yearCache (partner selection), both pre-threshold.
-    _buildChordDiagram(iso) {
-        if (!STATE.bilateralHistory) return '';
-
+    // Butterfly chart: for each of the top 7 partners, show export bar (right, blue)
+    // and import bar (left, red). Lengths are scaled to the maximum single-direction value.
+    // Source: bilateralHistory (gross flows, both directions). Falls back to yearCache net direction.
+    _buildButterflyChart(iso) {
         const rawFlows = STATE.yearCache[STATE.year] || [];
         const isRegional = STATE.region && STATE.region !== 'Global';
         const combined = {};
@@ -995,82 +1008,84 @@ const App = {
             else if (d.importer === iso) combined[d.exporter] = (combined[d.exporter] || 0) + d.netValue;
         });
 
-        const topPartnerIsos = Object.entries(combined)
+        const topPartners = Object.entries(combined)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 6)
+            .slice(0, 7)
             .map(([p]) => p);
 
-        if (topPartnerIsos.length === 0) return '';
+        if (topPartners.length === 0) return '';
 
-        // Matrix: row/col 0 = iso, 1..N = partners. matrix[i][j] = flow FROM i TO j.
-        const N = topPartnerIsos.length + 1;
-        const matrix = Array.from({length: N}, () => new Array(N).fill(0));
-
-        topPartnerIsos.forEach((pIso, j) => {
-            const a = [iso, pIso].sort()[0], b = [iso, pIso].sort()[1];
-            const hist = STATE.bilateralHistory[a + '|' + b];
-            const entry = hist ? hist[String(STATE.year)] : null;
-            if (entry) {
-                const isoIsA = iso === a;
-                matrix[0][j + 1] = isoIsA ? (entry.aToB || 0) : (entry.bToA || 0);
-                matrix[j + 1][0] = isoIsA ? (entry.bToA || 0) : (entry.aToB || 0);
+        const partnerData = topPartners.map(pIso => {
+            let expVal = 0, impVal = 0;
+            if (STATE.bilateralHistory) {
+                const a = [iso, pIso].sort()[0], b = [iso, pIso].sort()[1];
+                const hist = STATE.bilateralHistory[a + '|' + b];
+                const entry = hist ? hist[String(STATE.year)] : null;
+                if (entry) {
+                    const isoIsA = iso === a;
+                    expVal = isoIsA ? (entry.aToB || 0) : (entry.bToA || 0);
+                    impVal = isoIsA ? (entry.bToA || 0) : (entry.aToB || 0);
+                } else {
+                    // Fallback: place net value on the dominant side
+                    const flow = rawFlows.find(d =>
+                        (d.exporter === iso && d.importer === pIso) ||
+                        (d.exporter === pIso && d.importer === iso));
+                    if (flow) { if (flow.exporter === iso) expVal = flow.netValue; else impVal = flow.netValue; }
+                }
             } else {
-                matrix[0][j + 1] = combined[pIso] || 0;
+                const flow = rawFlows.find(d =>
+                    (d.exporter === iso && d.importer === pIso) ||
+                    (d.exporter === pIso && d.importer === iso));
+                if (flow) { if (flow.exporter === iso) expVal = flow.netValue; else impVal = flow.netValue; }
             }
+            return { pIso, expVal, impVal };
         });
 
-        const chords = d3.chord().padAngle(0.025)(matrix);
-        const W = 240, H = 240, innerR = 66, outerR = 80;
-        const arcGen = d3.arc().innerRadius(innerR).outerRadius(outerR);
-        const ribGen = d3.ribbon().radius(innerR - 1);
+        const maxVal = Math.max(...partnerData.map(d => Math.max(d.expVal, d.impVal)), 1);
 
-        const partnerPalette = ['#0ea5e9', '#22d3ee', '#2dd4bf', '#4ade80', '#a78bfa', '#fb923c'];
+        // Layout: name zone in center, bars diverge left (imports) and right (exports)
+        const W = 280, nameW = 72;
+        const cx = W / 2, leftEdge = cx - nameW / 2, rightEdge = cx + nameW / 2;
+        const barMaxLen = 92, barH = 9, rowGap = 16;
 
-        const groupSvg = chords.groups.map((g, i) => {
-            const pathD = arcGen(g);
-            const color = i === 0 ? '#004990' : (partnerPalette[i - 1] || '#94a3b8');
-            let label = '';
-            if (i > 0) {
-                const midAngle = (g.startAngle + g.endAngle) / 2;
-                const labelR = outerR + 16;
-                const lx = (labelR * Math.sin(midAngle)).toFixed(1);
-                const ly = (-labelR * Math.cos(midAngle)).toFixed(1);
-                const anchor = Math.sin(midAngle) > 0.1 ? 'start' : Math.sin(midAngle) < -0.1 ? 'end' : 'middle';
-                const name = STATE.countryNames[topPartnerIsos[i - 1]] || topPartnerIsos[i - 1];
-                const shortName = name.length > 9 ? name.slice(0, 8) + '…' : name;
-                label = `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle" font-size="7.5" fill="#374151" font-family="Inter,sans-serif">${shortName}</text>`;
-            }
-            return `<path d="${pathD}" fill="${color}" stroke="#fff" stroke-width="0.5" opacity="0.88"/>${label}`;
+        const rows = partnerData.map((d, i) => {
+            const y = i * rowGap;
+            const expLen = d.expVal > 0 ? Math.max(1.5, (d.expVal / maxVal) * barMaxLen) : 0;
+            const impLen = d.impVal > 0 ? Math.max(1.5, (d.impVal / maxVal) * barMaxLen) : 0;
+            const name = STATE.countryNames[d.pIso] || d.pIso;
+            const shortName = name.length > 12 ? name.slice(0, 11) + '…' : name;
+
+            const impBar = impLen > 0
+                ? `<rect x="${(leftEdge - impLen).toFixed(1)}" y="${y}" width="${impLen.toFixed(1)}" height="${barH}" rx="2" fill="#f87171" opacity="0.78"/>`
+                : '';
+            const expBar = expLen > 0
+                ? `<rect x="${rightEdge}" y="${y}" width="${expLen.toFixed(1)}" height="${barH}" rx="2" fill="#38bdf8" opacity="0.78"/>`
+                : '';
+            const nameEl = `<text x="${cx}" y="${y + barH - 1}" text-anchor="middle" font-size="7.5" fill="#374151" font-family="Inter,sans-serif">${shortName}</text>`;
+
+            return `${impBar}${expBar}${nameEl}`;
         }).join('');
 
-        const ribbonSvg = chords.map(ch => {
-            const pathD = ribGen(ch);
-            const pIdx = ch.source.index === 0 ? ch.target.index : ch.source.index;
-            const col = matrix[0][pIdx] >= matrix[pIdx][0] ? '#38bdf8' : '#f87171';
-            return `<path d="${pathD}" fill="${col}" stroke="${col}" stroke-width="0.4" fill-opacity="0.3" stroke-opacity="0.55"/>`;
-        }).join('');
+        const totalH = topPartners.length * rowGap + barH;
 
-        const isoName = STATE.countryNames[iso] || iso;
-        const centerText = isoName.length > 7 ? isoName.slice(0, 6) + '…' : isoName;
+        const grid = `
+            <text x="${(leftEdge - barMaxLen / 2).toFixed(0)}" y="-4" text-anchor="middle" font-size="7" font-weight="700" fill="#f87171" font-family="Inter,sans-serif">← Imports</text>
+            <text x="${(rightEdge + barMaxLen / 2).toFixed(0)}" y="-4" text-anchor="middle" font-size="7" font-weight="700" fill="#38bdf8" font-family="Inter,sans-serif">Exports →</text>
+            <line x1="${leftEdge}" y1="0" x2="${leftEdge}" y2="${totalH}" stroke="#E2E8F0" stroke-width="0.6" stroke-dasharray="2,2"/>
+            <line x1="${rightEdge}" y1="0" x2="${rightEdge}" y2="${totalH}" stroke="#E2E8F0" stroke-width="0.6" stroke-dasharray="2,2"/>`;
+
         const scopeNote = isRegional
-            ? `${STATE.region} · top 6 · pre-threshold`
-            : 'Top 6 partners · gross bilateral · pre-threshold';
+            ? `${STATE.region} · top 7 · pre-threshold`
+            : 'Top 7 partners · gross bilateral · pre-threshold';
 
         return `<div>
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Partner Web</div>
+            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Bilateral Trade Split</div>
             <div class="text-[8px] text-[#94a3b8] italic mb-2">${scopeNote}</div>
-            <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3 flex flex-col items-center">
-                <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-width:240px" preserveAspectRatio="xMidYMid meet">
-                    <g transform="translate(${W / 2},${H / 2})">
-                        ${ribbonSvg}
-                        ${groupSvg}
-                        <text x="0" y="4" text-anchor="middle" font-size="9" font-weight="700" fill="#004990" font-family="Inter,sans-serif">${centerText}</text>
-                    </g>
+            <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3">
+                <svg viewBox="0 -10 ${W} ${totalH + 12}" class="w-full overflow-visible" preserveAspectRatio="xMidYMid meet">
+                    ${grid}
+                    ${rows}
                 </svg>
-                <div class="flex items-center gap-3 mt-1 text-[9px]">
-                    <div class="flex items-center gap-1"><div style="width:10px;height:6px;background:#38bdf8;border-radius:2px;opacity:0.7"></div><span class="text-[#374151]">Net exporter</span></div>
-                    <div class="flex items-center gap-1"><div style="width:10px;height:6px;background:#f87171;border-radius:2px;opacity:0.7"></div><span class="text-[#374151]">Net importer</span></div>
-                </div>
             </div>
         </div>`;
     },
