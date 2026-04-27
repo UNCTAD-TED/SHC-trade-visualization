@@ -104,6 +104,8 @@ const App = {
         if (mobileLegendBtn) mobileLegendBtn.addEventListener('click', () => this.toggleMobileLegend());
         const mobileBackdrop = document.getElementById('mobile-legend-backdrop');
         if (mobileBackdrop) mobileBackdrop.addEventListener('click', () => this.toggleMobileLegend());
+        const mobileLegendClose = document.getElementById('mobile-legend-close');
+        if (mobileLegendClose) mobileLegendClose.addEventListener('click', () => this.toggleMobileLegend());
 
         // Arc detail modal
         document.getElementById('arc-modal-close').addEventListener('click', () => this.closeArcModal());

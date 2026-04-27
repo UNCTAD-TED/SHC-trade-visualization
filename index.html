@@ -9,6 +9,34 @@
     <script src="https://unpkg.com/topojson@3"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* モバイル版Legendパネルをフローティングカードとして強制上書き */
+        @media (max-width: 767px) {
+            #legend-panel {
+                position: fixed !important;
+                top: auto !important;
+                left: 12px !important;
+                right: 12px !important;
+                bottom: 80px !important; /* 下部のFAB群の上に浮いて配置 */
+                width: auto !important;
+                height: auto !important;
+                max-height: 45vh !important; /* 高さをさらに小さく制限 */
+                transform: translateY(calc(100% + 100px)) !important; /* 画面外へ下に隠しておく */
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease !important;
+                z-index: 33 !important;
+                border: 1px solid #CBD5E0 !important;
+                border-radius: 1rem !important; /* 全体の角を丸くする */
+                box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
+                opacity: 0 !important; /* 隠れている時は透明 */
+                pointer-events: none !important;
+            }
+            #legend-panel.mobile-open {
+                transform: translateY(0) !important; /* 上に引き上げる */
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
+        }
+    </style>
 </head>
 <body class="bg-[#f0f4f8] text-[#1a2332] font-sans h-[100dvh] flex flex-col overflow-hidden">
 
@@ -181,6 +209,14 @@
 
         <!-- ── Left Legend Panel ── -->
         <div id="legend-panel" class="flex-shrink-0 bg-white border-r border-[#CBD5E0] flex flex-col overflow-hidden">
+            <!-- Mobile Header & Close Button (Hidden on Desktop) -->
+            <div class="md:hidden flex items-center justify-between px-4 pt-2.5 pb-2 border-b border-[#E2E8F0] flex-shrink-0 bg-white rounded-t-2xl">
+                <span class="text-sm font-bold text-[#1a2332] uppercase tracking-wide">Legend</span>
+                <button id="mobile-legend-close" class="p-1.5 -mr-1.5 mt-1 rounded-lg hover:bg-[#F0F4F8] text-[#718096] transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
             <div class="px-3 py-2 border-b border-[#E2E8F0] flex-shrink-0 bg-[#F5F7FA]">
                 <h3 id="legend-title" class="text-[10px] font-bold text-[#1a2332] uppercase tracking-wider">Export Value</h3>
             </div>
