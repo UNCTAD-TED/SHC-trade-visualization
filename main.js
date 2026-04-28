@@ -1,6 +1,9 @@
 const App = {
     exporterSelector: null,
     importerSelector: null,
+    _lastRenderedRegion: null,
+    _globalRankCache: {},
+    _resizeTimer: null,
 
     async init() {
         STATE.selectedExporters = new Set();
@@ -124,8 +127,11 @@ const App = {
 
         window.addEventListener('resize', () => {
             setMobileHeight();
-            TradeMap.init();
-            TradeMap.renderFlows();
+            clearTimeout(this._resizeTimer);
+            this._resizeTimer = setTimeout(() => {
+                TradeMap.init();
+                TradeMap.renderFlows();
+            }, 200);
         });
 
         // ── Mobile Filter Panel ───────────────────────────────
@@ -275,32 +281,36 @@ const App = {
         if (countriesEl) countriesEl.textContent = Object.keys(stats).length;
 
         const topExpEl = document.getElementById('kpi-top-exp');
-        if (topExpEl) {
-            const sorted = Object.entries(stats).sort((a, b) => b[1].netBalance - a[1].netBalance);
-            if (sorted.length > 0 && sorted[0][1].netBalance > 0) {
-                const name = STATE.countryNames[sorted[0][0]] || sorted[0][0];
-                topExpEl.textContent = name.length > 16 ? name.slice(0, 15) + '…' : name;
-            } else {
-                topExpEl.textContent = '—';
-            }
-        }
-
         const topImpEl = document.getElementById('kpi-top-imp');
-        if (topImpEl) {
-            const sorted = Object.entries(stats).sort((a, b) => a[1].netBalance - b[1].netBalance);
-            if (sorted.length > 0 && sorted[0][1].netBalance < 0) {
-                const name = STATE.countryNames[sorted[0][0]] || sorted[0][0];
-                topImpEl.textContent = name.length > 16 ? name.slice(0, 15) + '…' : name;
-            } else {
-                topImpEl.textContent = '—';
+        if (topExpEl || topImpEl) {
+            const sortedByBalance = Object.entries(stats).sort((a, b) => b[1].netBalance - a[1].netBalance);
+            if (topExpEl) {
+                if (sortedByBalance.length > 0 && sortedByBalance[0][1].netBalance > 0) {
+                    const name = STATE.countryNames[sortedByBalance[0][0]] || sortedByBalance[0][0];
+                    topExpEl.textContent = name.length > 16 ? name.slice(0, 15) + '…' : name;
+                } else {
+                    topExpEl.textContent = '—';
+                }
+            }
+            if (topImpEl) {
+                const last = sortedByBalance[sortedByBalance.length - 1];
+                if (last && last[1].netBalance < 0) {
+                    const name = STATE.countryNames[last[0]] || last[0];
+                    topImpEl.textContent = name.length > 16 ? name.slice(0, 15) + '…' : name;
+                } else {
+                    topImpEl.textContent = '—';
+                }
             }
         }
 
-        const nsTotal = d3.sum(flows.filter(d => d.flowCategory === 'north-south'), d => d.netValue);
+        let nsTotal = 0, ssTotal = 0;
+        flows.forEach(d => {
+            if (d.flowCategory === 'north-south') nsTotal += d.netValue;
+            else if (d.flowCategory === 'south-south') ssTotal += d.netValue;
+        });
         const nsPctEl = document.getElementById('kpi-ns-pct');
         if (nsPctEl) nsPctEl.textContent = total > 0 ? Math.round(nsTotal / total * 100) + '%' : '—';
 
-        const ssTotal = d3.sum(flows.filter(d => d.flowCategory === 'south-south'), d => d.netValue);
         const ssPctEl = document.getElementById('kpi-ss-pct');
         if (ssPctEl) ssPctEl.textContent = total > 0 ? Math.round(ssTotal / total * 100) + '%' : '—';
     },
@@ -378,8 +388,7 @@ const App = {
         for (let y = 2015; y <= 2024; y++) yearData[y] = { aToB: 0, bToA: 0 };
 
         // Resolve bilateral history from pre-computed JSON
-        const a = [expIso, impIso].sort()[0];
-        const b = [expIso, impIso].sort()[1];
+        const [a, b] = [expIso, impIso].sort();
         const pairKey = `${a}|${b}`;
         const expIsA = expIso === a;
         const hist = STATE.bilateralHistory ? STATE.bilateralHistory[pairKey] : null;
@@ -729,7 +738,7 @@ const App = {
                 // Bilateral flow split: share flowing in the dominant direction. (pre-threshold gross flows)
                 let splitBadge = '';
                 if (STATE.bilateralHistory) {
-                    const a = [iso, pIso].sort()[0], b = [iso, pIso].sort()[1];
+                    const [a, b] = [iso, pIso].sort();
                     const hist = STATE.bilateralHistory[a + '|' + b];
                     const entry = hist ? hist[String(STATE.year)] : null;
                     if (entry) {
@@ -1018,7 +1027,7 @@ const App = {
         const partnerData = topPartners.map(pIso => {
             let expVal = 0, impVal = 0;
             if (STATE.bilateralHistory) {
-                const a = [iso, pIso].sort()[0], b = [iso, pIso].sort()[1];
+                const [a, b] = [iso, pIso].sort();
                 const hist = STATE.bilateralHistory[a + '|' + b];
                 const entry = hist ? hist[String(STATE.year)] : null;
                 if (entry) {
@@ -1098,13 +1107,16 @@ const App = {
             const isExp = stats.netBalance >= 0;
             const role = isExp ? 'net exporter' : 'net importer';
 
-            const globalVols = {};
             const _yearStr = String(STATE.year);
-            Object.entries(STATE.trendSummary).forEach(([isoKey, yearData]) => {
-                const val = yearData[_yearStr];
-                if (val > 0) globalVols[isoKey] = val;
-            });
-            const sortedGlobal = Object.entries(globalVols).sort((a, b) => b[1] - a[1]);
+            if (!this._globalRankCache[_yearStr]) {
+                const globalVols = {};
+                Object.entries(STATE.trendSummary).forEach(([isoKey, yearData]) => {
+                    const val = yearData[_yearStr];
+                    if (val > 0) globalVols[isoKey] = val;
+                });
+                this._globalRankCache[_yearStr] = Object.entries(globalVols).sort((a, b) => b[1] - a[1]);
+            }
+            const sortedGlobal = this._globalRankCache[_yearStr];
             const globalRank = sortedGlobal.findIndex(([k]) => k === iso) + 1;
             const totalCountries = sortedGlobal.length;
             const rankStr = globalRank > 0 ? `ranked <strong>#${globalRank} of ${totalCountries}</strong> globally` : 'active';
@@ -1173,7 +1185,10 @@ const App = {
         TradeMap.renderFlows();
         this.updateKPIBar();
 
-        setTimeout(() => TradeMap.zoomToRegion(STATE.region), 50);
+        if (this._lastRenderedRegion !== STATE.region) {
+            this._lastRenderedRegion = STATE.region;
+            setTimeout(() => TradeMap.zoomToRegion(STATE.region), 50);
+        }
     },
 
     showTooltip(event, iso) {

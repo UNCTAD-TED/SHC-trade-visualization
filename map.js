@@ -64,6 +64,7 @@ const TradeMap = {
 
         this.svg.append("defs");
         this.g = this.svg.append("g");
+        this._graticuleGeo = d3.geoGraticule()(); // GeoJSONは不変なので一度だけ生成
 
         this.zoomBehavior = d3.zoom()
             .scaleExtent([0.2, 8])
@@ -150,10 +151,8 @@ const TradeMap = {
                 .attr("class", "land-layer");
         }
 
-        const graticule = d3.geoGraticule();
-
         const graticulePath = landLayer.selectAll(".graticule")
-            .data([graticule()]);
+            .data([this._graticuleGeo || d3.geoGraticule()()]);
 
         graticulePath.enter().append("path")
             .attr("class", "graticule")
@@ -250,15 +249,13 @@ const TradeMap = {
             .range(isFocused ? [0.3, 0.95] : [0.15, 0.85])
             .clamp(true);
 
-        const colorScale = (val) => {
-            const transformed    = Math.sign(val) * Math.sqrt(Math.abs(val));
-            const maxTransformed = Math.sqrt(p98NetBal);
-            return d3.scaleLinear()
-                .domain([-maxTransformed, -maxTransformed * 0.15, 0, maxTransformed * 0.15, maxTransformed])
-                .range(["#e11d48", "#fb7185", "#ffffff", "#38bdf8", "#0284c7"])
-                .interpolate(d3.interpolateHcl)
-                .clamp(true)(transformed);
-        };
+        const maxTransformed = Math.sqrt(p98NetBal);
+        const _colorScaleFn = d3.scaleLinear()
+            .domain([-maxTransformed, -maxTransformed * 0.15, 0, maxTransformed * 0.15, maxTransformed])
+            .range(["#e11d48", "#fb7185", "#ffffff", "#38bdf8", "#0284c7"])
+            .interpolate(d3.interpolateHcl)
+            .clamp(true);
+        const colorScale = (val) => _colorScaleFn(Math.sign(val) * Math.sqrt(Math.abs(val)));
 
         let flowLayer = this.g.select(".flow-layer");
         if (flowLayer.empty()) flowLayer = this.g.append("g").attr("class", "flow-layer");
@@ -286,6 +283,16 @@ const TradeMap = {
             .remove();
 
         const focusedIso = this.focusedIso;
+
+        // パートナーセットを一度だけ構築してO(n×m)→O(n+m)にする
+        const focusedPartnerSet = new Set();
+        if (focusedIso) {
+            visibleFlows.forEach(f => {
+                if (f.exporter === focusedIso) focusedPartnerSet.add(f.importer);
+                else if (f.importer === focusedIso) focusedPartnerSet.add(f.exporter);
+            });
+        }
+
         const arcOpacity = (d) => {
             const base = opacityScale(d.netValue);
             if (focusedIso && d.exporter !== focusedIso && d.importer !== focusedIso) return base * 0.08;
@@ -351,8 +358,7 @@ const TradeMap = {
         const nodeOpacity = (d) => {
             if (!focusedIso) return 1;
             if (d === focusedIso) return 1;
-            const isPartner = visibleFlows.some(f => (f.exporter === focusedIso && f.importer === d) || (f.importer === focusedIso && f.exporter === d));
-            return isPartner ? 0.95 : 0.18;
+            return focusedPartnerSet.has(d) ? 0.95 : 0.18;
         };
 
         nodesEnter.merge(nodes)
@@ -399,8 +405,7 @@ const TradeMap = {
         const labelOpacity = (d) => {
             if (!focusedIso) return 1;
             if (d === focusedIso) return 1;
-            const isPartner = visibleFlows.some(f => (f.exporter === focusedIso && f.importer === d) || (f.importer === focusedIso && f.exporter === d));
-            return isPartner ? 0.85 : 0.2;
+            return focusedPartnerSet.has(d) ? 0.85 : 0.2;
         };
 
         labelsEnter.merge(labels)

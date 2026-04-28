@@ -1,5 +1,8 @@
 // countrySelector.js - Hierarchical country selection (Alpha-3, 3-level hierarchy)
 
+// ExporterとImporter両方のセレクターが同じJSONをfetchしないようモジュールレベルでキャッシュ
+let _classificationCache = null;
+
 class CountrySelector {
     constructor(elementId, labelId, type) {
         this.elementId = elementId;
@@ -17,9 +20,12 @@ class CountrySelector {
 
     async loadClassificationData() {
         try {
-            const response = await fetch('data/country_classification.json');
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            this.classificationData = await response.json();
+            if (!_classificationCache) {
+                const response = await fetch('data/country_classification.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                _classificationCache = await response.json();
+            }
+            this.classificationData = _classificationCache;
 
             this.allCountries = Object.keys(this.classificationData.countries)
                 .map(code => ({ code, name: this.classificationData.countries[code].name }))
