@@ -14,7 +14,9 @@
       "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(x['type'], x['name']\\) for x in d]\")",
       "Bash(curl -s -L \"https://raw.githubusercontent.com/unctad-infovis/un-init-project/main/package.json\")",
       "Bash(curl -s -L \"https://unctad-infovis.github.io/2026-cyberlaw_tracker/css/2026-cyberlaw_tracker.min.css\" -o /tmp/cyberlaw.css)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\" \"c:/Users/larat/OneDrive - United Nations/Documents/GitHub/SHC-trade-visualization/countrySelector.js\" \"c:/Users/larat/OneDrive - United Nations/Documents/GitHub/SHC-trade-visualization/dataLoader.js\" \"c:/Users/larat/OneDrive - United Nations/Documents/GitHub/SHC-trade-visualization/regions.js\")",
+      "Bash(grep -v \"//.*#\")"
     ]
   }
 }
