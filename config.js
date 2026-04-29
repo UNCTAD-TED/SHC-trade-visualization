@@ -11,10 +11,10 @@ const CONFIG = {
 
     // Flow category base colors (North = Developed, South = Developing/LDC)
     flowColors: {
-        'north-south': '#06b6d4',  // Cyan
-        'south-north': '#f43f5e',  // Magenta
-        'south-south': '#f59e0b',  // Amber
-        'north-north': '#64748b',  // Slate
+        'north-south': '#009EDB',  // UNCTAD Blue
+        'south-north': '#ED1847',  // UNCTAD Red
+        'south-south': '#FBAF17',  // UNCTAD Yellow
+        'north-north': '#AEA29A',  // UNCTAD Warm Grey
     },
 
     // Development status: 'north' = Developed economies

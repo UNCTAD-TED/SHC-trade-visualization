@@ -5,7 +5,16 @@
       "Bash(node --check map.js)",
       "Bash(node --check main.js)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "WebSearch",
+      "WebFetch(domain:unctad-infovis.github.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s -L \"https://raw.githubusercontent.com/unctad-infovis/un-init-project/main/README.md\")",
+      "Bash(curl -s -L \"https://api.github.com/repos/unctad-infovis/un-init-project/contents/templates\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(x['type'], x['name']\\) for x in d]\")",
+      "Bash(curl -s -L \"https://raw.githubusercontent.com/unctad-infovis/un-init-project/main/package.json\")",
+      "Bash(curl -s -L \"https://unctad-infovis.github.io/2026-cyberlaw_tracker/css/2026-cyberlaw_tracker.min.css\" -o /tmp/cyberlaw.css)",
+      "Read(//tmp/**)"
     ]
   }
 }

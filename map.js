@@ -89,7 +89,7 @@ const TradeMap = {
             .attr("width", "100%")
             .attr("height", "100%")
             .attr("viewBox", `0 0 ${this.width} ${this.height}`)
-            .style("background", "#F0F4F8");
+            .style("background", "#F3F8FD");
     },
 
     updateProjection() {
@@ -157,7 +157,7 @@ const TradeMap = {
         graticulePath.enter().append("path")
             .attr("class", "graticule")
             .attr("fill", "none")
-            .attr("stroke", "#E2E8F0")
+            .attr("stroke", "#EBEAE6")
             .attr("stroke-width", 0.5)
             .attr("stroke-opacity", 0.8)
             .merge(graticulePath)
@@ -170,10 +170,10 @@ const TradeMap = {
 
         const landsEnter = lands.enter().append("path")
             .attr("class", "land")
-            .attr("stroke", "#CBD5E0")
+            .attr("stroke", "#DED9D5")
             .attr("stroke-width", 0.5)
             .style("transition", "fill 0.2s ease")
-            .on("mouseover", function() { d3.select(this).attr("fill", "#E2E8F0"); })
+            .on("mouseover", function() { d3.select(this).attr("fill", "#EBEAE6"); })
             .on("mouseout",  function() { d3.select(this).attr("fill", "#FAFAFA"); });
 
         landsEnter.merge(lands)
@@ -252,7 +252,7 @@ const TradeMap = {
         const maxTransformed = Math.sqrt(p98NetBal);
         const _colorScaleFn = d3.scaleLinear()
             .domain([-maxTransformed, -maxTransformed * 0.15, 0, maxTransformed * 0.15, maxTransformed])
-            .range(["#e11d48", "#fb7185", "#ffffff", "#38bdf8", "#0284c7"])
+            .range(["#ED1847", "#F9C0C5", "#ffffff", "#C5DFEF", "#009EDB"])
             .interpolate(d3.interpolateHcl)
             .clamp(true);
         const colorScale = (val) => _colorScaleFn(Math.sign(val) * Math.sqrt(Math.abs(val)));
@@ -349,7 +349,7 @@ const TradeMap = {
         const nodesEnter = nodes.enter()
             .append("circle")
             .attr("class", "country-node")
-            .attr("stroke", "#CBD5E0")
+            .attr("stroke", "#DED9D5")
             .style("opacity", 0)
             .on("mouseover", (event, d) => App.showTooltip(event, d))
             .on("mouseout",  () => App.hideTooltip())
@@ -410,7 +410,7 @@ const TradeMap = {
 
         labelsEnter.merge(labels)
             .text(d => STATE.countryNames[d] || d)
-            .attr("fill", "#4A5568") // 柔らかく読みやすいダークスレート色に統一
+            .attr("fill", "#6E6259")
             .attr("stroke", "#FAFAFA") // 背景や陸地と同じ色で白フチ（Halo）をつける
             .attr("stroke-linejoin", "round")
             .transition().duration(750)
@@ -616,32 +616,32 @@ const TradeMap = {
             return `
                 <div class="flex items-center gap-1.5" style="opacity:${opacity}">
                     <span class="w-3 h-[3px] rounded-full flex-shrink-0" style="background:${CONFIG.flowColors[c.key]}"></span>
-                    <span class="text-[9px] font-bold text-[#374151] w-8 flex-shrink-0">${c.abbr}</span>
-                    <span class="text-[9px] text-[#718096] font-mono flex-shrink-0">${countStr}</span>
-                    <span class="text-[9px] text-[#718096] font-mono text-right flex-1">${valueStr}</span>
+                    <span class="text-[9px] font-bold text-[#231F20] w-8 flex-shrink-0">${c.abbr}</span>
+                    <span class="text-[9px] text-[#6E6259] font-mono flex-shrink-0">${countStr}</span>
+                    <span class="text-[9px] text-[#6E6259] font-mono text-right flex-1">${valueStr}</span>
                 </div>`;
         }).join('');
 
         const widthHtml = `
-            <div class="text-[9px] text-[#718096] italic mt-1">Arc width = net trade value</div>`;
+            <div class="text-[9px] text-[#6E6259] italic mt-1">Arc width = net trade value</div>`;
 
         const nodeHtml = `
-            <div class="mt-2 pt-2 border-t border-[#E2E8F0]">
-                <div class="text-[9px] text-[#718096] font-bold uppercase mb-1 tracking-wider">Nodes</div>
+            <div class="mt-2 pt-2 border-t border-[#EBEAE6]">
+                <div class="text-[9px] text-[#6E6259] font-bold uppercase mb-1 tracking-wider">Nodes</div>
                 <div class="flex items-center justify-center gap-0.5" style="height:20px">
-                    <div style="width:16px;height:16px;border-radius:50%;background:#e11d48" title="Strong net importer"></div>
-                    <div style="width:11px;height:11px;border-radius:50%;background:#fb7185" title="Net importer"></div>
-                    <div style="width:7px;height:7px;border-radius:50%;background:#f9a8d4" title="Slight net importer"></div>
-                    <div style="width:4px;height:4px;border-radius:50%;background:#9CA3AF;border:1px solid #CBD5E0" title="Balanced"></div>
-                    <div style="width:7px;height:7px;border-radius:50%;background:#7dd3fc" title="Slight net exporter"></div>
-                    <div style="width:11px;height:11px;border-radius:50%;background:#38bdf8" title="Net exporter"></div>
-                    <div style="width:16px;height:16px;border-radius:50%;background:#0284c7" title="Strong net exporter"></div>
+                    <div style="width:16px;height:16px;border-radius:50%;background:#ED1847" title="Strong net importer"></div>
+                    <div style="width:11px;height:11px;border-radius:50%;background:#F9C0C5" title="Net importer"></div>
+                    <div style="width:7px;height:7px;border-radius:50%;background:#F7DFDF" title="Slight net importer"></div>
+                    <div style="width:4px;height:4px;border-radius:50%;background:#DED9D5;border:1px solid #AEA29A" title="Balanced"></div>
+                    <div style="width:7px;height:7px;border-radius:50%;background:#E3EDF6" title="Slight net exporter"></div>
+                    <div style="width:11px;height:11px;border-radius:50%;background:#C5DFEF" title="Net exporter"></div>
+                    <div style="width:16px;height:16px;border-radius:50%;background:#009EDB" title="Strong net exporter"></div>
                 </div>
-                <div class="flex justify-between text-[9px] text-[#718096] font-mono mt-0.5">
+                <div class="flex justify-between text-[9px] text-[#6E6259] font-mono mt-0.5">
                     <span>← Importer</span>
                     <span>Exporter →</span>
                 </div>
-                <div class="text-[9px] text-[#718096] italic mt-0.5">Color = balance · Size = volume</div>
+                <div class="text-[9px] text-[#6E6259] italic mt-0.5">Color = balance · Size = volume</div>
             </div>`;
 
         // --- 4. Visibility Threshold ---
@@ -671,29 +671,29 @@ const TradeMap = {
 
         const autoTiersHtml = isManualThreshold ? '' : `
                 <div class="space-y-0.5 mt-1.5">
-                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Global'  ? 'text-[#004990] font-bold' : 'text-[#718096]'}">
-                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Global'  ? 'bg-[#004990]' : 'bg-[#CBD5E0]'}"></span>
+                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Global'  ? 'text-[#004990] font-bold' : 'text-[#6E6259]'}">
+                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Global'  ? 'bg-[#004990]' : 'bg-[#DED9D5]'}"></span>
                         <span class="flex-1">Global</span><span class="font-mono">$10M</span>
                     </div>
-                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Group'   ? 'text-[#004990] font-bold' : 'text-[#718096]'}">
-                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Group'   ? 'bg-[#004990]' : 'bg-[#CBD5E0]'}"></span>
+                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Group'   ? 'text-[#004990] font-bold' : 'text-[#6E6259]'}">
+                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Group'   ? 'bg-[#004990]' : 'bg-[#DED9D5]'}"></span>
                         <span class="flex-1">Region / Group (6+)</span><span class="font-mono">$100k</span>
                     </div>
-                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Country' ? 'text-[#004990] font-bold' : 'text-[#718096]'}">
-                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Country' ? 'bg-[#004990]' : 'bg-[#CBD5E0]'}"></span>
+                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Country' ? 'text-[#004990] font-bold' : 'text-[#6E6259]'}">
+                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Country' ? 'bg-[#004990]' : 'bg-[#DED9D5]'}"></span>
                         <span class="flex-1">Country (1–5)</span><span class="font-mono">$10k</span>
                     </div>
                 </div>`;
 
         const thresholdHtml = `
-            <div class="mt-2 pt-2 border-t border-[#E2E8F0]">
+            <div class="mt-2 pt-2 border-t border-[#EBEAE6]">
                 <div class="flex items-center justify-between mb-1">
-                    <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider">Threshold</div>
+                    <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider">Threshold</div>
                     ${modeBadge}
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-[9px] text-[#374151]">Min. flow</span>
-                    <span class="text-[10px] text-[#1a2332] font-bold font-mono">$${fmtShort(currentThreshold)}</span>
+                    <span class="text-[9px] text-[#231F20]">Min. flow</span>
+                    <span class="text-[10px] text-[#231F20] font-bold font-mono">$${fmtShort(currentThreshold)}</span>
                 </div>
                 ${autoTiersHtml}
             </div>`;

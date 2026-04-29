@@ -251,13 +251,13 @@ const App = {
     updateUIClasses(selector, activeEl) {
         document.querySelectorAll(selector).forEach(b => {
             b.classList.remove('bg-[#004990]', 'text-white');
-            b.classList.add('text-[#4A5568]');
+            b.classList.add('text-[#6E6259]');
             if (b.closest('#mobile-filter-panel')) {
                 b.style.backgroundColor = '';
                 b.style.color = '';
             }
         });
-        activeEl.classList.remove('text-[#4A5568]');
+        activeEl.classList.remove('text-[#6E6259]');
         activeEl.classList.add('bg-[#004990]', 'text-white');
         if (activeEl.closest('#mobile-filter-panel')) {
             activeEl.style.backgroundColor = '#004990';
@@ -412,7 +412,7 @@ const App = {
         const curAtoB = yearData[cy] ? yearData[cy].aToB : 0;
         const curBtoA = yearData[cy] ? yearData[cy].bToA : 0;
         const curNet  = curAtoB - curBtoA;
-        const netCol  = curNet >= 0 ? '#38bdf8' : '#f87171';
+        const netCol  = curNet >= 0 ? '#009EDB' : '#ED1847';
         const netSign = curNet >= 0 ? '+' : '';
         const fc = STATE.filteredData.find(d =>
             (d.exporter === expIso && d.importer === impIso) ||
@@ -426,17 +426,17 @@ const App = {
 
         let html = `
         <div class="grid grid-cols-3 gap-2 mb-1">
-            <div class="bg-[#F0F7FF] border border-[#BFDBFE] rounded-lg px-3 py-2 text-center">
-                <div class="text-[9px] text-[#0284C7] uppercase font-bold mb-0.5">${expName} →</div>
-                <div class="text-sm font-bold text-[#1a2332] font-mono">${mf.fmt(curAtoB)}</div>
+            <div class="bg-[#E3EDF6] border border-[#C5DFEF] rounded-lg px-3 py-2 text-center">
+                <div class="text-[9px] text-[#0077B8] uppercase font-bold mb-0.5">${expName} →</div>
+                <div class="text-sm font-bold text-[#231F20] font-mono">${mf.fmt(curAtoB)}</div>
             </div>
             <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg px-3 py-2 text-center">
-                <div class="text-[9px] text-[#718096] uppercase font-bold mb-0.5">Net (${cy})</div>
+                <div class="text-[9px] text-[#6E6259] uppercase font-bold mb-0.5">Net (${cy})</div>
                 <div class="text-sm font-bold font-mono" style="color:${netCol}">${netSign}${mf.fmt(Math.abs(curNet))}</div>
             </div>
-            <div class="bg-[#FFF0F0] border border-[#FECACA] rounded-lg px-3 py-2 text-center">
-                <div class="text-[9px] text-[#DC2626] uppercase font-bold mb-0.5">← ${impName}</div>
-                <div class="text-sm font-bold text-[#1a2332] font-mono">${mf.fmt(curBtoA)}</div>
+            <div class="bg-[#F7DFDF] border border-[#F9C0C5] rounded-lg px-3 py-2 text-center">
+                <div class="text-[9px] text-[#ED1847] uppercase font-bold mb-0.5">← ${impName}</div>
+                <div class="text-sm font-bold text-[#231F20] font-mono">${mf.fmt(curBtoA)}</div>
             </div>
         </div>
         <div class="flex justify-center mb-3">${catBadge}</div>`;
@@ -450,21 +450,21 @@ const App = {
             const isCur = y === cy;
             const yr = String(y).slice(2);
             return `
-                <rect x="${x}" y="${H/2 - aH}" width="${bw}" height="${aH}" rx="1" fill="#38bdf8" opacity="${isCur ? 1 : 0.45}"/>
-                <rect x="${x}" y="${H/2}" width="${bw}" height="${bH}" rx="1" fill="#f87171" opacity="${isCur ? 1 : 0.45}"/>
-                ${isCur ? `<rect x="${x - 0.5}" y="2" width="${bw + 1}" height="${H - 4}" rx="2" fill="none" stroke="#60a5fa" stroke-width="1"/>` : ''}
-                <text x="${x + bw/2}" y="${H + 11}" text-anchor="middle" font-size="7" fill="${isCur ? '#0077B6' : '#9CA3AF'}" font-family="Inter,monospace">${yr}</text>`;
+                <rect x="${x}" y="${H/2 - aH}" width="${bw}" height="${aH}" rx="1" fill="#009EDB" opacity="${isCur ? 1 : 0.45}"/>
+                <rect x="${x}" y="${H/2}" width="${bw}" height="${bH}" rx="1" fill="#ED1847" opacity="${isCur ? 1 : 0.45}"/>
+                ${isCur ? `<rect x="${x - 0.5}" y="2" width="${bw + 1}" height="${H - 4}" rx="2" fill="none" stroke="#0077B8" stroke-width="1"/>` : ''}
+                <text x="${x + bw/2}" y="${H + 11}" text-anchor="middle" font-size="7" fill="${isCur ? '#0077B8' : '#AEA29A'}" font-family="Inter,monospace">${yr}</text>`;
         }).join('');
 
         html += `
         <div>
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1.5">Bilateral Trade History</div>
+            <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-1.5">Bilateral Trade History</div>
             <div class="flex items-center gap-3 mb-1">
-                <div class="flex items-center gap-1"><div class="w-3 h-2 rounded-sm bg-sky-400 opacity-80"></div><span class="text-[9px] text-[#4A5568]">${expName} exports</span></div>
-                <div class="flex items-center gap-1"><div class="w-3 h-2 rounded-sm bg-red-400 opacity-80"></div><span class="text-[9px] text-[#4A5568]">${impName} exports</span></div>
+                <div class="flex items-center gap-1"><div class="w-3 h-2 rounded-sm bg-[#009EDB] opacity-80"></div><span class="text-[9px] text-[#6E6259]">${expName} exports</span></div>
+                <div class="flex items-center gap-1"><div class="w-3 h-2 rounded-sm bg-[#ED1847] opacity-80"></div><span class="text-[9px] text-[#6E6259]">${impName} exports</span></div>
             </div>
             <svg width="${W}" height="${H + 14}" class="w-full overflow-visible">
-                <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#CBD5E0" stroke-width="0.5"/>
+                <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#AAA096" stroke-width="0.5"/>
                 ${bars}
             </svg>
         </div>`;
@@ -472,10 +472,10 @@ const App = {
         const tableRows = years.filter(y => atoBs[years.indexOf(y)] > 0 || bToAs[years.indexOf(y)] > 0).map(y => {
             const idx = years.indexOf(y);
             const net = nets[idx];
-            const nCol = net >= 0 ? '#38bdf8' : '#f87171';
+            const nCol = net >= 0 ? '#009EDB' : '#ED1847';
             const isCur = y === cy;
-            return `<tr class="${isCur ? 'bg-[#EBF5FF]' : 'hover:bg-[#F5F7FA]'}">
-                <td class="py-1 px-2 text-[10px] font-mono ${isCur ? 'text-[#004990] font-bold' : 'text-[#6B7280]'}">${y}</td>
+            return `<tr class="${isCur ? 'bg-[#E3EDF6]' : 'hover:bg-[#F3F8FD]'}">
+                <td class="py-1 px-2 text-[10px] font-mono ${isCur ? 'text-[#004990] font-bold' : 'text-[#6E6259]'}">${y}</td>
                 <td class="py-1 px-2 text-[10px] font-mono text-sky-600 text-right">${mf.fmt(atoBs[idx])}</td>
                 <td class="py-1 px-2 text-[10px] font-mono text-red-500 text-right">${mf.fmt(bToAs[idx])}</td>
                 <td class="py-1 px-2 text-[10px] font-mono text-right font-bold" style="color:${nCol}">${net >= 0 ? '+' : ''}${mf.fmt(Math.abs(net))}</td>
@@ -484,14 +484,14 @@ const App = {
 
         html += `
         <div>
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1.5">Year-by-Year Table</div>
+            <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-1.5">Year-by-Year Table</div>
             <table class="w-full border-collapse">
                 <thead>
                     <tr class="border-b border-[#E2E8F0]">
-                        <th class="py-1 px-2 text-[9px] text-[#718096] text-left font-bold">Year</th>
+                        <th class="py-1 px-2 text-[9px] text-[#6E6259] text-left font-bold">Year</th>
                         <th class="py-1 px-2 text-[9px] text-sky-600 text-right font-bold">${expName} →</th>
                         <th class="py-1 px-2 text-[9px] text-red-500 text-right font-bold">← ${impName}</th>
-                        <th class="py-1 px-2 text-[9px] text-[#718096] text-right font-bold">Net</th>
+                        <th class="py-1 px-2 text-[9px] text-[#6E6259] text-right font-bold">Net</th>
                     </tr>
                 </thead>
                 <tbody>${tableRows}</tbody>
@@ -553,24 +553,24 @@ const App = {
         ];
 
         const headerRows = metricRows.map(r => {
-            const hlA = r.winA === true  ? 'color:#34d399' : r.winA === false ? 'color:#f87171' : '';
-            const hlB = r.winA === false ? 'color:#34d399' : r.winA === true  ? 'color:#f87171' : '';
+            const hlA = r.winA === true  ? 'color:#72BF44' : r.winA === false ? 'color:#ED1847' : '';
+            const hlB = r.winA === false ? 'color:#72BF44' : r.winA === true  ? 'color:#ED1847' : '';
             return `<tr class="border-b border-[#F0F0F0]">
                 <td class="py-1.5 px-3 text-[10px] font-mono text-right" style="${hlA}">${r.vA}</td>
-                <td class="py-1.5 px-3 text-[9px] text-[#718096] text-center font-bold uppercase">${r.label}</td>
+                <td class="py-1.5 px-3 text-[9px] text-[#6E6259] text-center font-bold uppercase">${r.label}</td>
                 <td class="py-1.5 px-3 text-[10px] font-mono" style="${hlB}">${r.vB}</td>
             </tr>`;
         }).join('');
 
         let html = `
         <div class="grid grid-cols-3 gap-0 mb-4 text-center">
-            <div class="py-2 bg-[#E0F2FE] rounded-l-lg border border-[#BAE6FD] border-r-0">
-                <div class="text-xs font-bold text-[#0284C7]">${nameA}</div>
+            <div class="py-2 bg-[#E3EDF6] rounded-l-lg border border-[#C5DFEF] border-r-0">
+                <div class="text-xs font-bold text-[#0077B8]">${nameA}</div>
             </div>
             <div class="py-2 bg-[#F5F7FA] border-y border-[#E2E8F0] flex items-center justify-center">
-                <span class="text-[#A0AEC0] font-bold text-sm">vs</span>
+                <span class="text-[#AEA29A] font-bold text-sm">vs</span>
             </div>
-            <div class="py-2 bg-[#FFFBEB] rounded-r-lg border border-[#FDE68A] border-l-0">
+            <div class="py-2 bg-[#FFF4BF] rounded-r-lg border border-[#FFD48E] border-l-0">
                 <div class="text-xs font-bold text-[#D97706]">${nameB}</div>
             </div>
         </div>
@@ -588,30 +588,30 @@ const App = {
             const x = i * (bw + gap) + bw / 2;
             const yp = H - (totA[y] / maxV) * H;
             const isCur = y === STATE.year;
-            return `<circle cx="${x}" cy="${yp}" r="${isCur ? 4 : 2}" fill="${isCur ? '#38bdf8' : '#0ea5e9'}" opacity="${isCur ? 1 : 0.7}"/>`;
+            return `<circle cx="${x}" cy="${yp}" r="${isCur ? 4 : 2}" fill="${isCur ? '#009EDB' : '#009EDB'}" opacity="${isCur ? 1 : 0.7}"/>`;
         }).join('');
         const dotsB = years.map((y, i) => {
             const x = i * (bw + gap) + bw / 2;
             const yp = H - (totB[y] / maxV) * H;
             const isCur = y === STATE.year;
-            return `<circle cx="${x}" cy="${yp}" r="${isCur ? 4 : 2}" fill="${isCur ? '#f59e0b' : '#d97706'}" opacity="${isCur ? 1 : 0.7}"/>`;
+            return `<circle cx="${x}" cy="${yp}" r="${isCur ? 4 : 2}" fill="${isCur ? '#FBAF17' : '#B06E2A'}" opacity="${isCur ? 1 : 0.7}"/>`;
         }).join('');
         const xLabels = years.filter((_, i) => i % 2 === 0).map(y => {
             const idx = years.indexOf(y);
             const x = idx * (bw + gap) + bw / 2;
-            return `<text x="${x}" y="${H + 12}" text-anchor="middle" font-size="7" fill="#475569" font-family="Inter,monospace">${String(y).slice(2)}</text>`;
+            return `<text x="${x}" y="${H + 12}" text-anchor="middle" font-size="7" fill="#6E6259" font-family="Inter,monospace">${String(y).slice(2)}</text>`;
         }).join('');
 
         html += `
         <div class="mb-4">
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-2">Trade Volume Trend</div>
+            <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-2">Trade Volume Trend</div>
             <div class="flex items-center gap-4 mb-1.5">
-                <div class="flex items-center gap-1"><div class="w-6 h-[2px] bg-sky-500"></div><span class="text-[9px] text-[#4A5568]">${nameA}</span></div>
-                <div class="flex items-center gap-1"><div class="w-6 h-[2px] bg-amber-500"></div><span class="text-[9px] text-[#4A5568]">${nameB}</span></div>
+                <div class="flex items-center gap-1"><div class="w-6 h-[2px] bg-[#009EDB]"></div><span class="text-[9px] text-[#6E6259]">${nameA}</span></div>
+                <div class="flex items-center gap-1"><div class="w-6 h-[2px] bg-[#FBAF17]"></div><span class="text-[9px] text-[#6E6259]">${nameB}</span></div>
             </div>
             <svg width="${W}" height="${H + 16}" class="w-full overflow-visible">
-                <polyline points="${points(totA)}" fill="none" stroke="#0ea5e9" stroke-width="1.5" opacity="0.8"/>
-                <polyline points="${points(totB)}" fill="none" stroke="#d97706" stroke-width="1.5" opacity="0.8"/>
+                <polyline points="${points(totA)}" fill="none" stroke="#009EDB" stroke-width="1.5" opacity="0.8"/>
+                <polyline points="${points(totB)}" fill="none" stroke="#B06E2A" stroke-width="1.5" opacity="0.8"/>
                 ${dotsA}${dotsB}${xLabels}
             </svg>
         </div>`;
@@ -619,22 +619,22 @@ const App = {
         const tableRows = years.filter(y => totA[y] > 0 || totB[y] > 0).reverse().map(y => {
             const isCur = y === STATE.year;
             const winA = totA[y] > totB[y];
-            return `<tr class="${isCur ? 'bg-[#EBF5FF]' : 'hover:bg-[#F5F7FA]'}">
-                <td class="py-1 px-3 text-[10px] font-mono text-right" style="color:${winA ? '#059669' : '#9CA3AF'}">${mf.fmt(totA[y])}</td>
-                <td class="py-1 px-3 text-[9px] text-center font-mono ${isCur ? 'text-[#004990] font-bold' : 'text-[#718096]'}">${y}</td>
-                <td class="py-1 px-3 text-[10px] font-mono" style="color:${!winA ? '#059669' : '#9CA3AF'}">${mf.fmt(totB[y])}</td>
+            return `<tr class="${isCur ? 'bg-[#E3EDF6]' : 'hover:bg-[#F3F8FD]'}">
+                <td class="py-1 px-3 text-[10px] font-mono text-right" style="color:${winA ? '#72BF44' : '#AEA29A'}">${mf.fmt(totA[y])}</td>
+                <td class="py-1 px-3 text-[9px] text-center font-mono ${isCur ? 'text-[#004990] font-bold' : 'text-[#6E6259]'}">${y}</td>
+                <td class="py-1 px-3 text-[10px] font-mono" style="color:${!winA ? '#72BF44' : '#AEA29A'}">${mf.fmt(totB[y])}</td>
             </tr>`;
         }).join('');
 
         html += `
         <div>
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1.5">Year-by-Year Comparison</div>
+            <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-1.5">Year-by-Year Comparison</div>
             <table class="w-full border-collapse">
                 <thead>
                     <tr class="border-b border-[#E2E8F0]">
                         <th class="py-1 px-3 text-[9px] text-sky-600 text-right font-bold">${nameA}</th>
-                        <th class="py-1 px-3 text-[9px] text-[#718096] text-center font-bold">Year</th>
-                        <th class="py-1 px-3 text-[9px] text-amber-600 font-bold">${nameB}</th>
+                        <th class="py-1 px-3 text-[9px] text-[#6E6259] text-center font-bold">Year</th>
+                        <th class="py-1 px-3 text-[9px] text-[#B06E2A] font-bold">${nameB}</th>
                     </tr>
                 </thead>
                 <tbody>${tableRows}</tbody>
@@ -657,7 +657,7 @@ const App = {
 
         let html = '';
 
-        html += `<div class="bg-[#EBF5FF] border border-[#BFDBFE] rounded-lg p-3 space-y-1.5">
+        html += `<div class="bg-[#E3EDF6] border border-[#C5DFEF] rounded-lg p-3 space-y-1.5">
             <div class="text-[9px] text-[#004990] font-bold uppercase tracking-wider mb-1.5">Auto Insights</div>
             ${this._generateNarrative(iso, stats, partnerExports, partnerImports, yearlyTotals, mf)}
         </div>`;
@@ -665,17 +665,17 @@ const App = {
         if (!stats) return html;
 
         const isExp = stats.netBalance >= 0;
-        const balColor = isExp ? '#38bdf8' : '#f87171';
-        const roleBg = isExp ? 'background:rgba(56,189,248,0.15);color:#38bdf8' : 'background:rgba(248,113,113,0.15);color:#f87171';
+        const balColor = isExp ? '#009EDB' : '#ED1847';
+        const roleBg = isExp ? 'background:rgba(0,158,219,0.15);color:#009EDB' : 'background:rgba(237,24,71,0.15);color:#ED1847';
         html += `<div>
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-2">Key Metrics (${STATE.year})</div>
+            <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-2">Key Metrics (${STATE.year})</div>
             <div class="grid grid-cols-2 gap-2">
                 <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg px-3 py-2">
-                    <div class="text-[9px] text-[#718096] uppercase">${mf.grossLabel.replace(':','')}</div>
-                    <div class="text-sm font-bold text-[#1a2332] font-mono">${mf.fmt(stats.grossVolume)}</div>
+                    <div class="text-[9px] text-[#6E6259] uppercase">${mf.grossLabel.replace(':','')}</div>
+                    <div class="text-sm font-bold text-[#231F20] font-mono">${mf.fmt(stats.grossVolume)}</div>
                 </div>
                 <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg px-3 py-2">
-                    <div class="text-[9px] text-[#718096] uppercase">${mf.netLabel.replace(':','')}</div>
+                    <div class="text-[9px] text-[#6E6259] uppercase">${mf.netLabel.replace(':','')}</div>
                     <div class="text-sm font-bold font-mono" style="color:${balColor}">${isExp ? '+' : ''}${mf.fmt(Math.abs(stats.netBalance))}</div>
                 </div>
             </div>
@@ -719,13 +719,13 @@ const App = {
                 const barPct = Math.round((val / maxPVal) * 100);
                 const isExportTo = !!partnerExports[pIso];
                 const arrow = isExportTo ? '→' : '←';
-                const aColor = isExportTo ? '#38bdf8' : '#f87171';
+                const aColor = isExportTo ? '#009EDB' : '#ED1847';
                 const arcExpIso = isExportTo ? iso : pIso;
                 const arcImpIso = isExportTo ? pIso : iso;
 
                 // Rank asymmetry: where does iso rank in pIso's own partner list? (pre-threshold)
                 const theirRank = getPartnerRank(iso, pIso);
-                const rankCol = theirRank <= 3 ? '#10b981' : theirRank <= 10 ? '#f59e0b' : '#94a3b8';
+                const rankCol = theirRank <= 3 ? '#72BF44' : theirRank <= 10 ? '#FBAF17' : '#AEA29A';
                 const rankTip = theirRank > 0 ? `${pName} ranks ${isoName} as their #${theirRank} trading partner (pre-threshold)` : '';
                 const rankDisplay = theirRank > 0
                     ? `<div class="flex items-baseline gap-0.5 flex-shrink-0" title="${rankTip}">
@@ -733,7 +733,7 @@ const App = {
                             <span class="text-[#D1D5DB] text-[7px] leading-none">·</span>
                             <span class="text-[9px] font-mono font-bold leading-none" style="color:${rankCol}">#${theirRank}</span>
                         </div>`
-                    : `<span class="text-[#9CA3AF] text-[9px] font-mono flex-shrink-0">${idx + 1}</span>`;
+                    : `<span class="text-[#AEA29A] text-[9px] font-mono flex-shrink-0">${idx + 1}</span>`;
 
                 // Bilateral flow split: share flowing in the dominant direction. (pre-threshold gross flows)
                 let splitBadge = '';
@@ -749,7 +749,7 @@ const App = {
                         if (tot > 0) {
                             const domPct = Math.round(Math.max(isoOut, isoIn) / tot * 100);
                             const expDom = isoOut >= isoIn;
-                            const badgeCol = domPct >= 75 ? (expDom ? '#0284c7' : '#e11d48') : '#94a3b8';
+                            const badgeCol = domPct >= 75 ? (expDom ? '#009EDB' : '#ED1847') : '#AEA29A';
                             const tip = expDom
                                 ? `${domPct}% of gross bilateral trade flows from ${isoName}`
                                 : `${domPct}% of gross bilateral trade flows from ${pName}`;
@@ -761,22 +761,22 @@ const App = {
                 return `<div class="flex items-center gap-2 text-[11px] group">
                     ${rankDisplay}
                     <span style="color:${aColor}" class="flex-shrink-0 font-bold text-xs">${arrow}</span>
-                    <span class="text-[#374151] flex-1 truncate">${pName}</span>
-                    <div class="w-10 h-[5px] bg-[#E5E7EB] rounded-full overflow-hidden flex-shrink-0">
+                    <span class="text-[#231F20] flex-1 truncate">${pName}</span>
+                    <div class="w-10 h-[5px] bg-[#EBEAE6] rounded-full overflow-hidden flex-shrink-0">
                         <div class="h-full rounded-full" style="width:${barPct}%;background:${aColor};opacity:0.7"></div>
                     </div>
                     ${splitBadge}
-                    <span class="text-[#6B7280] font-mono text-[10px] w-12 text-right flex-shrink-0">${mf.fmt(val)}</span>
+                    <span class="text-[#6E6259] font-mono text-[10px] w-12 text-right flex-shrink-0">${mf.fmt(val)}</span>
                     <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="App.openArcModal('${arcExpIso}','${arcImpIso}')" class="text-[8px] px-1.5 py-0.5 rounded bg-[#E5E7EB] hover:bg-[#004990] text-[#4B5563] hover:text-white transition" title="Bilateral history">↗</button>
-                        <button onclick="App.openCompareModal('${iso}','${pIso}')" class="text-[8px] px-1.5 py-0.5 rounded bg-[#E5E7EB] hover:bg-amber-500 text-[#4B5563] hover:text-white transition" title="Compare countries">⇄</button>
+                        <button onclick="App.openArcModal('${arcExpIso}','${arcImpIso}')" class="text-[8px] px-1.5 py-0.5 rounded bg-[#EBEAE6] hover:bg-[#004990] text-[#4B5563] hover:text-white transition" title="Bilateral history">↗</button>
+                        <button onclick="App.openCompareModal('${iso}','${pIso}')" class="text-[8px] px-1.5 py-0.5 rounded bg-[#EBEAE6] hover:bg-[#B06E2A] text-[#4B5563] hover:text-white transition" title="Compare countries">⇄</button>
                     </div>
                 </div>`;
             }).join('');
             html += `<div>
                 <div class="flex items-center justify-between mb-2">
-                    <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider">Trading Partners</div>
-                    <div class="text-[8px] text-[#94a3b8] italic">you·them rank · split</div>
+                    <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider">Trading Partners</div>
+                    <div class="text-[8px] text-[#AEA29A] italic">you·them rank · split</div>
                 </div>
                 <div class="space-y-1.5">${rows}</div>
             </div>`;
@@ -797,10 +797,10 @@ const App = {
                 const x = i * (barW + gap);
                 const isCur = years[i] === STATE.year;
                 const yLabel = String(years[i]).slice(2);
-                return `<rect x="${x}" y="${H - h}" width="${barW}" height="${h}" rx="2" fill="${isCur ? '#004990' : '#CBD5E0'}" ${isCur ? 'stroke="#0077B6" stroke-width="1"' : ''}/><text x="${x + barW / 2}" y="${H + 11}" text-anchor="middle" font-size="7" fill="${isCur ? '#0077B6' : '#9CA3AF'}" font-family="Inter,monospace">${yLabel}</text>`;
+                return `<rect x="${x}" y="${H - h}" width="${barW}" height="${h}" rx="2" fill="${isCur ? '#004990' : '#DED9D5'}" ${isCur ? 'stroke="#0077B8" stroke-width="1"' : ''}/><text x="${x + barW / 2}" y="${H + 11}" text-anchor="middle" font-size="7" fill="${isCur ? '#0077B8' : '#AEA29A'}" font-family="Inter,monospace">${yLabel}</text>`;
             }).join('');
             html += `<div>
-                <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-2">Trade Trend (2015–${STATE.year})</div>
+                <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-2">Trade Trend (2015–${STATE.year})</div>
                 <svg width="${W}" height="${H + 14}" class="overflow-visible w-full">${bars}</svg>
             </div>`;
         }
@@ -819,11 +819,11 @@ const App = {
             const barSegs = segments.map(s => `<div class="h-full" style="width:${s.pct}%;background:${CONFIG.flowColors[s.cat]}"></div>`).join('');
             const rows = segments.map(s => `<div class="flex items-center gap-2">
                 <div class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:${CONFIG.flowColors[s.cat]}"></div>
-                <span class="text-[10px] text-[#374151] flex-1">${catFull[s.cat]}</span>
+                <span class="text-[10px] text-[#231F20] flex-1">${catFull[s.cat]}</span>
                 <span class="text-[10px] font-bold font-mono" style="color:${CONFIG.flowColors[s.cat]}">${Math.round(s.pct)}%</span>
             </div>`).join('');
             html += `<div>
-                <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-2">Flow Composition</div>
+                <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-2">Flow Composition</div>
                 <div class="flex h-[6px] rounded-full overflow-hidden gap-px mb-2">${barSegs}</div>
                 <div class="space-y-1">${rows}</div>
             </div>`;
@@ -859,8 +859,8 @@ const App = {
 
         // Thresholds calibrated for trade (not market-competition DOJ levels).
         let label, badge;
-        if (hhi < 0.20)      { label = 'Diversified';        badge = '#10b981'; }
-        else if (hhi < 0.40) { label = 'Moderate';           badge = '#f59e0b'; }
+        if (hhi < 0.20)      { label = 'Diversified';        badge = '#72BF44'; }
+        else if (hhi < 0.40) { label = 'Moderate';           badge = '#FBAF17'; }
         else                  { label = 'Highly concentrated'; badge = '#ef4444'; }
 
         const W = 240, H = 110, cx = W / 2, cy = H - 12, r = 84;
@@ -876,41 +876,41 @@ const App = {
             const a = startA + (endA - startA) * v;
             const x1 = cx + (r + 3) * Math.cos(a), y1 = cy + (r + 3) * Math.sin(a);
             const x2 = cx + (r - 7) * Math.cos(a), y2 = cy + (r - 7) * Math.sin(a);
-            return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#94a3b8" stroke-width="1"/>`;
+            return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#AEA29A" stroke-width="1"/>`;
         };
         const mx1 = cx + (r - 14) * Math.cos(valA), my1 = cy + (r - 14) * Math.sin(valA);
         const mx2 = cx + (r + 6)  * Math.cos(valA), my2 = cy + (r + 6)  * Math.sin(valA);
 
         return `<div>
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Partner Concentration (HHI)</div>
-            <div class="text-[8px] text-[#94a3b8] italic mb-2">${scopeNote}</div>
+            <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-1">Partner Concentration (HHI)</div>
+            <div class="text-[8px] text-[#AEA29A] italic mb-2">${scopeNote}</div>
             <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3">
                 <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height:130px" preserveAspectRatio="xMidYMid meet">
                     <path d="${arcPath(startA, endA)}" stroke="#E2E8F0" stroke-width="9" fill="none" stroke-linecap="round"/>
                     <path d="${arcPath(startA, valA)}" stroke="${badge}" stroke-width="9" fill="none" stroke-linecap="round"/>
                     ${tick(0.20)}${tick(0.40)}
-                    <line x1="${mx1.toFixed(2)}" y1="${my1.toFixed(2)}" x2="${mx2.toFixed(2)}" y2="${my2.toFixed(2)}" stroke="#1a2332" stroke-width="2.5" stroke-linecap="round"/>
-                    <text x="${cx}" y="${cy - 36}" text-anchor="middle" font-size="22" font-weight="700" fill="#1a2332" font-family="Inter,monospace">${(hhi * 10000).toFixed(0)}</text>
-                    <text x="${cx}" y="${cy - 20}" text-anchor="middle" font-size="9" fill="#718096" font-family="Inter,sans-serif">HHI score (0–10000)</text>
+                    <line x1="${mx1.toFixed(2)}" y1="${my1.toFixed(2)}" x2="${mx2.toFixed(2)}" y2="${my2.toFixed(2)}" stroke="#231F20" stroke-width="2.5" stroke-linecap="round"/>
+                    <text x="${cx}" y="${cy - 36}" text-anchor="middle" font-size="22" font-weight="700" fill="#231F20" font-family="Inter,monospace">${(hhi * 10000).toFixed(0)}</text>
+                    <text x="${cx}" y="${cy - 20}" text-anchor="middle" font-size="9" fill="#6E6259" font-family="Inter,sans-serif">HHI score (0–10000)</text>
                 </svg>
                 <div class="flex justify-center -mt-1">
                     <span class="text-[10px] font-bold px-3 py-1 rounded-full" style="background:${badge}22;color:${badge}">${label}</span>
                 </div>
                 <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[#E2E8F0]">
                     <div class="text-center">
-                        <div class="text-[8px] text-[#718096] uppercase font-bold">Top 1</div>
-                        <div class="text-xs font-bold font-mono text-[#1a2332]">${top1Pct.toFixed(0)}%</div>
-                        <div class="text-[8px] text-[#718096] truncate" title="${top1Name}">${top1Name}</div>
+                        <div class="text-[8px] text-[#6E6259] uppercase font-bold">Top 1</div>
+                        <div class="text-xs font-bold font-mono text-[#231F20]">${top1Pct.toFixed(0)}%</div>
+                        <div class="text-[8px] text-[#6E6259] truncate" title="${top1Name}">${top1Name}</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-[8px] text-[#718096] uppercase font-bold">Top 3</div>
-                        <div class="text-xs font-bold font-mono text-[#1a2332]">${top3Pct.toFixed(0)}%</div>
-                        <div class="text-[8px] text-[#718096]">share</div>
+                        <div class="text-[8px] text-[#6E6259] uppercase font-bold">Top 3</div>
+                        <div class="text-xs font-bold font-mono text-[#231F20]">${top3Pct.toFixed(0)}%</div>
+                        <div class="text-[8px] text-[#6E6259]">share</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-[8px] text-[#718096] uppercase font-bold">Top 5</div>
-                        <div class="text-xs font-bold font-mono text-[#1a2332]">${top5Pct.toFixed(0)}%</div>
-                        <div class="text-[8px] text-[#718096]">share</div>
+                        <div class="text-[8px] text-[#6E6259] uppercase font-bold">Top 5</div>
+                        <div class="text-xs font-bold font-mono text-[#231F20]">${top5Pct.toFixed(0)}%</div>
+                        <div class="text-[8px] text-[#6E6259]">share</div>
                     </div>
                 </div>
             </div>
@@ -978,27 +978,27 @@ const App = {
                 const x2 = cx + (innerR + len) * Math.cos(angleRad), y2 = cy + (innerR + len) * Math.sin(angleRad);
                 parts.push(`<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${color}" stroke-width="6" stroke-linecap="round" opacity="0.88"/>`);
             };
-            drawBar(expLen, centerRad + offsetRad, '#0284c7');
-            drawBar(impLen, centerRad - offsetRad, '#e11d48');
+            drawBar(expLen, centerRad + offsetRad, '#009EDB');
+            drawBar(impLen, centerRad - offsetRad, '#ED1847');
 
             const labelR = innerR + maxBarLen + 14;
-            parts.push(`<text x="${(cx + labelR * Math.cos(centerRad)).toFixed(2)}" y="${(cy + labelR * Math.sin(centerRad) + 3).toFixed(2)}" text-anchor="middle" font-size="10" font-weight="700" fill="#94a3b8" font-family="Inter,sans-serif">${labels[i]}</text>`);
+            parts.push(`<text x="${(cx + labelR * Math.cos(centerRad)).toFixed(2)}" y="${(cy + labelR * Math.sin(centerRad) + 3).toFixed(2)}" text-anchor="middle" font-size="10" font-weight="700" fill="#AEA29A" font-family="Inter,sans-serif">${labels[i]}</text>`);
         }
-        parts.push(`<circle cx="${cx}" cy="${cy}" r="3.2" fill="#1a2332"/>`);
+        parts.push(`<circle cx="${cx}" cy="${cy}" r="3.2" fill="#231F20"/>`);
 
         const scopeNote = isRegional ? `${STATE.region} intra-regional · pre-threshold` : 'All net bilateral flows · pre-threshold';
         return `<div>
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Trade Fingerprint</div>
-            <div class="text-[8px] text-[#94a3b8] italic mb-2">${scopeNote}</div>
+            <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-1">Trade Fingerprint</div>
+            <div class="text-[8px] text-[#AEA29A] italic mb-2">${scopeNote}</div>
             <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3 flex flex-col items-center">
                 <svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-width:220px" preserveAspectRatio="xMidYMid meet">
                     ${parts.join('')}
                 </svg>
                 <div class="flex items-center gap-3 mt-1 text-[9px]">
-                    <div class="flex items-center gap-1"><div style="width:10px;height:3px;background:#0284c7;border-radius:2px"></div><span class="text-[#374151]">Exports</span></div>
-                    <div class="flex items-center gap-1"><div style="width:10px;height:3px;background:#e11d48;border-radius:2px"></div><span class="text-[#374151]">Imports</span></div>
+                    <div class="flex items-center gap-1"><div style="width:10px;height:3px;background:#009EDB;border-radius:2px"></div><span class="text-[#231F20]">Exports</span></div>
+                    <div class="flex items-center gap-1"><div style="width:10px;height:3px;background:#ED1847;border-radius:2px"></div><span class="text-[#231F20]">Imports</span></div>
                 </div>
-                <div class="text-[9px] text-[#718096] italic mt-1 text-center">Bar direction = geographic bearing from this country</div>
+                <div class="text-[9px] text-[#6E6259] italic mt-1 text-center">Bar direction = geographic bearing from this country</div>
             </div>
         </div>`;
     },
@@ -1065,12 +1065,12 @@ const App = {
             const shortName = name.length > 12 ? name.slice(0, 11) + '…' : name;
 
             const impBar = impLen > 0
-                ? `<rect x="${(leftEdge - impLen).toFixed(1)}" y="${y}" width="${impLen.toFixed(1)}" height="${barH}" rx="2" fill="#f87171" opacity="0.78"/>`
+                ? `<rect x="${(leftEdge - impLen).toFixed(1)}" y="${y}" width="${impLen.toFixed(1)}" height="${barH}" rx="2" fill="#ED1847" opacity="0.78"/>`
                 : '';
             const expBar = expLen > 0
-                ? `<rect x="${rightEdge}" y="${y}" width="${expLen.toFixed(1)}" height="${barH}" rx="2" fill="#38bdf8" opacity="0.78"/>`
+                ? `<rect x="${rightEdge}" y="${y}" width="${expLen.toFixed(1)}" height="${barH}" rx="2" fill="#009EDB" opacity="0.78"/>`
                 : '';
-            const nameEl = `<text x="${cx}" y="${y + barH - 1}" text-anchor="middle" font-size="7.5" fill="#374151" font-family="Inter,sans-serif">${shortName}</text>`;
+            const nameEl = `<text x="${cx}" y="${y + barH - 1}" text-anchor="middle" font-size="7.5" fill="#231F20" font-family="Inter,sans-serif">${shortName}</text>`;
 
             return `${impBar}${expBar}${nameEl}`;
         }).join('');
@@ -1078,8 +1078,8 @@ const App = {
         const totalH = topPartners.length * rowGap + barH;
 
         const grid = `
-            <text x="${(leftEdge - barMaxLen / 2).toFixed(0)}" y="-4" text-anchor="middle" font-size="7" font-weight="700" fill="#f87171" font-family="Inter,sans-serif">← Imports</text>
-            <text x="${(rightEdge + barMaxLen / 2).toFixed(0)}" y="-4" text-anchor="middle" font-size="7" font-weight="700" fill="#38bdf8" font-family="Inter,sans-serif">Exports →</text>
+            <text x="${(leftEdge - barMaxLen / 2).toFixed(0)}" y="-4" text-anchor="middle" font-size="7" font-weight="700" fill="#ED1847" font-family="Inter,sans-serif">← Imports</text>
+            <text x="${(rightEdge + barMaxLen / 2).toFixed(0)}" y="-4" text-anchor="middle" font-size="7" font-weight="700" fill="#009EDB" font-family="Inter,sans-serif">Exports →</text>
             <line x1="${leftEdge}" y1="0" x2="${leftEdge}" y2="${totalH}" stroke="#E2E8F0" stroke-width="0.6" stroke-dasharray="2,2"/>
             <line x1="${rightEdge}" y1="0" x2="${rightEdge}" y2="${totalH}" stroke="#E2E8F0" stroke-width="0.6" stroke-dasharray="2,2"/>`;
 
@@ -1088,8 +1088,8 @@ const App = {
             : 'Top 7 partners · gross bilateral · pre-threshold';
 
         return `<div>
-            <div class="text-[9px] text-[#718096] font-bold uppercase tracking-wider mb-1">Bilateral Trade Split</div>
-            <div class="text-[8px] text-[#94a3b8] italic mb-2">${scopeNote}</div>
+            <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider mb-1">Bilateral Trade Split</div>
+            <div class="text-[8px] text-[#AEA29A] italic mb-2">${scopeNote}</div>
             <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-lg p-3">
                 <svg viewBox="0 -10 ${W} ${totalH + 12}" class="w-full overflow-visible" preserveAspectRatio="xMidYMid meet">
                     ${grid}
@@ -1131,7 +1131,7 @@ const App = {
             if (prevVal > 0 && curVal > 0) {
                 const yoy = ((curVal - prevVal) / prevVal) * 100;
                 const dir = yoy >= 0 ? 'grew' : 'declined';
-                const col = yoy >= 0 ? '#34d399' : '#f87171';
+                const col = yoy >= 0 ? '#72BF44' : '#ED1847';
                 const firstNZ = years.findIndex(y => yearlyTotals[y] > 0);
                 let cagrStr = '';
                 if (firstNZ >= 0 && curIdx > firstNZ && yearlyTotals[years[firstNZ]] > 0) {
@@ -1173,8 +1173,8 @@ const App = {
             if (s) sentences.push(s);
         }
 
-        if (sentences.length === 0) return `<p class="text-[11px] text-[#9CA3AF] italic">No trade data available for this country in the current view.</p>`;
-        return sentences.map(s => `<p class="text-[11px] text-[#374151] leading-relaxed">${s}</p>`).join('');
+        if (sentences.length === 0) return `<p class="text-[11px] text-[#AEA29A] italic">No trade data available for this country in the current view.</p>`;
+        return sentences.map(s => `<p class="text-[11px] text-[#231F20] leading-relaxed">${s}</p>`).join('');
     },
 
     updateDashboard(rebuildMenus = true) {
@@ -1200,7 +1200,7 @@ const App = {
         const region = RegionConfig.getRegion(iso);
         const devStatus = CONFIG.development[iso] === 'north' ? 'Developed' : 'Developing';
         const regionTag = region && region !== 'Other'
-            ? `<span class="text-[9px] text-[#718096]">${region} · ${devStatus}</span>` : '';
+            ? `<span class="text-[9px] text-[#6E6259]">${region} · ${devStatus}</span>` : '';
 
         let content = `
         <div class="flex items-center justify-between gap-3 mb-1.5">
@@ -1215,19 +1215,19 @@ const App = {
         }
 
         const isNetExporter = stats.netBalance >= 0;
-        const balanceColor = isNetExporter ? '#38bdf8' : '#f87171';
+        const balanceColor = isNetExporter ? '#009EDB' : '#ED1847';
         const balanceSign  = isNetExporter ? '+' : '';
         const roleLabel    = isNetExporter ? 'Net Exporter' : 'Net Importer';
-        const roleBg       = isNetExporter ? 'background:rgba(56,189,248,0.15);color:#38bdf8' : 'background:rgba(248,113,113,0.15);color:#f87171';
+        const roleBg       = isNetExporter ? 'background:rgba(0,158,219,0.15);color:#009EDB' : 'background:rgba(237,24,71,0.15);color:#ED1847';
 
         content += `
         <div class="grid grid-cols-2 gap-2 mb-1.5">
             <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-md px-2 py-1.5">
-                <div class="text-[9px] text-[#718096] uppercase">${mf.grossLabel.replace(':','')}</div>
-                <div class="text-xs font-bold text-[#1a2332] font-mono">${mf.fmt(stats.grossVolume)}</div>
+                <div class="text-[9px] text-[#6E6259] uppercase">${mf.grossLabel.replace(':','')}</div>
+                <div class="text-xs font-bold text-[#231F20] font-mono">${mf.fmt(stats.grossVolume)}</div>
             </div>
             <div class="bg-[#F5F7FA] border border-[#E2E8F0] rounded-md px-2 py-1.5">
-                <div class="text-[9px] text-[#718096] uppercase">${mf.netLabel.replace(':','')}</div>
+                <div class="text-[9px] text-[#6E6259] uppercase">${mf.netLabel.replace(':','')}</div>
                 <div class="text-xs font-bold font-mono" style="color:${balanceColor}">${balanceSign}${mf.fmt(Math.abs(stats.netBalance))}</div>
             </div>
         </div>
@@ -1261,21 +1261,21 @@ const App = {
                 const barPct = Math.round((val / maxPVal) * 100);
                 const isExportTo = !!partnerExports[pIso];
                 const arrow = isExportTo ? '→' : '←';
-                const arrowColor = isExportTo ? '#38bdf8' : '#f87171';
+                const arrowColor = isExportTo ? '#009EDB' : '#ED1847';
                 return `
                 <div class="flex items-center gap-1.5 text-[10px] leading-relaxed">
                     <span style="color:${arrowColor}" class="flex-shrink-0 font-bold">${arrow}</span>
-                    <span class="text-[#374151] w-[72px] truncate">${shortName}</span>
-                    <div class="flex-1 h-[5px] bg-[#E5E7EB] rounded-full overflow-hidden">
+                    <span class="text-[#231F20] w-[72px] truncate">${shortName}</span>
+                    <div class="flex-1 h-[5px] bg-[#EBEAE6] rounded-full overflow-hidden">
                         <div class="h-full rounded-full" style="width:${barPct}%;background:${arrowColor};opacity:0.7"></div>
                     </div>
-                    <span class="text-[#6B7280] font-mono text-[9px] w-[52px] text-right">${mf.fmt(val)}</span>
+                    <span class="text-[#6E6259] font-mono text-[9px] w-[52px] text-right">${mf.fmt(val)}</span>
                 </div>`;
             }).join('');
 
             content += `
             <div class="pt-1.5 border-t border-[#E2E8F0]">
-                <div class="text-[9px] text-[#718096] font-bold uppercase mb-1 tracking-wider">Top Partners</div>
+                <div class="text-[9px] text-[#6E6259] font-bold uppercase mb-1 tracking-wider">Top Partners</div>
                 ${partnerRows}
             </div>`;
         }
@@ -1304,7 +1304,7 @@ const App = {
 
             content += `
             <div class="mt-1.5 pt-1.5 border-t border-[#E2E8F0]">
-                <div class="text-[9px] text-[#718096] font-bold uppercase mb-1 tracking-wider">Flow Composition</div>
+                <div class="text-[9px] text-[#6E6259] font-bold uppercase mb-1 tracking-wider">Flow Composition</div>
                 <div class="flex h-[4px] rounded-full overflow-hidden gap-px">${barSegments}</div>
                 <div class="flex items-center justify-center gap-1 mt-1 flex-wrap">${labelSpans}</div>
             </div>`;
@@ -1325,14 +1325,14 @@ const App = {
                 const h = Math.max(1, (v / maxYV) * H);
                 const x = i * (barW + gap);
                 const isCur = years[i] === STATE.year;
-                return `<rect x="${x}" y="${H - h}" width="${barW}" height="${h}" rx="1.5" fill="${isCur ? '#004990' : '#CBD5E0'}" ${isCur ? 'stroke="#0077B6" stroke-width="0.5"' : ''}/>`;
+                return `<rect x="${x}" y="${H - h}" width="${barW}" height="${h}" rx="1.5" fill="${isCur ? '#004990' : '#DED9D5'}" ${isCur ? 'stroke="#0077B8" stroke-width="0.5"' : ''}/>`;
             }).join('');
 
             const curIdx = years.indexOf(STATE.year);
             let yoyHtml = '';
             if (curIdx > 0 && yVals[curIdx - 1] > 0) {
                 const yoy = ((yVals[curIdx] - yVals[curIdx - 1]) / yVals[curIdx - 1]) * 100;
-                const yoyCol = yoy >= 0 ? '#34d399' : '#f87171';
+                const yoyCol = yoy >= 0 ? '#72BF44' : '#ED1847';
                 const yoySign = yoy >= 0 ? '+' : '';
                 yoyHtml = `<span class="text-[9px] font-mono font-bold" style="color:${yoyCol}">${yoySign}${yoy.toFixed(0)}% YoY</span>`;
             }
@@ -1342,7 +1342,7 @@ const App = {
                 const n = curIdx - firstNonZeroIdx;
                 const cagr = (Math.pow(yVals[curIdx] / yVals[firstNonZeroIdx], 1 / n) - 1) * 100;
                 if (isFinite(cagr)) {
-                    const cagrCol = cagr >= 0 ? '#34d399' : '#f87171';
+                    const cagrCol = cagr >= 0 ? '#72BF44' : '#ED1847';
                     cagrHtml = `<span class="text-[8px] font-mono" style="color:${cagrCol}">CAGR ${cagr >= 0 ? '+' : ''}${cagr.toFixed(1)}%</span>`;
                 }
             }
@@ -1350,11 +1350,11 @@ const App = {
             content += `
             <div class="mt-1.5 pt-1.5 border-t border-[#E2E8F0]">
                 <div class="flex items-center justify-between mb-1">
-                    <span class="text-[9px] text-[#718096] font-bold uppercase tracking-wider">Trend</span>
+                    <span class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider">Trend</span>
                     <div class="flex items-center gap-2">${yoyHtml}${cagrHtml}</div>
                 </div>
                 <svg width="${W}" height="${H}" class="w-full">${bars}</svg>
-                <div class="flex justify-between text-[8px] text-[#9CA3AF] font-mono mt-0.5">
+                <div class="flex justify-between text-[8px] text-[#AEA29A] font-mono mt-0.5">
                     <span>${years[0]}</span><span>${years[years.length - 1]}</span>
                 </div>
             </div>`;
@@ -1368,7 +1368,7 @@ const App = {
             const total = regionCountries.length;
             if (rank > 0) {
                 content += `
-                <div class="mt-1.5 pt-1.5 border-t border-[#E2E8F0] text-[9px] text-[#718096] flex items-center gap-1">
+                <div class="mt-1.5 pt-1.5 border-t border-[#E2E8F0] text-[9px] text-[#6E6259] flex items-center gap-1">
                     <span class="text-[#004990] font-bold text-[10px]">#${rank}</span>
                     <span>of ${total} in ${region}</span>
                     <span class="ml-auto px-1.5 py-0.5 rounded text-[8px] font-bold" style="${roleBg}">${roleLabel}</span>
