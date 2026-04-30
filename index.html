@@ -5,360 +5,300 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Second-Hand Clothes Trade Monitor</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* モバイル版Legendパネルをフローティングカードとして強制上書き */
-        @media (max-width: 767px) {
-            #legend-panel {
-                position: fixed !important;
-                top: auto !important;
-                left: 12px !important;
-                right: 12px !important;
-                bottom: 80px !important; /* 下部のFAB群の上に浮いて配置 */
-                width: auto !important;
-                height: auto !important;
-                max-height: 45vh !important; /* 高さをさらに小さく制限 */
-                transform: translateY(calc(100% + 100px)) !important; /* 画面外へ下に隠しておく */
-                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease !important;
-                z-index: 33 !important;
-                border: 1px solid #DED9D5 !important;
-                border-radius: 1rem !important; /* 全体の角を丸くする */
-                box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
-                opacity: 0 !important; /* 隠れている時は透明 */
-                pointer-events: none !important;
-            }
-            #legend-panel.mobile-open {
-                transform: translateY(0) !important; /* 上に引き上げる */
-                opacity: 1 !important;
-                pointer-events: auto !important;
-            }
-        }
-    </style>
 </head>
-<body class="bg-[#F3F8FD] text-[#231F20] font-sans h-[100dvh] flex flex-col overflow-hidden">
+<body>
 
-    <!-- UNCTAD-style header: dark navy with white text -->
-    <header id="main-header" class="bg-[#004990] border-b border-[#003A75] p-3 z-30 shadow-md">
-        <div class="max-w-[1600px] mx-auto flex flex-col xl:flex-row justify-between items-center gap-4">
+    <!-- ── UNCTAD Header ── -->
+    <header id="main-header">
+        <div class="header-inner">
 
-            <div class="flex items-center gap-3 min-w-fit">
-                <div class="flex items-center justify-center p-1"><img src="assets/unctad-icon.svg" alt="UNCTAD" class="w-8 h-8 object-contain"></div>
+            <div class="header-brand">
+                <img src="assets/unctad-icon.svg" alt="UNCTAD">
                 <div>
-                    <h1 class="text-lg font-bold text-white tracking-tight leading-tight">Global Second-Hand Clothes Trade Monitor</h1>
-                    <div class="flex gap-2 text-[10px] text-[#7BB7E1] font-mono">
+                    <h1>Global Second-Hand Clothes Trade Monitor</h1>
+                    <div class="header-meta">
                         <span>EST 2026</span>
-                        <span class="text-white/30">|</span>
+                        <span class="meta-sep">|</span>
                         <span>DATA: UN COMTRADE</span>
                     </div>
                 </div>
             </div>
 
-            <div class="hidden md:flex md:flex-wrap items-center gap-3 bg-[#003A75] p-1.5 rounded border border-[#003A75] w-full xl:w-auto justify-start md:justify-center xl:justify-end">
+            <div class="header-controls">
 
-                <div class="w-px h-6 bg-white/30"></div>
-                <div class="flex bg-white rounded-md p-1 border border-[#DED9D5] shadow-sm gap-0.5">
-                    <button class="region-btn px-2 py-1.5 text-xs font-bold rounded transition-all bg-[#004990] text-white" data-region="Global" title="Global">All</button>
-                    <button class="region-btn px-2 py-1.5 text-xs font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-region="Africa" title="Africa">AF</button>
-                    <button class="region-btn px-2 py-1.5 text-xs font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-region="Americas" title="Americas">AM</button>
-                    <button class="region-btn px-2 py-1.5 text-xs font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-region="Asia" title="Asia">AS</button>
-                    <button class="region-btn px-2 py-1.5 text-xs font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-region="Europe" title="Europe">EU</button>
-                    <button class="region-btn px-2 py-1.5 text-xs font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-region="Oceania" title="Oceania">OC</button>
+                <div class="ctrl-divider"></div>
+
+                <!-- Region filter -->
+                <div class="ctrl-pill">
+                    <button class="region-btn btn-toggle active" data-region="Global" title="Global">All</button>
+                    <button class="region-btn btn-toggle" data-region="Africa"   title="Africa">AF</button>
+                    <button class="region-btn btn-toggle" data-region="Americas" title="Americas">AM</button>
+                    <button class="region-btn btn-toggle" data-region="Asia"     title="Asia">AS</button>
+                    <button class="region-btn btn-toggle" data-region="Europe"   title="Europe">EU</button>
+                    <button class="region-btn btn-toggle" data-region="Oceania"  title="Oceania">OC</button>
                 </div>
 
-                <div class="w-px h-6 bg-white/30"></div>
+                <div class="ctrl-divider"></div>
 
-                <div class="flex bg-white rounded-md p-1 border border-[#DED9D5] shadow-sm">
-                    <select id="year-select" class="bg-transparent text-xs font-bold text-[#231F20] px-2 py-1.5 outline-none cursor-pointer rounded">
-                        <option value="2024" class="bg-white" selected>2024</option>
-                        <option value="2023" class="bg-white">2023</option>
-                        <option value="2022" class="bg-white">2022</option>
-                        <option value="2021" class="bg-white">2021</option>
-                        <option value="2020" class="bg-white">2020</option>
-                        <option value="2019" class="bg-white">2019</option>
-                        <option value="2018" class="bg-white">2018</option>
-                        <option value="2017" class="bg-white">2017</option>
-                        <option value="2016" class="bg-white">2016</option>
-                        <option value="2015" class="bg-white">2015</option>
+                <!-- Year select -->
+                <div class="ctrl-pill">
+                    <select id="year-select" class="ctrl-year">
+                        <option value="2024" selected>2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                        <option value="2021">2021</option>
+                        <option value="2020">2020</option>
+                        <option value="2019">2019</option>
+                        <option value="2018">2018</option>
+                        <option value="2017">2017</option>
+                        <option value="2016">2016</option>
+                        <option value="2015">2015</option>
                     </select>
                 </div>
 
-                <div class="flex bg-white rounded-md p-1 border border-[#DED9D5] shadow-sm items-center gap-1 px-2" title="Filter by economic flow direction">
-                    <span class="text-[10px] text-[#6E6259] font-bold uppercase mr-1">Flows</span>
-                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="North to South">
+                <!-- Flow direction filter -->
+                <div class="ctrl-pill" title="Filter by economic flow direction">
+                    <span class="ctrl-flows-label">Flows</span>
+                    <label class="flow-label" title="North to South">
                         <input type="checkbox" class="flow-checkbox" value="north-south" checked>
-                        <span class="text-[10px] font-bold" style="color:#009EDB">N→S</span>
+                        <span style="color:#009EDB">N→S</span>
                     </label>
-                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="South to North">
+                    <label class="flow-label" title="South to North">
                         <input type="checkbox" class="flow-checkbox" value="south-north" checked>
-                        <span class="text-[10px] font-bold" style="color:#ED1847">S→N</span>
+                        <span style="color:#ED1847">S→N</span>
                     </label>
-                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="South to South">
+                    <label class="flow-label" title="South to South">
                         <input type="checkbox" class="flow-checkbox" value="south-south" checked>
-                        <span class="text-[10px] font-bold" style="color:#FBAF17">S→S</span>
+                        <span style="color:#FBAF17">S→S</span>
                     </label>
-                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="North to North">
+                    <label class="flow-label" title="North to North">
                         <input type="checkbox" class="flow-checkbox" value="north-north" checked>
-                        <span class="text-[10px] font-bold" style="color:#AEA29A">N→N</span>
+                        <span style="color:#AEA29A">N→N</span>
                     </label>
                 </div>
 
-                <div id="threshold-divider" class="w-px h-6 bg-white/30"></div>
+                <div id="threshold-divider" class="ctrl-divider"></div>
 
-                <div id="threshold-group" class="flex bg-white rounded-md p-1 border border-[#DED9D5] shadow-sm gap-0.5" title="Visibility threshold — minimum trade value to display">
-                    <button class="threshold-btn px-2 py-1.5 text-[10px] font-bold rounded transition-all bg-[#004990] text-white" data-threshold="auto">Auto</button>
-                    <button class="threshold-btn px-2 py-1.5 text-[10px] font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-threshold="10000000">$10M</button>
-                    <button class="threshold-btn px-2 py-1.5 text-[10px] font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-threshold="1000000">$1M</button>
-                    <button class="threshold-btn px-2 py-1.5 text-[10px] font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-threshold="500000">$500k</button>
-                    <button class="threshold-btn px-2 py-1.5 text-[10px] font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-threshold="100000">$100k</button>
-                    <button class="threshold-btn px-2 py-1.5 text-[10px] font-bold rounded transition-all text-[#6E6259] hover:text-[#231F20]" data-threshold="10000">$10k</button>
+                <!-- Threshold filter -->
+                <div id="threshold-group" class="ctrl-pill" title="Visibility threshold — minimum trade value to display">
+                    <button class="threshold-btn btn-toggle active" data-threshold="auto">Auto</button>
+                    <button class="threshold-btn btn-toggle" data-threshold="10000000">$10M</button>
+                    <button class="threshold-btn btn-toggle" data-threshold="1000000">$1M</button>
+                    <button class="threshold-btn btn-toggle" data-threshold="500000">$500k</button>
+                    <button class="threshold-btn btn-toggle" data-threshold="100000">$100k</button>
+                    <button class="threshold-btn btn-toggle" data-threshold="10000">$10k</button>
                 </div>
 
-                <div class="w-px h-6 bg-white/30"></div>
+                <div class="ctrl-divider"></div>
 
-                <div class="relative z-50">
-                    <button id="exp-btn" class="flex items-center justify-between w-36 bg-white text-xs text-[#231F20] border border-[#DED9D5] rounded-md px-2 py-2 hover:border-[#004990] transition-colors">
-                        <div class="flex flex-col items-start leading-none">
-                            <span class="text-[8px] text-[#6E6259] uppercase">Exporter (From)</span>
-                            <span id="exp-label" class="truncate font-bold w-24 text-left">All Exporters</span>
+                <!-- Exporter picker -->
+                <div class="picker-wrapper">
+                    <button id="exp-btn" class="country-picker-btn">
+                        <div class="picker-labels">
+                            <span class="picker-type">Exporter (From)</span>
+                            <span id="exp-label" class="picker-value">All Exporters</span>
                         </div>
-                        <div class="flex items-center gap-1 flex-shrink-0 ml-1">
-                            <span id="exp-count" class="hidden text-[9px] bg-[#004990] text-white rounded-full px-1.5 font-bold leading-4"></span>
-                            <svg class="w-3 h-3 text-[#6E6259]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:4px">
+                            <span id="exp-count" class="picker-badge hidden"></span>
+                            <svg class="picker-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </div>
                     </button>
-                    <div id="exp-menu" class="hidden absolute top-full right-0 mt-2 w-64 bg-white border border-[#DED9D5] rounded-md shadow-md overflow-hidden flex flex-col max-h-[400px]">
-                        <div class="p-2 border-b border-[#EBEAE6] bg-[#F3F8FD]">
-                            <input type="text" id="exp-search" placeholder="Search Exporter..." class="w-full bg-white text-xs text-[#231F20] px-2 py-1.5 rounded border border-[#DED9D5] focus:outline-none focus:border-[#004990]">
-                            <div class="flex justify-end mt-2">
-                                <button id="exp-clear-all" class="text-[10px] text-red-500">Clear</button>
-                            </div>
+                    <div id="exp-menu" class="country-picker-menu hidden">
+                        <div class="picker-search-area">
+                            <input type="text" id="exp-search" placeholder="Search Exporter...">
+                            <button id="exp-clear-all" class="picker-clear">Clear</button>
                         </div>
-                        <div id="exp-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+                        <div id="exp-list" class="picker-list"></div>
                     </div>
                 </div>
 
-                <div class="relative z-50">
-                    <button id="imp-btn" class="flex items-center justify-between w-36 bg-white text-xs text-[#231F20] border border-[#DED9D5] rounded-md px-2 py-2 hover:border-[#004990] transition-colors">
-                        <div class="flex flex-col items-start leading-none">
-                            <span class="text-[8px] text-[#6E6259] uppercase">Importer (To)</span>
-                            <span id="imp-label" class="truncate font-bold w-24 text-left">All Importers</span>
+                <!-- Importer picker -->
+                <div class="picker-wrapper">
+                    <button id="imp-btn" class="country-picker-btn">
+                        <div class="picker-labels">
+                            <span class="picker-type">Importer (To)</span>
+                            <span id="imp-label" class="picker-value">All Importers</span>
                         </div>
-                        <div class="flex items-center gap-1 flex-shrink-0 ml-1">
-                            <span id="imp-count" class="hidden text-[9px] bg-amber-600 text-white rounded-full px-1.5 font-bold leading-4"></span>
-                            <svg class="w-3 h-3 text-[#6E6259]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:4px">
+                            <span id="imp-count" class="picker-badge hidden" style="background:#b45309"></span>
+                            <svg class="picker-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </div>
                     </button>
-                    <div id="imp-menu" class="hidden absolute top-full right-0 mt-2 w-64 bg-white border border-[#DED9D5] rounded-md shadow-md overflow-hidden flex flex-col max-h-[400px]">
-                        <div class="p-2 border-b border-[#EBEAE6] bg-[#F3F8FD]">
-                            <input type="text" id="imp-search" placeholder="Search Importer..." class="w-full bg-white text-xs text-[#231F20] px-2 py-1.5 rounded border border-[#DED9D5] focus:outline-none focus:border-[#004990]">
-                            <div class="flex justify-end mt-2">
-                                <button id="imp-clear-all" class="text-[10px] text-red-500">Clear</button>
-                            </div>
+                    <div id="imp-menu" class="country-picker-menu hidden">
+                        <div class="picker-search-area">
+                            <input type="text" id="imp-search" placeholder="Search Importer...">
+                            <button id="imp-clear-all" class="picker-clear">Clear</button>
                         </div>
-                        <div id="imp-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+                        <div id="imp-list" class="picker-list"></div>
                     </div>
                 </div>
 
-            </div>
-        </div>
+            </div><!-- /.header-controls -->
+        </div><!-- /.header-inner -->
     </header>
 
-    <div id="kpi-bar" class="z-20 px-4 py-1.5">
-        <div class="max-w-[1600px] mx-auto flex items-center justify-start md:justify-center gap-4 flex-nowrap md:flex-wrap overflow-x-auto">
-            <div class="kpi-item">
-                <span class="kpi-label">Total</span>
-                <span class="kpi-value" id="kpi-total">—</span>
-            </div>
+    <!-- ── KPI Bar ── -->
+    <div id="kpi-bar">
+        <div class="kpi-inner">
+            <div class="kpi-item"><span class="kpi-label">Total</span><span class="kpi-value" id="kpi-total">—</span></div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item">
-                <span class="kpi-label">Flows</span>
-                <span class="kpi-value" id="kpi-flows">—</span>
-            </div>
+            <div class="kpi-item"><span class="kpi-label">Flows</span><span class="kpi-value" id="kpi-flows">—</span></div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item">
-                <span class="kpi-label">Countries</span>
-                <span class="kpi-value" id="kpi-countries">—</span>
-            </div>
+            <div class="kpi-item"><span class="kpi-label">Countries</span><span class="kpi-value" id="kpi-countries">—</span></div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item">
-                <span class="kpi-label">#1 Exporter</span>
-                <span class="kpi-value" id="kpi-top-exp" style="color:#0077B6">—</span>
-            </div>
+            <div class="kpi-item"><span class="kpi-label">#1 Exporter</span><span class="kpi-value" id="kpi-top-exp" style="color:#0077B6">—</span></div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item">
-                <span class="kpi-label">#1 Importer</span>
-                <span class="kpi-value" id="kpi-top-imp" style="color:#C0392B">—</span>
-            </div>
+            <div class="kpi-item"><span class="kpi-label">#1 Importer</span><span class="kpi-value" id="kpi-top-imp" style="color:#C0392B">—</span></div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item">
-                <span class="kpi-label">N→S</span>
-                <span class="kpi-value" id="kpi-ns-pct" style="color:#009EDB">—</span>
-            </div>
+            <div class="kpi-item"><span class="kpi-label">N→S</span><span class="kpi-value" id="kpi-ns-pct" style="color:#009EDB">—</span></div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item">
-                <span class="kpi-label">S→S</span>
-                <span class="kpi-value" id="kpi-ss-pct" style="color:#FBAF17">—</span>
-            </div>
+            <div class="kpi-item"><span class="kpi-label">S→S</span><span class="kpi-value" id="kpi-ss-pct" style="color:#FBAF17">—</span></div>
         </div>
     </div>
 
-    <main class="flex flex-1 overflow-hidden min-h-0 relative">
+    <main>
 
         <!-- ── Left Legend Panel ── -->
-        <div id="legend-panel" class="flex-shrink-0 bg-white border-r border-[#DED9D5] flex flex-col overflow-hidden">
-            <!-- Mobile Header & Close Button (Hidden on Desktop) -->
-            <div class="md:hidden flex items-center justify-between px-4 pt-2.5 pb-2 border-b border-[#EBEAE6] flex-shrink-0 bg-white rounded-t-2xl">
-                <span class="text-sm font-bold text-[#231F20] uppercase tracking-wide">Legend</span>
-                <button id="mobile-legend-close" class="p-1.5 -mr-1.5 mt-1 rounded-lg hover:bg-[#F3F8FD] text-[#6E6259] transition-colors">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <div id="legend-panel">
+            <div class="legend-mobile-header">
+                <span>Legend</span>
+                <button id="mobile-legend-close" class="btn-close">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-
-            <div class="px-3 py-2 border-b border-[#EBEAE6] flex-shrink-0 bg-[#F3F8FD]">
-                <h3 id="legend-title" class="text-[10px] font-bold text-[#231F20] uppercase tracking-wider">Export Value</h3>
+            <div class="legend-title-row">
+                <h3 id="legend-title">Export Value</h3>
             </div>
-            <div id="legend-content" class="flex-1 overflow-y-auto px-3 py-2"></div>
-            <div id="total-stats" class="px-3 py-2 border-t border-[#EBEAE6] flex-shrink-0 bg-[#F3F8FD]">
-                <div class="flex justify-between items-baseline">
-                    <span class="text-[9px] text-[#6E6259]">Shown</span>
-                    <span class="text-[11px] font-bold text-[#231F20] font-mono" id="stat-value">-</span>
+            <div id="legend-content"></div>
+            <div id="total-stats">
+                <div class="stat-row">
+                    <span class="stat-label">Shown</span>
+                    <span class="stat-val" id="stat-value">-</span>
                 </div>
-                <div class="flex justify-between items-baseline mt-0.5">
-                    <span class="text-[9px] text-[#6E6259]">Bilateral</span>
-                    <span class="text-[10px] text-[#6E6259] font-mono" id="stat-bilateral">-</span>
+                <div class="stat-row">
+                    <span class="stat-label">Bilateral</span>
+                    <span class="stat-secondary" id="stat-bilateral">-</span>
                 </div>
-                <div class="flex justify-center mt-0.5">
-                    <span class="text-[9px] text-[#6E6259] font-mono" id="stat-coverage"></span>
-                </div>
+                <span id="stat-coverage"></span>
             </div>
-            <div class="px-3 py-2 border-t border-[#EBEAE6] flex-shrink-0 flex flex-col items-center gap-1 bg-[#F3F8FD]">
-                <img src="assets/smep-logo.png" alt="SMEP Logo" class="h-8 w-auto object-contain opacity-75 hover:opacity-100 transition-opacity">
-                <span class="text-[9px] text-[#6E6259] font-mono">Supported by SMEP</span>
+            <div class="legend-footer">
+                <img src="assets/smep-logo.png" alt="SMEP Logo">
+                <span>Supported by SMEP</span>
             </div>
         </div>
 
         <!-- ── Map + Overlays ── -->
-        <div class="relative flex-1 overflow-hidden bg-[#F3F8FD]">
-            <div id="map-container" class="absolute inset-0 w-full h-full z-0"></div>
+        <div class="map-area">
+            <div id="map-container"></div>
 
-            <!-- Map footnote -->
-            <div class="absolute bottom-2 left-3 z-10 pointer-events-none max-w-[min(520px,90vw)]">
-                <p class="text-[9px] leading-snug text-[#6E6259] opacity-70">
-                    * Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths. Routes are omitted where the computed sea distance exceeds four times the straight-line distance between countries, as transport mode data are not available to confirm whether trade flows by sea or land.
-                </p>
+            <div class="map-footnote">
+                <p>* Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths. Routes are omitted where the computed sea distance exceeds four times the straight-line distance between countries, as transport mode data are not available to confirm whether trade flows by sea or land.</p>
             </div>
 
-            <div id="tooltip" class="absolute hidden z-50 pointer-events-none"></div>
+            <div id="tooltip"></div>
 
             <!-- Insight Side Panel (P1) -->
-            <div id="insight-panel" class="absolute top-0 right-0 h-full bg-white border-l border-[#DED9D5] z-30 flex flex-col shadow-xl">
-                <div class="flex items-start justify-between px-4 py-3 border-b border-[#EBEAE6] bg-[#F3F8FD] flex-shrink-0">
-                    <div class="min-w-0 flex-1 pr-2">
-                        <div id="panel-country-name" class="text-base font-bold text-[#231F20] leading-tight truncate">—</div>
-                        <div id="panel-country-meta" class="text-[10px] text-[#6E6259] mt-0.5">—</div>
+            <div id="insight-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <div id="panel-country-name">—</div>
+                        <div id="panel-country-meta">—</div>
                     </div>
-                    <button id="panel-close-btn" class="text-[#6E6259] hover:text-[#231F20] p-1 rounded-lg hover:bg-[#EBEAE6] transition flex-shrink-0 mt-0.5" title="Close">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <button id="panel-close-btn" class="btn-close" title="Close">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
-                <div id="panel-body" class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-                    <div class="text-center text-[#AEA29A] text-xs py-8">Click a country on the map</div>
+                <div id="panel-body">
+                    <div style="text-align:center;color:#AEA29A;font-size:12px;padding:32px 0">Click a country on the map</div>
                 </div>
             </div>
 
             <!-- P2-A: Arc Detail Modal -->
-            <div id="arc-modal" class="hidden absolute inset-0 z-40 flex items-center justify-center">
-                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" id="arc-modal-backdrop"></div>
-                <div class="relative bg-white border border-[#DED9D5] rounded-md shadow-md w-[520px] max-w-[95vw] flex flex-col max-h-[85vh]">
-                    <div class="flex items-center justify-between px-5 py-3.5 border-b border-[#EBEAE6] bg-[#F3F8FD] flex-shrink-0">
+            <div id="arc-modal" class="hidden">
+                <div class="modal-backdrop" id="arc-modal-backdrop"></div>
+                <div class="modal-card">
+                    <div class="modal-header">
                         <div>
-                            <div id="arc-modal-title" class="text-sm font-bold text-[#231F20]">—</div>
-                            <div id="arc-modal-meta" class="text-[10px] text-[#6E6259] mt-0.5">Bilateral Trade History</div>
+                            <div id="arc-modal-title" class="modal-title">—</div>
+                            <div id="arc-modal-meta" class="modal-subtitle">Bilateral Trade History</div>
                         </div>
-                        <button id="arc-modal-close" class="text-[#6E6259] hover:text-[#231F20] p-1 rounded-lg hover:bg-[#EBEAE6] transition">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        <button id="arc-modal-close" class="btn-close">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
-                    <div id="arc-modal-body" class="flex-1 overflow-y-auto px-5 py-4 space-y-4"></div>
+                    <div id="arc-modal-body" class="modal-body"></div>
                 </div>
             </div>
 
             <!-- P2-B: Compare Modal -->
-            <div id="compare-modal" class="hidden absolute inset-0 z-40 flex items-center justify-center">
-                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" id="compare-modal-backdrop"></div>
-                <div class="relative bg-white border border-[#DED9D5] rounded-md shadow-md w-[680px] max-w-[95vw] flex flex-col max-h-[85vh]">
-                    <div class="flex items-center justify-between px-5 py-3.5 border-b border-[#EBEAE6] bg-[#F3F8FD] flex-shrink-0">
-                        <div id="compare-modal-title" class="text-sm font-bold text-[#231F20]">Country Comparison</div>
-                        <button id="compare-modal-close" class="text-[#6E6259] hover:text-[#231F20] p-1 rounded-lg hover:bg-[#EBEAE6] transition">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <div id="compare-modal" class="hidden">
+                <div class="modal-backdrop" id="compare-modal-backdrop"></div>
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <div id="compare-modal-title" class="modal-title">Country Comparison</div>
+                        <button id="compare-modal-close" class="btn-close">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
-                    <div id="compare-modal-body" class="flex-1 overflow-y-auto px-5 py-4"></div>
+                    <div id="compare-modal-body" class="modal-body"></div>
                 </div>
             </div>
 
-            <!-- Mobile: Legend toggle FAB (hidden on md+) -->
-            <button id="mobile-legend-btn" class="md:hidden absolute bottom-4 left-3 mb-[env(safe-area-inset-bottom)] z-20 bg-white border border-[#DED9D5] shadow-lg rounded-xl px-3 py-2 flex items-center gap-1.5 text-xs font-bold text-[#231F20] active:bg-[#EBEAE6] transition-colors">
-                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+            <!-- Mobile FABs -->
+            <button id="mobile-legend-btn">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
                 Legend
             </button>
 
-            <!-- Mobile: Fit to screen FAB -->
-            <button id="fit-screen-btn" class="md:hidden absolute bottom-16 right-3 mb-[env(safe-area-inset-bottom)] z-20 bg-white border border-[#DED9D5] shadow-lg rounded-full w-9 h-9 flex items-center justify-center text-[#6E6259] active:bg-[#EBEAE6] transition-colors" title="Fit to screen">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+            <button id="fit-screen-btn" title="Fit to screen">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
             </button>
 
-            <!-- Mobile: Filters FAB -->
-            <button id="mobile-filter-btn" class="md:hidden absolute bottom-4 right-3 mb-[env(safe-area-inset-bottom)] z-20 bg-[#004990] border border-[#003A75] shadow-lg rounded-xl px-3 py-2 flex items-center gap-1.5 text-xs font-bold text-white active:bg-[#003A75] transition-colors">
-                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+            <button id="mobile-filter-btn">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                 Filters
-                <span id="mobile-filter-badge" class="hidden bg-white text-[#004990] text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none"></span>
+                <span id="mobile-filter-badge" class="filter-badge"></span>
             </button>
 
-            <!-- Mobile: Legend backdrop -->
-            <div id="mobile-legend-backdrop" class="hidden fixed inset-0 bg-black/30 z-[24]"></div>
-            <!-- Mobile: Filter backdrop -->
-            <div id="mobile-filter-backdrop" class="hidden fixed inset-0 bg-black/40 z-[32]"></div>
-            <!-- Mobile: Country picker backdrop -->
-            <div id="mobile-country-backdrop" class="hidden fixed inset-0 bg-black/50 z-[195]"></div>
+            <!-- Backdrops (initially hidden, JS toggles .hidden) -->
+            <div id="mobile-legend-backdrop"  class="hidden"></div>
+            <div id="mobile-filter-backdrop"  class="hidden"></div>
+            <div id="mobile-country-backdrop" class="hidden"></div>
 
-            <div id="loader" class="absolute inset-0 flex flex-col items-center justify-center bg-[#F3F8FD] z-50">
-                <div class="w-12 h-12 border-4 border-[#004990]/30 border-t-[#004990] rounded-full animate-spin mb-4"></div>
-                <p class="text-[#004990] font-mono text-sm animate-pulse">Loading Trade Data...</p>
+            <div id="loader">
+                <div class="loader-spinner"></div>
+                <p>Loading Trade Data...</p>
             </div>
-        </div>
+        </div><!-- /.map-area -->
 
     </main>
 
     <!-- ── Mobile Filter Panel (bottom sheet) ── -->
-    <div id="mobile-filter-panel" class="md:hidden fixed inset-x-0 bottom-0 z-[33] bg-white rounded-t-2xl shadow-2xl flex flex-col" style="max-height:82vh">
-        <div class="flex justify-center pt-2.5 pb-1 flex-shrink-0">
-            <div class="w-10 h-1 bg-[#DED9D5] rounded-full"></div>
-        </div>
-        <div class="flex items-center justify-between px-4 py-2 border-b border-[#EBEAE6] flex-shrink-0">
-            <span class="text-sm font-bold text-[#231F20] uppercase tracking-wide">Filters</span>
-            <button id="mobile-filter-close" class="p-2 -mr-1 rounded-lg hover:bg-[#F3F8FD] text-[#6E6259] transition-colors">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    <div id="mobile-filter-panel">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span>Filters</span>
+            <button id="mobile-filter-close" class="btn-close">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
-        <div class="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-5 pb-10">
+        <div class="sheet-body">
 
-            <!-- Region -->
-            <div>
-                <div class="text-[10px] font-bold text-[#6E6259] uppercase tracking-wider mb-2">Region</div>
-                <div class="flex flex-wrap gap-2">
-                    <button class="region-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-region="Global">All</button>
-                    <button class="region-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-region="Africa">Africa</button>
-                    <button class="region-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-region="Americas">Americas</button>
-                    <button class="region-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-region="Asia">Asia</button>
-                    <button class="region-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-region="Europe">Europe</button>
-                    <button class="region-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-region="Oceania">Oceania</button>
+            <div class="sheet-section">
+                <div class="section-label">Region</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                    <button class="region-btn btn-toggle-lg" data-region="Global">All</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Africa">Africa</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Americas">Americas</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Asia">Asia</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Europe">Europe</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Oceania">Oceania</button>
                 </div>
             </div>
 
-            <!-- Year -->
-            <div>
-                <div class="text-[10px] font-bold text-[#6E6259] uppercase tracking-wider mb-2">Year</div>
-                <select id="m-year-select" class="w-full bg-[#F3F8FD] text-sm font-bold text-[#231F20] px-3 py-3 rounded-lg border border-[#DED9D5] focus:outline-none focus:border-[#004990]">
+            <div class="sheet-section">
+                <div class="section-label">Year</div>
+                <select id="m-year-select" class="sheet-select">
                     <option value="2024">2024</option>
                     <option value="2023">2023</option>
                     <option value="2022">2022</option>
@@ -372,68 +312,64 @@
                 </select>
             </div>
 
-            <!-- Flow Direction -->
-            <div>
-                <div class="text-[10px] font-bold text-[#6E6259] uppercase tracking-wider mb-2">Flow Direction</div>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="flex items-center gap-3 p-3 rounded-lg border border-[#EBEAE6] bg-[#F3F8FD] cursor-pointer">
-                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="north-south" checked style="accent-color:#009EDB">
-                        <span class="text-sm font-bold" style="color:#009EDB">N → S</span>
+            <div class="sheet-section">
+                <div class="section-label">Flow Direction</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                    <label class="flow-label-lg">
+                        <input type="checkbox" class="flow-checkbox" value="north-south" checked style="accent-color:#009EDB">
+                        <span style="color:#009EDB">N → S</span>
                     </label>
-                    <label class="flex items-center gap-3 p-3 rounded-lg border border-[#EBEAE6] bg-[#F3F8FD] cursor-pointer">
-                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="south-north" checked style="accent-color:#ED1847">
-                        <span class="text-sm font-bold" style="color:#ED1847">S → N</span>
+                    <label class="flow-label-lg">
+                        <input type="checkbox" class="flow-checkbox" value="south-north" checked style="accent-color:#ED1847">
+                        <span style="color:#ED1847">S → N</span>
                     </label>
-                    <label class="flex items-center gap-3 p-3 rounded-lg border border-[#EBEAE6] bg-[#F3F8FD] cursor-pointer">
-                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="south-south" checked style="accent-color:#FBAF17">
-                        <span class="text-sm font-bold" style="color:#FBAF17">S → S</span>
+                    <label class="flow-label-lg">
+                        <input type="checkbox" class="flow-checkbox" value="south-south" checked style="accent-color:#FBAF17">
+                        <span style="color:#FBAF17">S → S</span>
                     </label>
-                    <label class="flex items-center gap-3 p-3 rounded-lg border border-[#EBEAE6] bg-[#F3F8FD] cursor-pointer">
-                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="north-north" checked style="accent-color:#AEA29A">
-                        <span class="text-sm font-bold" style="color:#AEA29A">N → N</span>
+                    <label class="flow-label-lg">
+                        <input type="checkbox" class="flow-checkbox" value="north-north" checked style="accent-color:#AEA29A">
+                        <span style="color:#AEA29A">N → N</span>
                     </label>
                 </div>
             </div>
 
-            <!-- Min Trade Value -->
-            <div>
-                <div class="text-[10px] font-bold text-[#6E6259] uppercase tracking-wider mb-2">Min. Trade Value</div>
-                <div class="flex flex-wrap gap-2">
-                    <button class="threshold-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-threshold="auto">Auto</button>
-                <button class="threshold-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-threshold="10000000">$10M</button>
-                    <button class="threshold-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-threshold="1000000">$1M</button>
-                    <button class="threshold-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-threshold="500000">$500k</button>
-                    <button class="threshold-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-threshold="100000">$100k</button>
-                    <button class="threshold-btn px-4 py-2.5 text-sm font-bold rounded-lg transition-all" data-threshold="10000">$10k</button>
+            <div class="sheet-section">
+                <div class="section-label">Min. Trade Value</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                    <button class="threshold-btn btn-toggle-lg" data-threshold="auto">Auto</button>
+                    <button class="threshold-btn btn-toggle-lg" data-threshold="10000000">$10M</button>
+                    <button class="threshold-btn btn-toggle-lg" data-threshold="1000000">$1M</button>
+                    <button class="threshold-btn btn-toggle-lg" data-threshold="500000">$500k</button>
+                    <button class="threshold-btn btn-toggle-lg" data-threshold="100000">$100k</button>
+                    <button class="threshold-btn btn-toggle-lg" data-threshold="10000">$10k</button>
                 </div>
             </div>
 
-            <!-- Exporter -->
-            <div>
-                <div class="text-[10px] font-bold text-[#6E6259] uppercase tracking-wider mb-2">Exporter (From)</div>
-                <button id="m-exp-btn" class="w-full flex items-center justify-between bg-[#F3F8FD] text-[#231F20] border border-[#DED9D5] rounded-lg px-3 py-3 hover:border-[#004990] transition-colors">
-                    <span id="m-exp-label" class="text-sm font-bold truncate">All Exporters</span>
-                    <div class="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span id="m-exp-count" class="hidden text-[10px] bg-[#004990] text-white rounded-full px-2 py-0.5 font-bold"></span>
-                        <svg class="w-4 h-4 text-[#6E6259]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            <div class="sheet-section">
+                <div class="section-label">Exporter (From)</div>
+                <button id="m-exp-btn" class="picker-btn-full">
+                    <span id="m-exp-label" class="picker-value">All Exporters</span>
+                    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">
+                        <span id="m-exp-count" class="picker-badge hidden"></span>
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </div>
                 </button>
             </div>
 
-            <!-- Importer -->
-            <div>
-                <div class="text-[10px] font-bold text-[#6E6259] uppercase tracking-wider mb-2">Importer (To)</div>
-                <button id="m-imp-btn" class="w-full flex items-center justify-between bg-[#F3F8FD] text-[#231F20] border border-[#DED9D5] rounded-lg px-3 py-3 hover:border-[#004990] transition-colors">
-                    <span id="m-imp-label" class="text-sm font-bold truncate">All Importers</span>
-                    <div class="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span id="m-imp-count" class="hidden text-[10px] bg-amber-600 text-white rounded-full px-2 py-0.5 font-bold"></span>
-                        <svg class="w-4 h-4 text-[#6E6259]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            <div class="sheet-section">
+                <div class="section-label">Importer (To)</div>
+                <button id="m-imp-btn" class="picker-btn-full">
+                    <span id="m-imp-label" class="picker-value">All Importers</span>
+                    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">
+                        <span id="m-imp-count" class="picker-badge hidden" style="background:#b45309"></span>
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </div>
                 </button>
             </div>
 
-        </div>
-    </div>
+        </div><!-- /.sheet-body -->
+    </div><!-- /#mobile-filter-panel -->
 
     <script type="module" src="main.js"></script>
 </body>

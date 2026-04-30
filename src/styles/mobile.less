@@ -1,0 +1,321 @@
+@import 'variables.less';
+
+// ── Mobile: Legend toggle FAB ──────────────────────────────────
+#mobile-legend-btn {
+  display: none;
+  position: absolute;
+  bottom: 16px;
+  left: 12px;
+  margin-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+  background: #fff;
+  border: 1px solid @ungrey-border;
+  box-shadow: @shadow-md;
+  border-radius: @radius-xl;
+  padding: 8px 12px;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: @ungrey-dark;
+  cursor: pointer;
+  transition: background 0.12s;
+
+  &:active { background: @ungrey-bg; }
+
+  @media (max-width: (@bp-md - 1px)) { display: flex; }
+}
+
+// ── Mobile: Fit screen FAB ─────────────────────────────────────
+#fit-screen-btn {
+  display: none;
+  position: absolute;
+  bottom: 64px;
+  right: 12px;
+  margin-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+  background: #fff;
+  border: 1px solid @ungrey-border;
+  box-shadow: @shadow-md;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  color: @ungrey-text;
+  cursor: pointer;
+  transition: background 0.12s;
+
+  &:active { background: @ungrey-bg; }
+
+  @media (max-width: (@bp-md - 1px)) { display: flex; }
+}
+
+// ── Mobile: Filters FAB ────────────────────────────────────────
+#mobile-filter-btn {
+  display: none;
+  position: absolute;
+  bottom: 16px;
+  right: 12px;
+  margin-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+  background: @unblue-dark;
+  border: 1px solid @unblue-darker;
+  box-shadow: @shadow-md;
+  border-radius: @radius-xl;
+  padding: 8px 12px;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.12s;
+
+  &:active { background: @unblue-darker; }
+
+  .filter-badge {
+    display: none;
+    background: #fff;
+    color: @unblue-dark;
+    font-size: 9px;
+    font-weight: 700;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+
+    &.visible { display: flex; }
+  }
+
+  @media (max-width: (@bp-md - 1px)) { display: flex; }
+}
+
+// ── Mobile: Legend panel (floating card) ──────────────────────
+@media (max-width: (@bp-md - 1px)) {
+  #legend-panel {
+    position: fixed !important;
+    top: auto !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 80px !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: 45vh !important;
+    transform: translateY(calc(100% + 100px)) !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease !important;
+    z-index: 33 !important;
+    border: 1px solid @ungrey-border !important;
+    border-radius: @radius-xl !important;
+    box-shadow: @shadow-lg !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+
+    &.mobile-open {
+      transform: translateY(0) !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+  }
+}
+
+// ── Mobile: Filter bottom sheet ────────────────────────────────
+#mobile-filter-panel {
+  display: none;
+  position: fixed;
+  inset-x: 0;
+  bottom: 0;
+  z-index: 33;
+  background: #fff;
+  border-radius: @radius-xl @radius-xl 0 0;
+  box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
+  flex-direction: column;
+  max-height: 82vh;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.open { transform: translateY(0); }
+
+  @media (max-width: (@bp-md - 1px)) { display: flex; }
+
+  .sheet-handle {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0 4px;
+    flex-shrink: 0;
+
+    &::after {
+      content: '';
+      width: 40px;
+      height: 4px;
+      background: @ungrey-border;
+      border-radius: 2px;
+    }
+  }
+
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid @ungrey-bg;
+    flex-shrink: 0;
+
+    span {
+      font-size: 13px;
+      font-weight: 700;
+      color: @ungrey-dark;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-close {
+      padding: 8px;
+      margin: -4px;
+      border-radius: @radius-lg;
+      border: none;
+      background: transparent;
+      color: @ungrey-text;
+      cursor: pointer;
+      transition: background 0.12s;
+      &:hover { background: @unblue-bg; }
+    }
+  }
+
+  .sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+    padding-bottom: 40px;
+  }
+
+  .sheet-section {
+    margin-bottom: 20px;
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: @ungrey-text;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+  }
+
+  .btn-toggle-lg {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: @font-family;
+    border-radius: @radius-lg;
+    border: none;
+    background: @unblue-bg;
+    color: @ungrey-text;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+
+    &.active {
+      background: @unblue-dark;
+      color: #fff;
+    }
+  }
+
+  .flow-label-lg {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: @radius-lg;
+    border: 1px solid @ungrey-bg;
+    background: @unblue-bg;
+    cursor: pointer;
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    span {
+      font-size: 13px;
+      font-weight: 700;
+    }
+  }
+
+  select.sheet-select {
+    width: 100%;
+    background: @unblue-bg;
+    font-size: 13px;
+    font-weight: 700;
+    color: @ungrey-dark;
+    padding: 12px;
+    border-radius: @radius-lg;
+    border: 1px solid @ungrey-border;
+    outline: none;
+    cursor: pointer;
+
+    &:focus { border-color: @unblue-dark; }
+  }
+
+  .picker-btn-full {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: @unblue-bg;
+    color: @ungrey-dark;
+    border: 1px solid @ungrey-border;
+    border-radius: @radius-lg;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+
+    &:hover { border-color: @unblue-dark; }
+
+    .picker-value { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .picker-badge { font-size: 10px; background: @unblue-dark; color: #fff; border-radius: 99px; padding: 2px 8px; font-weight: 700; &.hidden { display: none; } }
+  }
+}
+
+// ── Mobile: Country picker full-screen sheet ──────────────────
+#exp-menu.mobile-menu-fixed,
+#imp-menu.mobile-menu-fixed {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  max-height: 75vh !important;
+  border-radius: @radius-xl @radius-xl 0 0 !important;
+  z-index: 200 !important;
+  margin-top: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+}
+
+// ── Mobile: Backdrops (hidden class controls visibility) ──────
+#mobile-legend-backdrop,
+#mobile-filter-backdrop,
+#mobile-country-backdrop {
+  display: block;  // .hidden utility overrides to none when closed
+  position: fixed;
+  inset: 0;
+}
+
+#mobile-legend-backdrop  { background: rgba(0,0,0,0.3); z-index: 24; }
+#mobile-filter-backdrop  { background: rgba(0,0,0,0.4); z-index: 32; }
+#mobile-country-backdrop { background: rgba(0,0,0,0.5); z-index: 195; }
+
+// Mobile insight panel: hide top elements when open
+@media (max-width: (@bp-md - 1px)) {
+  body.insight-open #main-header,
+  body.insight-open #kpi-bar { display: none !important; }
+}

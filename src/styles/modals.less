@@ -1,0 +1,95 @@
+@import 'variables.less';
+
+// ── Shared modal backdrop ──────────────────────────────────────
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(2px);
+}
+
+// ── Shared modal card ──────────────────────────────────────────
+.modal-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid @ungrey-border;
+  border-radius: @radius-md;
+  box-shadow: @shadow-md;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid @ungrey-bg;
+    background: @unblue-bg;
+    flex-shrink: 0;
+
+    .modal-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: @ungrey-dark;
+    }
+
+    .modal-subtitle {
+      font-size: 10px;
+      color: @ungrey-text;
+      margin-top: 2px;
+    }
+
+    .btn-close {
+      color: @ungrey-text;
+      padding: 4px;
+      border-radius: @radius-lg;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+      &:hover { background: @ungrey-bg; color: @ungrey-dark; }
+    }
+  }
+
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-track { background: transparent; }
+    &::-webkit-scrollbar-thumb { background: @ungrey-border; border-radius: 2px; }
+  }
+}
+
+// ── Arc Detail Modal (P2-A) ────────────────────────────────────
+#arc-modal {
+  display: flex;  // hidden class overrides this when closed
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  align-items: center;
+  justify-content: center;
+  animation: modal-fade-in 0.18s ease;
+
+  .modal-card { width: 520px; max-width: 95vw; }
+}
+
+// ── Compare Modal (P2-B) ───────────────────────────────────────
+#compare-modal {
+  display: flex;  // hidden class overrides this when closed
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  align-items: center;
+  justify-content: center;
+  animation: modal-fade-in 0.18s ease;
+
+  .modal-card { width: 680px; max-width: 95vw; }
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}

@@ -1,4 +1,4 @@
-import './style.css';
+import './src/styles/styles.less';
 import * as d3 from 'd3';
 import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
 import { RegionConfig } from './regions.js';
@@ -258,20 +258,8 @@ const App = {
     },
 
     updateUIClasses(selector, activeEl) {
-        document.querySelectorAll(selector).forEach(b => {
-            b.classList.remove('bg-[#004990]', 'text-white');
-            b.classList.add('text-[#6E6259]');
-            if (b.closest('#mobile-filter-panel')) {
-                b.style.backgroundColor = '';
-                b.style.color = '';
-            }
-        });
-        activeEl.classList.remove('text-[#6E6259]');
-        activeEl.classList.add('bg-[#004990]', 'text-white');
-        if (activeEl.closest('#mobile-filter-panel')) {
-            activeEl.style.backgroundColor = '#004990';
-            activeEl.style.color = 'white';
-        }
+        document.querySelectorAll(selector).forEach(b => b.classList.remove('active'));
+        activeEl.classList.add('active');
     },
 
     updateKPIBar() {

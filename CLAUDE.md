@@ -14,9 +14,9 @@ UN COMTRADEデータを元に、国家間の貿易フローをアーク（弧線
 ## 現在の移行ステータス
 
 ```
-Phase 1: Vite移行          ✅ 完了
-Phase 2: UNCTADブランディング + LESS化  ← 次のステップ
-Phase 3: ドキュメント化                  (未着手)
+Phase 1: Vite移行                      ✅ 完了
+Phase 2: UNCTADブランディング + LESS化  ✅ 完了
+Phase 3: ドキュメント化                  ← 次のステップ
 ```
 
 ### Phase 1 完了内容

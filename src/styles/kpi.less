@@ -1,0 +1,54 @@
+@import 'variables.less';
+
+#kpi-bar {
+  background: rgba(255,255,255,0.97);
+  border-bottom: 1px solid rgba(203,213,224,0.9);
+  padding: 6px 16px;
+  z-index: 20;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+
+  .kpi-inner {
+    max-width: @content-max-width;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+
+    @media (min-width: @bp-md) { justify-content: center; flex-wrap: wrap; }
+  }
+
+  .kpi-item {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .kpi-label {
+    font-size: 9px;
+    color: @ungrey-text;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .kpi-value {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: @font-mono;
+    color: @ungrey-dark;
+    transition: color 0.3s ease;
+  }
+
+  .kpi-divider {
+    width: 1px;
+    height: 16px;
+    background: @ungrey-border;
+    flex-shrink: 0;
+  }
+}
