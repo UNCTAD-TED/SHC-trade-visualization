@@ -1,4 +1,6 @@
-const CONFIG = {
+import * as d3 from 'd3';
+
+export const CONFIG = {
     geoJsonUrl: 'assets/worldmap-economies-4326.topo.json',
 
     thresholds: {
@@ -36,7 +38,7 @@ const CONFIG = {
 };
 
 // Metric display formatting (used by tooltips and legends)
-const METRIC_FORMAT = {
+export const METRIC_FORMAT = {
     value: {
         grossLabel: 'Gross Volume:', netLabel: 'Net Balance:',
         fmt: (v) => {
@@ -50,7 +52,7 @@ const METRIC_FORMAT = {
     },
 };
 
-const STATE = {
+export const STATE = {
     // Per-year pre-computed net flows, keyed by year number
     yearCache: {},
 

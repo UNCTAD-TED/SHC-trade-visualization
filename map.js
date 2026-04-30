@@ -1,4 +1,9 @@
-const TradeMap = {
+import * as d3 from 'd3';
+import * as topojson from 'topojson-client';
+import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
+import { RegionConfig } from './regions.js';
+
+export const TradeMap = {
     isoMap: {
         "4": "AFG", "8": "ALB", "12": "DZA", "24": "AGO", "32": "ARG", "51": "ARM", "36": "AUS",
         "40": "AUT", "31": "AZE", "44": "BHS", "48": "BHR", "50": "BGD", "52": "BRB", "112": "BLR",
@@ -450,7 +455,7 @@ const TradeMap = {
             .style("mix-blend-mode", "multiply")
             .style("opacity", 0)
             .attr("stroke", d => CONFIG.flowColors[d.flowCategory])
-            .on("click", (event, d) => { event.stopPropagation(); App.openArcModal(d.exporter, d.importer); });
+            .on("click", (event, d) => { event.stopPropagation(); document.dispatchEvent(new CustomEvent('shc:arc-click', { detail: { exporter: d.exporter, importer: d.importer } })); });
 
         const buildArcD = (d) => {
             if (focusedIso) {
@@ -496,9 +501,9 @@ const TradeMap = {
             .attr("class", "country-node")
             .attr("stroke", "#DED9D5")
             .style("opacity", 0)
-            .on("mouseover", (event, d) => App.showTooltip(event, d))
-            .on("mouseout",  () => App.hideTooltip())
-            .on("click",     (event, d) => { event.stopPropagation(); App.openInsightPanel(d); });
+            .on("mouseover", (event, d) => document.dispatchEvent(new CustomEvent('shc:country-hover', { detail: { event, country: d } })))
+            .on("mouseout",  () => document.dispatchEvent(new CustomEvent('shc:country-hoverend')))
+            .on("click",     (event, d) => { event.stopPropagation(); document.dispatchEvent(new CustomEvent('shc:country-click', { detail: d })); });
 
         const nodeOpacity = (d) => {
             if (!focusedIso) return 1;
@@ -922,4 +927,3 @@ const TradeMap = {
         if (coverageEl) coverageEl.innerText = `${coverage.toFixed(1)}% of bilateral trade shown`;
     }
 };
-window.TradeMap = TradeMap;

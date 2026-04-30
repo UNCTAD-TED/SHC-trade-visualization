@@ -218,7 +218,7 @@ class CountrySelector {
 
     updateSelection() {
         this._syncUI();
-        if (window.App?.updateDashboard) window.App.updateDashboard(false);
+        document.dispatchEvent(new CustomEvent('shc:selection-change'));
     }
 
     // Update selection state + UI without triggering a dashboard update (used by region/year handlers)
@@ -240,4 +240,4 @@ class CountrySelector {
     clearAll() { this.selectedCountries.clear(); this.updateSelection(); }
 }
 
-window.CountrySelector = CountrySelector;
+export { CountrySelector };

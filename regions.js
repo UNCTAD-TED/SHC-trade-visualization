@@ -1,4 +1,4 @@
-const RegionConfig = {
+export const RegionConfig = {
     // UNCTAD 5 Major Regions + Global Definition
     regions: {
         "Global": { center: [0, 20], scale: 1 },

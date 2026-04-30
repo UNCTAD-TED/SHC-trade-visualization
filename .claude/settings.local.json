@@ -22,7 +22,10 @@
       "Bash(pip install *)",
       "Bash(python -c \"import searoute as sr; help\\(sr.searoute\\)\")",
       "Bash(node -e ' *)",
-      "Bash(python scripts/generate_routes.py)"
+      "Bash(python scripts/generate_routes.py)",
+      "Bash(npm install *)",
+      "Bash(cp -r assets public/)",
+      "Bash(cp -r data public/)"
     ]
   }
 }

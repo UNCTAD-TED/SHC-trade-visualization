@@ -1,3 +1,11 @@
+import './style.css';
+import * as d3 from 'd3';
+import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
+import { RegionConfig } from './regions.js';
+import { CountrySelector } from './countrySelector.js';
+import { DataLoader } from './dataLoader.js';
+import { TradeMap } from './map.js';
+
 const App = {
     exporterSelector: null,
     importerSelector: null,
@@ -1467,7 +1475,14 @@ const App = {
     }
 };
 
+// Inline onclick handlers in dynamically generated HTML require global access
 window.App = App;
+
+document.addEventListener('shc:selection-change',  () => App.updateDashboard(false));
+document.addEventListener('shc:arc-click',         e  => App.openArcModal(e.detail.exporter, e.detail.importer));
+document.addEventListener('shc:country-click',     e  => App.openInsightPanel(e.detail));
+document.addEventListener('shc:country-hover',     e  => App.showTooltip(e.detail.event, e.detail.country));
+document.addEventListener('shc:country-hoverend',  () => App.hideTooltip());
 
 document.addEventListener('DOMContentLoaded', () => {
     App.init();

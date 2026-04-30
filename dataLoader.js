@@ -1,4 +1,10 @@
-const DataLoader = {
+import * as d3 from 'd3';
+import * as topojson from 'topojson-client';
+import { CONFIG, STATE } from './config.js';
+import { RegionConfig } from './regions.js';
+import { TradeMap } from './map.js';
+
+export const DataLoader = {
 
     async loadAll() {
         try {
