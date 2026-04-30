@@ -41,6 +41,13 @@ const TradeMap = {
     // ── Focus mode state (insight panel spotlight)
     focusedIso: null,
 
+    // When a country is focused, also highlight these additional territory codes (numeric)
+    // China (156) includes Taiwan Province of China (158) per UNCTAD political position
+    _territoryAliases: { 'CHN': ['158'] },
+
+    // Lazy-computed reverse of isoMap: iso3 → numeric string
+    _reverseIsoMap: null,
+
     // ── Route path cache: "exp|imp" → SVG path string (invalidated on resize)
     _routePathCache: null,
 
@@ -74,7 +81,7 @@ const TradeMap = {
             .on("zoom", (event) => {
                 this.g.attr("transform", event.transform);
                 const k = event.transform.k;
-                this.g.selectAll(".land, .graticule").attr("stroke-width", 0.5 / k);
+                this.g.selectAll(".land, .graticule, .border").attr("stroke-width", 0.5 / k);
                 this.g.selectAll(".trade-arc").attr("stroke-width", function() {
                     return (+d3.select(this).attr("data-original-width") || 1) / k;
                 });
@@ -183,6 +190,40 @@ const TradeMap = {
         landsEnter.merge(lands)
             .attr("fill", "#FAFAFA")
             .attr("d", this.path);
+
+        this._renderBorderLayers(landLayer);
+    },
+
+    // Render disputed/special border lines (dashed, dotted, dash-dotted) from TopoJSON layers
+    _renderBorderLayers(landLayer) {
+        if (!STATE.borderLayers) return;
+
+        const specs = [
+            { key: 'dashed',     cls: 'border-dashed',      dasharray: '4,3'        },
+            { key: 'dotted',     cls: 'border-dotted',      dasharray: '1.5,2.5'    },
+            { key: 'dashDotted', cls: 'border-dash-dotted', dasharray: '5,2,1.5,2'  },
+        ];
+
+        specs.forEach(({ key, cls, dasharray }) => {
+            const features = STATE.borderLayers[key];
+            if (!features) return;
+
+            const paths = landLayer.selectAll(`path.${cls}`)
+                .data(features.features, d => d.properties && d.properties.code);
+
+            paths.exit().remove();
+
+            paths.enter().append("path")
+                .attr("class", `border ${cls}`)
+                .attr("fill", "none")
+                .attr("stroke", "#9B9189")
+                .attr("stroke-width", 0.5)
+                .attr("stroke-dasharray", dasharray)
+                .attr("stroke-linecap", "round")
+                .style("pointer-events", "none")
+                .merge(paths)
+                .attr("d", this.path);
+        });
     },
 
     // ── Flow rendering (Export Value / 2D only)
@@ -571,9 +612,23 @@ const TradeMap = {
                 return partners.has(d) ? 0.85 : 0.2;
             });
 
+        // Lazy-build reverse isoMap (iso3 → numeric code string)
+        if (!this._reverseIsoMap) {
+            this._reverseIsoMap = {};
+            Object.entries(this.isoMap).forEach(([num, iso3]) => { this._reverseIsoMap[iso3] = num; });
+        }
+        const focusedCode = this._reverseIsoMap[iso];
+        const aliasCodes  = this._territoryAliases[iso] || [];
+        const highlightCodes = new Set([focusedCode, ...aliasCodes].filter(Boolean));
+
         this.g.selectAll(".land")
             .transition().duration(450)
-            .style("opacity", 0.6);
+            .style("opacity", function(d) {
+                return (d && highlightCodes.has(String(d.properties.code))) ? 1 : 0.35;
+            })
+            .attr("fill", function(d) {
+                return (d && highlightCodes.has(String(d.properties.code))) ? "#EAF4FB" : "#FAFAFA";
+            });
 
         this._renderHalo(iso);
         this._renderParticles(iso, visibleFlows);
@@ -613,7 +668,9 @@ const TradeMap = {
             .transition().duration(400).style("opacity", 1);
 
         this.g.selectAll(".land")
-            .transition().duration(400).style("opacity", 1);
+            .transition().duration(400)
+            .style("opacity", 1)
+            .attr("fill", "#FAFAFA");
 
         this._clearHalo();
         this._clearParticles();

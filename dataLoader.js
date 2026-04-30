@@ -15,6 +15,13 @@ const DataLoader = {
             }
             STATE.geoData = topojson.feature(world, world.objects.economies);
 
+            // Convert disputed/special border layers to GeoJSON for rendering
+            STATE.borderLayers = {
+                dashed:     topojson.feature(world, world.objects['dashed-borders']),
+                dotted:     topojson.feature(world, world.objects['dotted-borders']),
+                dashDotted: topojson.feature(world, world.objects['dash-dotted-borders']),
+            };
+
             // Populate coords/names from TopoJSON centroids first
             this.processGeoData(STATE.geoData);
 

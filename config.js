@@ -80,6 +80,9 @@ const STATE = {
     countryNames: {},
     routes: {},
 
+    // Border line layers from TopoJSON (dashed/dotted/dash-dotted for disputed borders)
+    borderLayers: null,
+
     // Label visibility toggles
     showExporterLabels: true,
     showImporterLabels: true,
