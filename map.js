@@ -41,6 +41,9 @@ const TradeMap = {
     // ── Focus mode state (insight panel spotlight)
     focusedIso: null,
 
+    // ── Route path cache: "exp|imp" → SVG path string (invalidated on resize)
+    _routePathCache: null,
+
     // ── 1. Initialization
     init() {
         const container = document.getElementById("map-container");
@@ -93,6 +96,7 @@ const TradeMap = {
     },
 
     updateProjection() {
+        this._routePathCache = null; // projection changes → cached SVG paths are stale
         // 1. 正距円筒図法の特性（横360度:縦180度）に合わせ、横・縦それぞれのベーススケールを計算
         const baseScaleX = this.width / 6.28;
         const baseScaleY = this.height / 3.14;
@@ -182,6 +186,75 @@ const TradeMap = {
     },
 
     // ── Flow rendering (Export Value / 2D only)
+    // Normalize a GeoJSON LineString for equirectangular rendering.
+    // searoute uses extended longitudes (e.g. -220° for Japan on Pacific routes).
+    // This wraps all coords to [-180, 180] and splits at the antimeridian into a MultiLineString.
+    normalizeRoute(geometry) {
+        if (!geometry || geometry.type !== 'LineString') return geometry;
+        const wrap = lon => ((lon % 360) + 540) % 360 - 180;
+        const normalized = geometry.coordinates.map(([lon, lat]) => [wrap(lon), lat]);
+        const segments = [];
+        let seg = [normalized[0]];
+        for (let i = 1; i < normalized.length; i++) {
+            const prevLon = seg[seg.length - 1][0];
+            const [lon, lat] = normalized[i];
+            if (Math.abs(lon - prevLon) > 180) {
+                segments.push(seg);
+                seg = [[lon, lat]];
+            } else {
+                seg.push([lon, lat]);
+            }
+        }
+        segments.push(seg);
+        return { type: 'MultiLineString', coordinates: segments };
+    },
+
+    // Build the full SVG path for a focused flow:
+    // exporter centroid → sea route (direction-corrected) → importer centroid.
+    // Results are memoized per (exporter, importer) pair; cache is invalidated on resize.
+    _buildRoutePath(d) {
+        if (!this._routePathCache) this._routePathCache = new Map();
+        const cacheKey = `${d.exporter}|${d.importer}`;
+        if (this._routePathCache.has(cacheKey)) return this._routePathCache.get(cacheKey);
+
+        const routeKey = [d.exporter, d.importer].sort().join("|");
+        const route = STATE.routes && STATE.routes[routeKey];
+        if (!route) return null;
+
+        const normalized = this.normalizeRoute(route.geometry);
+        let segs = normalized.coordinates;
+
+        const expCoord = STATE.countryCoords[d.exporter];
+        const impCoord = STATE.countryCoords[d.importer];
+
+        // Detect direction: compare first route coord to each country's centroid.
+        // If it's closer to the importer the route is stored in reverse.
+        if (expCoord && impCoord && segs.length > 0 && segs[0].length > 0) {
+            const firstGeo = segs[0][0];
+            const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+            if (dist2(firstGeo, impCoord) < dist2(firstGeo, expCoord)) {
+                segs = segs.map(s => [...s].reverse()).reverse();
+            }
+        }
+
+        // Extend: prepend exporter centroid to first segment, append importer centroid to last.
+        if (expCoord && impCoord) {
+            if (segs.length === 1) {
+                segs = [[expCoord, ...segs[0], impCoord]];
+            } else {
+                segs = [
+                    [expCoord, ...segs[0]],
+                    ...segs.slice(1, -1),
+                    [...segs[segs.length - 1], impCoord],
+                ];
+            }
+        }
+
+        const result = this.path({ type: 'MultiLineString', coordinates: segs });
+        this._routePathCache.set(cacheKey, result);
+        return result;
+    },
+
     renderFlows() {
         if (!this.svg) return;
 
@@ -295,7 +368,7 @@ const TradeMap = {
 
         const arcOpacity = (d) => {
             const base = opacityScale(d.netValue);
-            if (focusedIso && d.exporter !== focusedIso && d.importer !== focusedIso) return base * 0.08;
+            if (focusedIso && d.exporter !== focusedIso && d.importer !== focusedIso) return 0;
             return base;
         };
 
@@ -309,27 +382,29 @@ const TradeMap = {
             .attr("stroke", d => CONFIG.flowColors[d.flowCategory])
             .on("click", (event, d) => { event.stopPropagation(); App.openArcModal(d.exporter, d.importer); });
 
+        const buildArcD = (d) => {
+            if (focusedIso) {
+                const rp = this._buildRoutePath(d);
+                if (rp) return rp;
+            }
+            const s = STATE.countryCoords[d.exporter];
+            const t = STATE.countryCoords[d.importer];
+            if (!s || !t) return null;
+            const p1 = this.projection(s);
+            const p2 = this.projection(t);
+            if (!p1 || !p2) return null;
+            const dx = p2[0] - p1[0];
+            const dy = p2[1] - p1[1];
+            const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
+            return `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,1 ${p2[0]},${p2[1]}`;
+        };
+
         arcsEnter.merge(arcs)
             .attr("id", d => `arc-${d.exporter}-${d.importer}`)
             .attr("data-original-width", d => edgeWidthScale(d.netValue))
             .attr("data-base-opacity", d => opacityScale(d.netValue))
+            .attr("d", buildArcD)  // set shape immediately — no interpolation glitch
             .transition().duration(750).ease(d3.easeCubicOut)
-            .attr("d", d => {
-                const s = STATE.countryCoords[d.exporter];
-                const t = STATE.countryCoords[d.importer];
-                if (!s || !t) return null;
-
-                const p1 = this.projection(s);
-                const p2 = this.projection(t);
-                if (!p1 || !p2) return null;
-
-                const dx = p2[0] - p1[0];
-                const dy = p2[1] - p1[1];
-                const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
-                const sweep = 1;
-
-                return `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,${sweep} ${p2[0]},${p2[1]}`;
-            })
             .attr("stroke", d => CONFIG.flowColors[d.flowCategory])
             .attr("stroke-width", d => edgeWidthScale(d.netValue) / currentK)
             .style("opacity", arcOpacity);
@@ -454,12 +529,32 @@ const TradeMap = {
         });
 
         const focusedIso = iso;
+        const self = this;
+
+        // Update path shapes immediately (before opacity fade) to avoid D3 path interpolation glitch
+        this.g.selectAll(".trade-arc")
+            .attr("d", function(d) {
+                if (d.exporter !== focusedIso && d.importer !== focusedIso) return d3.select(this).attr("d");
+                const rp = self._buildRoutePath(d);
+                if (rp) return rp;
+                const s = STATE.countryCoords[d.exporter];
+                const t = STATE.countryCoords[d.importer];
+                if (!s || !t) return d3.select(this).attr("d");
+                const p1 = self.projection(s);
+                const p2 = self.projection(t);
+                if (!p1 || !p2) return d3.select(this).attr("d");
+                const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+                const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
+                return `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,1 ${p2[0]},${p2[1]}`;
+            });
+
+        // Then animate only opacity
         this.g.selectAll(".trade-arc")
             .transition().duration(450)
             .style("opacity", function(d) {
                 const base = +d3.select(this).attr("data-base-opacity") || 0.5;
                 if (d.exporter === focusedIso || d.importer === focusedIso) return base;
-                return base * 0.08;
+                return 0;
             });
 
         this.g.selectAll(".country-node")
@@ -488,6 +583,23 @@ const TradeMap = {
         if (!this.g) return;
         this.focusedIso = null;
 
+        const self = this;
+
+        // Snap path shapes back to circular arcs immediately, before opacity animates in
+        this.g.selectAll(".trade-arc")
+            .attr("d", function(d) {
+                const s = STATE.countryCoords[d.exporter];
+                const t = STATE.countryCoords[d.importer];
+                if (!s || !t) return d3.select(this).attr("d");
+                const p1 = self.projection(s);
+                const p2 = self.projection(t);
+                if (!p1 || !p2) return d3.select(this).attr("d");
+                const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+                const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
+                return `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,1 ${p2[0]},${p2[1]}`;
+            });
+
+        // Then fade opacity back in
         this.g.selectAll(".trade-arc")
             .transition().duration(400)
             .style("opacity", function() {

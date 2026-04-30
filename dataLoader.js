@@ -27,6 +27,12 @@ const DataLoader = {
             STATE.trendSummary = trendSummary;
             STATE.yearCache[STATE.year] = yearFlows;
 
+            // Load routes.json in the background — not needed until a country is clicked
+            STATE._routesPromise = fetch('data/routes.json')
+                .then(r => r.json())
+                .then(data => { STATE.routes = data; })
+                .catch(err => console.warn('routes.json load failed:', err));
+
             // Start loading bilateral history in the background
             STATE._bilateralPromise = fetch('data/bilateral_history.json')
                 .then(r => r.json())

@@ -16,7 +16,11 @@
       "Bash(curl -s -L \"https://unctad-infovis.github.io/2026-cyberlaw_tracker/css/2026-cyberlaw_tracker.min.css\" -o /tmp/cyberlaw.css)",
       "Read(//tmp/**)",
       "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\" \"c:/Users/larat/OneDrive - United Nations/Documents/GitHub/SHC-trade-visualization/countrySelector.js\" \"c:/Users/larat/OneDrive - United Nations/Documents/GitHub/SHC-trade-visualization/dataLoader.js\" \"c:/Users/larat/OneDrive - United Nations/Documents/GitHub/SHC-trade-visualization/regions.js\")",
-      "Bash(grep -v \"//.*#\")"
+      "Bash(grep -v \"//.*#\")",
+      "Bash(python -c ' *)",
+      "Bash(python scripts/build_port_db.py)",
+      "Bash(pip install *)",
+      "Bash(python -c \"import searoute as sr; help\\(sr.searoute\\)\")"
     ]
   }
 }

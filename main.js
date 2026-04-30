@@ -341,7 +341,11 @@ const App = {
 
         this._currentPanelIso = iso;
         this.hideTooltip();
-        if (TradeMap && TradeMap.setFocus) TradeMap.setFocus(iso);
+        if (TradeMap && TradeMap.setFocus) {
+            // Ensure routes.json is loaded before switching to sea-route rendering
+            const doFocus = () => TradeMap.setFocus(iso);
+            STATE._routesPromise ? STATE._routesPromise.then(doFocus) : doFocus();
+        }
     },
 
     closeInsightPanel() {

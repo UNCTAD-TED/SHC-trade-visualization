@@ -78,6 +78,7 @@ const STATE = {
 
     countryCoords: {},
     countryNames: {},
+    routes: {},
 
     // Label visibility toggles
     showExporterLabels: true,
