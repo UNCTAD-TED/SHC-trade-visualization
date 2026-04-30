@@ -11,6 +11,7 @@ class CountrySelector {
         this.classificationData = null;
         this.selectedCountries = new Set();
         this.allCountries = [];
+        this._checkboxByCode = {};
     }
 
     async init() {
@@ -161,6 +162,7 @@ class CountrySelector {
             else this.selectedCountries.delete(code);
             this.updateSelection();
         });
+        this._checkboxByCode[code] = checkbox;
         const span = document.createElement('span');
         span.className = 'text-[#1a2332]';
         span.textContent = name;
@@ -182,11 +184,11 @@ class CountrySelector {
         } else {
             labelEl.textContent = `${count} Countries`;
         }
-        document.querySelectorAll(`#${this.elementId}-list input[type="checkbox"]`).forEach(cb => {
-            if (cb.dataset.country) {
-                cb.checked = this.selectedCountries.has(cb.dataset.country);
-            }
-        });
+        // Use cached element references to avoid querySelectorAll over potentially 200+ checkboxes
+        for (const [code, cb] of Object.entries(this._checkboxByCode)) {
+            const should = this.selectedCountries.has(code);
+            if (cb.checked !== should) cb.checked = should;
+        }
         this.syncGroupCheckboxes();
         const badge = document.getElementById(`${this.elementId}-count`);
         const btn   = document.getElementById(`${this.elementId}-btn`);

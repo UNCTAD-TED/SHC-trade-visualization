@@ -699,10 +699,10 @@
     "source": "PLSCI+WPI"
   },
   "KIR": {
-    "name": "Benti",
+    "name": "Betio Port, South Tarawa",
     "coords": [
-      -13.2,
-      9.1667
+      172.92,
+      1.37
     ],
     "plsci": 26.12,
     "source": "PLSCI+WPI"
@@ -969,10 +969,10 @@
     "source": "PLSCI+WPI"
   },
   "PLW": {
-    "name": "Korsor",
+    "name": "Malakal Harbor",
     "coords": [
-      11.1333,
-      55.3333
+      134.46,
+      7.34
     ],
     "plsci": 11.07,
     "source": "PLSCI+WPI"

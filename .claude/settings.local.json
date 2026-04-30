@@ -21,7 +21,8 @@
       "Bash(python scripts/build_port_db.py)",
       "Bash(pip install *)",
       "Bash(python -c \"import searoute as sr; help\\(sr.searoute\\)\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(python scripts/generate_routes.py)"
     ]
   }
 }

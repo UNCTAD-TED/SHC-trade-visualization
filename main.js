@@ -4,6 +4,7 @@ const App = {
     _lastRenderedRegion: null,
     _globalRankCache: {},
     _resizeTimer: null,
+    _prevSelectionCount: 0,
 
     async init() {
         STATE.selectedExporters = new Set();
@@ -1184,6 +1185,15 @@ const App = {
     updateDashboard(rebuildMenus = true) {
         STATE.selectedExporters = new Set(this.exporterSelector.getSelectedCountries());
         STATE.selectedImporters = new Set(this.importerSelector.getSelectedCountries());
+
+        // Auto-reset threshold only when transitioning from "some selected" → "none selected"
+        const currentSelectionCount = STATE.selectedExporters.size + STATE.selectedImporters.size;
+        if (currentSelectionCount === 0 && this._prevSelectionCount > 0 && STATE.thresholdMode !== 'auto') {
+            STATE.thresholdMode = 'auto';
+            const autoBtn = document.querySelector('.threshold-btn[data-threshold="auto"]');
+            if (autoBtn) this.updateUIClasses('.threshold-btn', autoBtn);
+        }
+        this._prevSelectionCount = currentSelectionCount;
 
         DataLoader.filterData();
         TradeMap.renderFlows();

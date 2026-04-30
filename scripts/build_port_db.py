@@ -375,6 +375,8 @@ MANUAL_OVERRIDES: dict[str, tuple] = {
     "VGB": ( -64.6200,  18.4167, "Road Town, Tortola"),
     "CRI": ( -83.0333,  10.0167, "Puerto Moin, Costa Rica"),
     "ERI": (  39.4667,  15.6000, "Port of Massawa, Eritrea"),
+    "KIR": ( 172.9200,   1.3700, "Betio Port, South Tarawa"),   # 大西洋の誤港にマッチしていた
+    "PLW": ( 134.4600,   7.3400, "Malakal Harbor, Palau"),       # デンマーク・コルスアに誤マッチ
     # trade dataに存在するが ports 未登録の国（沿岸・島嶼・特殊領土）
     # 優先度高（貿易量あり）
     "BIH": (  17.9800,  42.9300, "Port of Neum, Bosnia Herzegovina"),

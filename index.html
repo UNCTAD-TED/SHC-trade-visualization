@@ -87,21 +87,21 @@
 
                 <div class="flex bg-white rounded-md p-1 border border-[#DED9D5] shadow-sm items-center gap-1 px-2" title="Filter by economic flow direction">
                     <span class="text-[10px] text-[#6E6259] font-bold uppercase mr-1">Flows</span>
-                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="North to South (UNCTAD Blue)">
+                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="North to South">
                         <input type="checkbox" class="flow-checkbox" value="north-south" checked>
-                        <span class="text-[10px] font-bold" style="color:#004990">N→S</span>
+                        <span class="text-[10px] font-bold" style="color:#009EDB">N→S</span>
                     </label>
-                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="South to North (UNCTAD Orange)">
+                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="South to North">
                         <input type="checkbox" class="flow-checkbox" value="south-north" checked>
-                        <span class="text-[10px] font-bold" style="color:#E87722">S→N</span>
+                        <span class="text-[10px] font-bold" style="color:#ED1847">S→N</span>
                     </label>
-                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="South to South (UNCTAD Light Blue)">
+                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="South to South">
                         <input type="checkbox" class="flow-checkbox" value="south-south" checked>
-                        <span class="text-[10px] font-bold" style="color:#00A3E0">S→S</span>
+                        <span class="text-[10px] font-bold" style="color:#FBAF17">S→S</span>
                     </label>
-                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="North to North (Muted Slate)">
+                    <label class="cursor-pointer hover:bg-[#F3F8FD] p-1 rounded transition" title="North to North">
                         <input type="checkbox" class="flow-checkbox" value="north-north" checked>
-                        <span class="text-[10px] font-bold" style="color:#7A99AC">N→N</span>
+                        <span class="text-[10px] font-bold" style="color:#AEA29A">N→N</span>
                     </label>
                 </div>
 
@@ -195,12 +195,12 @@
             <div class="kpi-divider"></div>
             <div class="kpi-item">
                 <span class="kpi-label">N→S</span>
-                <span class="kpi-value" id="kpi-ns-pct" style="color:#0891B2">—</span>
+                <span class="kpi-value" id="kpi-ns-pct" style="color:#009EDB">—</span>
             </div>
             <div class="kpi-divider"></div>
             <div class="kpi-item">
                 <span class="kpi-label">S→S</span>
-                <span class="kpi-value" id="kpi-ss-pct" style="color:#B45309">—</span>
+                <span class="kpi-value" id="kpi-ss-pct" style="color:#FBAF17">—</span>
             </div>
         </div>
     </div>
@@ -247,7 +247,7 @@
             <!-- Map footnote -->
             <div class="absolute bottom-2 left-3 z-10 pointer-events-none max-w-[min(520px,90vw)]">
                 <p class="text-[9px] leading-snug text-[#6E6259] opacity-70">
-                    * Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths.
+                    * Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths. Routes are omitted where the computed sea distance exceeds four times the straight-line distance between countries, as transport mode data are not available to confirm whether trade flows by sea or land.
                 </p>
             </div>
 
@@ -381,20 +381,20 @@
                 <div class="text-[10px] font-bold text-[#6E6259] uppercase tracking-wider mb-2">Flow Direction</div>
                 <div class="grid grid-cols-2 gap-2">
                     <label class="flex items-center gap-3 p-3 rounded-lg border border-[#EBEAE6] bg-[#F3F8FD] cursor-pointer">
-                        <input type="checkbox" class="flow-checkbox w-4 h-4 accent-[#004990] flex-shrink-0" value="north-south" checked>
-                        <span class="text-sm font-bold" style="color:#004990">N → S</span>
+                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="north-south" checked style="accent-color:#009EDB">
+                        <span class="text-sm font-bold" style="color:#009EDB">N → S</span>
                     </label>
                     <label class="flex items-center gap-3 p-3 rounded-lg border border-[#EBEAE6] bg-[#F3F8FD] cursor-pointer">
-                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="south-north" checked style="accent-color:#E87722">
-                        <span class="text-sm font-bold" style="color:#E87722">S → N</span>
+                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="south-north" checked style="accent-color:#ED1847">
+                        <span class="text-sm font-bold" style="color:#ED1847">S → N</span>
                     </label>
                     <label class="flex items-center gap-3 p-3 rounded-lg border border-[#EBEAE6] bg-[#F3F8FD] cursor-pointer">
-                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="south-south" checked style="accent-color:#00A3E0">
-                        <span class="text-sm font-bold" style="color:#00A3E0">S → S</span>
+                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="south-south" checked style="accent-color:#FBAF17">
+                        <span class="text-sm font-bold" style="color:#FBAF17">S → S</span>
                     </label>
                     <label class="flex items-center gap-3 p-3 rounded-lg border border-[#EBEAE6] bg-[#F3F8FD] cursor-pointer">
-                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="north-north" checked style="accent-color:#7A99AC">
-                        <span class="text-sm font-bold" style="color:#7A99AC">N → N</span>
+                        <input type="checkbox" class="flow-checkbox w-4 h-4 flex-shrink-0" value="north-north" checked style="accent-color:#AEA29A">
+                        <span class="text-sm font-bold" style="color:#AEA29A">N → N</span>
                     </label>
                 </div>
             </div>

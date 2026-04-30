@@ -51,6 +51,19 @@ const TradeMap = {
     // ── Route path cache: "exp|imp" → SVG path string (invalidated on resize)
     _routePathCache: null,
 
+    // ── Legend dirty-check: skip full DOM rebuild when inputs haven't changed
+    _lastLegendKey: null,
+
+    // ── Shared compact number formatter (no currency symbol) used in renderLegend
+    _fmtShort(v) {
+        const a = Math.abs(v);
+        const s = v < 0 ? '-' : '';
+        if (a >= 1e9) return s + d3.format('.2f')(a / 1e9) + 'B';
+        if (a >= 1e6) return s + d3.format('.2f')(a / 1e6) + 'M';
+        if (a >= 1e3) return s + d3.format('.2f')(a / 1e3) + 'K';
+        return s + d3.format(',.0f')(a);
+    },
+
     // ── 1. Initialization
     init() {
         const container = document.getElementById("map-container");
@@ -262,11 +275,27 @@ const TradeMap = {
         const route = STATE.routes && STATE.routes[routeKey];
         if (!route) return null;
 
-        const normalized = this.normalizeRoute(route.geometry);
-        let segs = normalized.coordinates;
-
         const expCoord = STATE.countryCoords[d.exporter];
         const impCoord = STATE.countryCoords[d.importer];
+
+        // Detour filter: if the sea route is >4x the centroid straight-line distance,
+        // the pair likely trades overland — fall back to circular arc.
+        if (expCoord && impCoord && route.properties?.length_km) {
+            const toRad = deg => deg * Math.PI / 180;
+            const dLat = toRad(impCoord[1] - expCoord[1]);
+            const dLon = toRad(impCoord[0] - expCoord[0]);
+            const a = Math.sin(dLat / 2) ** 2
+                    + Math.cos(toRad(expCoord[1])) * Math.cos(toRad(impCoord[1]))
+                    * Math.sin(dLon / 2) ** 2;
+            const directKm = 2 * 6371 * Math.asin(Math.sqrt(a));
+            if (directKm > 300 && route.properties.length_km / directKm > 4.0) {
+                this._routePathCache.set(cacheKey, null);
+                return null;
+            }
+        }
+
+        const normalized = this.normalizeRoute(route.geometry);
+        let segs = normalized.coordinates;
 
         // Detect direction: compare first route coord to each country's centroid.
         // If it's closer to the importer the route is stored in reverse.
@@ -331,6 +360,10 @@ const TradeMap = {
             currentK = d3.zoomTransform(this.svg.node()).k;
         }
 
+        // Projection cache: each ISO is projected at most once per render call
+        const _projCache = {};
+        const projOf = (iso) => _projCache[iso] || (_projCache[iso] = this.getProjectedPoint(iso));
+
         const nodeStatsArr  = Object.values(nodeStats);
         const isFocused = STATE.selectedExporters.size > 0 || STATE.selectedImporters.size > 0;
 
@@ -381,12 +414,8 @@ const TradeMap = {
         if (labelLayer.empty()) labelLayer = this.g.append("g").attr("class", "label-layer");
 
         // --- 1. Arcs (edges) ---
-        const visibleFlows = netFlows.filter(d => {
-            const s = STATE.countryCoords[d.exporter];
-            const t = STATE.countryCoords[d.importer];
-            if (!s || !t) return false;
-            return true;
-        });
+        const visibleFlows = netFlows.filter(d =>
+            STATE.countryCoords[d.exporter] && STATE.countryCoords[d.importer]);
 
         const arcs = flowLayer.selectAll(".trade-arc")
             .data(visibleFlows, d => `${d.exporter}|${d.importer}`);
@@ -480,8 +509,8 @@ const TradeMap = {
         nodesEnter.merge(nodes)
             .attr("data-original-radius", d => radiusScale(nodeStats[d].grossVolume))
             .transition().duration(750).ease(d3.easeElasticOut)
-            .attr("cx", d => this.getProjectedPoint(d)[0])
-            .attr("cy", d => this.getProjectedPoint(d)[1])
+            .attr("cx", d => projOf(d)[0])
+            .attr("cy", d => projOf(d)[1])
             .attr("r", d => radiusScale(nodeStats[d].grossVolume) / currentK)
             .attr("fill", d => colorScale(nodeStats[d].netBalance))
             .attr("stroke-width", 1.5 / currentK)
@@ -530,8 +559,8 @@ const TradeMap = {
             .attr("stroke", "#FAFAFA") // 背景や陸地と同じ色で白フチ（Halo）をつける
             .attr("stroke-linejoin", "round")
             .transition().duration(750)
-            .attr("x", d => this.getProjectedPoint(d)[0] + (radiusScale(nodeStats[d].grossVolume) / currentK) + 4)
-            .attr("y", d => this.getProjectedPoint(d)[1] + 4)
+            .attr("x", d => projOf(d)[0] + (radiusScale(nodeStats[d].grossVolume) / currentK) + 4)
+            .attr("y", d => projOf(d)[1] + 4)
             .attr("font-size", (8.5 / Math.sqrt(currentK)) + "px") // 10pxから8.5pxへ少し縮小
             .attr("stroke-width", 2.5 / currentK)
             .style("opacity", labelOpacity);
@@ -751,13 +780,18 @@ const TradeMap = {
         const container = document.getElementById('legend-content');
         if (!container) return;
 
+        const netFlows  = STATE.filteredData || [];
+        const nodeStats = STATE.nodeStats || {};
+
+        // Skip full DOM rebuild when all inputs are unchanged
+        const _legendKey = `${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${[...STATE.flowFilters].sort().join(',')}`;
+        if (this._lastLegendKey === _legendKey) return;
+        this._lastLegendKey = _legendKey;
+
         const titleEl = document.getElementById('legend-title');
         if (titleEl) titleEl.innerText = 'Export Value ($)';
 
-        const netFlows  = STATE.filteredData || [];
-        const nodeStats = STATE.nodeStats || {};
-        const fmt       = d3.format(",.0f");
-        const fmtShort  = (v) => { const a = Math.abs(v); const s = v < 0 ? '-' : ''; if (a >= 1e9) return s + d3.format('.2f')(a / 1e9) + 'B'; if (a >= 1e6) return s + d3.format('.2f')(a / 1e6) + 'M'; if (a >= 1e3) return s + d3.format('.2f')(a / 1e3) + 'K'; return s + d3.format(',.0f')(a); };
+        const fmtShort = this._fmtShort.bind(this);
 
         // --- 1. Flow Categories ---
         const categories = [
