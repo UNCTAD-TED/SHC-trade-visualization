@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Second-Hand Clothes Trade Monitor</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* 1. KPIバーの上の線を非表示にする */
+        #main-header { border-bottom: none !important; }
+        #kpi-bar { border-top: none !important; box-shadow: none !important; }
+        
+        /* 2. 画面の一番下に水色の線を配置する */
+        body {
+            border-bottom: 4px solid #009edb !important;
+        }
+        
+        /* 3. KPIバーとLegendの背景色を変更する */
+        #kpi-bar, #legend-panel {
+            background-color: #f2f8fc !important;
+        }
+    </style>
 </head>
 <body>
 
@@ -16,7 +31,7 @@
                 <img src="assets/unctad-icon.svg" alt="UNCTAD" class="header-logo">
                 <div class="header-text">
                     <h3>Global Second-Hand Clothes Trade Monitor</h3>
-                    <h4>UNCTAD &middot; Data: UN Comtrade</h4>
+                    <h4>UNCTAD &middot; SMEP project</h4>
                 </div>
             </div>
 
@@ -133,6 +148,31 @@
         </div><!-- /.header-inner -->
     </header>
 
+    <!-- ── Legend Bar (between filters and KPI) ── -->
+    <div id="legend-panel">
+        <div class="legend-mobile-header">
+            <span>Legend</span>
+            <button id="mobile-legend-close" class="btn-close">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div id="legend-content"></div>
+        <div id="total-stats">
+            <div class="stat-row">
+                <span class="stat-label">Shown</span>
+                <span class="stat-val" id="stat-value">—</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Bilateral</span>
+                <span class="stat-secondary" id="stat-bilateral">—</span>
+            </div>
+            <span id="stat-coverage"></span>
+        </div>
+        <div class="legend-footer">
+            <img src="assets/smep-logo.png" alt="SMEP">
+        </div>
+    </div>
+
     <!-- ── KPI Bar ── -->
     <div id="kpi-bar">
         <div class="kpi-inner">
@@ -154,44 +194,11 @@
 
     <main>
 
-        <!-- ── Left Legend Panel ── -->
-        <div id="legend-panel">
-            <div class="legend-mobile-header">
-                <span>Legend</span>
-                <button id="mobile-legend-close" class="btn-close">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            <div class="legend-title-row">
-                <h3 id="legend-title">Export Value</h3>
-            </div>
-            <div id="legend-content"></div>
-            <div id="total-stats">
-                <div class="stat-row">
-                    <span class="stat-label">Shown</span>
-                    <span class="stat-val" id="stat-value">-</span>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Bilateral</span>
-                    <span class="stat-secondary" id="stat-bilateral">-</span>
-                </div>
-                <span id="stat-coverage"></span>
-            </div>
-            <div class="legend-footer">
-                <img src="assets/smep-logo.png" alt="SMEP Logo">
-                <span>Supported by SMEP</span>
-            </div>
-        </div>
-
         <!-- ── Map + Overlays ── -->
         <div class="map-area">
             <div id="map-container"></div>
 
-            <div class="map-footnote">
-                <p>* Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths. Routes are omitted where the computed sea distance exceeds four times the straight-line distance between countries, as transport mode data are not available to confirm whether trade flows by sea or land.</p>
-            </div>
-
-            <div id="tooltip"></div>
+<div id="tooltip"></div>
 
             <!-- Insight Side Panel (P1) -->
             <div id="insight-panel">
@@ -268,6 +275,12 @@
         </div><!-- /.map-area -->
 
     </main>
+
+    <!-- ── Map Footer ── -->
+    <footer id="map-footer">
+        <p> Source: BACI based on UN Comtrade. Data cover HS&nbsp;6309 (Used or new clothing and other worn articles).</p>
+        <p> Note: Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing cargo paths. Routes are omitted where computed sea distance exceeds four times the straight-line distance, as transport mode data are unavailable.</p>
+    </footer>
 
     <!-- ── Mobile Filter Panel (bottom sheet) ── -->
     <div id="mobile-filter-panel">

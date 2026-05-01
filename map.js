@@ -785,25 +785,20 @@ export const TradeMap = {
         const container = document.getElementById('legend-content');
         if (!container) return;
 
-        const netFlows  = STATE.filteredData || [];
-        const nodeStats = STATE.nodeStats || {};
+        const netFlows = STATE.filteredData || [];
 
-        // Skip full DOM rebuild when all inputs are unchanged
         const _legendKey = `${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${[...STATE.flowFilters].sort().join(',')}`;
         if (this._lastLegendKey === _legendKey) return;
         this._lastLegendKey = _legendKey;
 
-        const titleEl = document.getElementById('legend-title');
-        if (titleEl) titleEl.innerText = 'Export Value ($)';
-
         const fmtShort = this._fmtShort.bind(this);
 
-        // --- 1. Flow Categories ---
+        // Flow categories
         const categories = [
-            { key: 'north-south', label: 'North → South', abbr: 'N→S' },
-            { key: 'south-north', label: 'South → North', abbr: 'S→N' },
-            { key: 'south-south', label: 'South → South', abbr: 'S→S' },
-            { key: 'north-north', label: 'North → North', abbr: 'N→N' },
+            { key: 'north-south', label: 'N→S' },
+            { key: 'south-north', label: 'S→N' },
+            { key: 'south-south', label: 'S→S' },
+            { key: 'north-north', label: 'N→N' },
         ];
 
         const catStats = {};
@@ -815,115 +810,68 @@ export const TradeMap = {
             }
         });
 
-        const catHtml = categories.map(c => {
-            const active = STATE.flowFilters.has(c.key);
-            const stat   = catStats[c.key];
-            const opacity = active ? '1' : '0.25';
-            const valueStr = stat.count > 0 ? `$${fmtShort(stat.total)}` : '—';
-            const countStr = stat.count > 0 ? `${stat.count}` : '0';
-            return `
-                <div class="flex items-center gap-1.5" style="opacity:${opacity}">
-                    <span class="w-3 h-[3px] rounded-full flex-shrink-0" style="background:${CONFIG.flowColors[c.key]}"></span>
-                    <span class="text-[9px] font-bold text-[#231F20] w-8 flex-shrink-0">${c.abbr}</span>
-                    <span class="text-[9px] text-[#6E6259] font-mono flex-shrink-0">${countStr}</span>
-                    <span class="text-[9px] text-[#6E6259] font-mono text-right flex-1">${valueStr}</span>
-                </div>`;
+        const flowItems = categories.map(c => {
+            const active   = STATE.flowFilters.has(c.key);
+            const stat     = catStats[c.key];
+            const valStr   = stat.count > 0 ? `$${fmtShort(stat.total)}` : '—';
+            const cntStr   = stat.count > 0 ? `${stat.count}` : '0';
+            return `<div class="legend-flow-item" style="opacity:${active ? 1 : 0.3}">
+                <span class="legend-flow-dot" style="background:${CONFIG.flowColors[c.key]}"></span>
+                <span class="legend-flow-label">${c.label}</span>
+                <span class="legend-flow-stat">${cntStr} · ${valStr}</span>
+            </div>`;
         }).join('');
 
-        const widthHtml = `
-            <div class="text-[9px] text-[#6E6259] italic mt-1">Arc width = net trade value</div>`;
-
-        const nodeHtml = `
-            <div class="mt-2 pt-2 border-t border-[#EBEAE6]">
-                <div class="text-[9px] text-[#6E6259] font-bold uppercase mb-1 tracking-wider">Nodes</div>
-                <div class="flex items-center justify-center gap-0.5" style="height:20px">
-                    <div style="width:16px;height:16px;border-radius:50%;background:#ED1847" title="Strong net importer"></div>
-                    <div style="width:11px;height:11px;border-radius:50%;background:#F9C0C5" title="Net importer"></div>
-                    <div style="width:7px;height:7px;border-radius:50%;background:#F7DFDF" title="Slight net importer"></div>
-                    <div style="width:4px;height:4px;border-radius:50%;background:#DED9D5;border:1px solid #AEA29A" title="Balanced"></div>
-                    <div style="width:7px;height:7px;border-radius:50%;background:#E3EDF6" title="Slight net exporter"></div>
-                    <div style="width:11px;height:11px;border-radius:50%;background:#C5DFEF" title="Net exporter"></div>
-                    <div style="width:16px;height:16px;border-radius:50%;background:#009EDB" title="Strong net exporter"></div>
-                </div>
-                <div class="flex justify-between text-[9px] text-[#6E6259] font-mono mt-0.5">
-                    <span>← Importer</span>
-                    <span>Exporter →</span>
-                </div>
-                <div class="text-[9px] text-[#6E6259] italic mt-0.5">Color = balance · Size = volume</div>
-            </div>`;
-
-        // --- 4. Visibility Threshold ---
-        const isManualThreshold = STATE.thresholdMode !== 'auto';
-        let currentThreshold, autoZoomLevel;
-
-        if (isManualThreshold) {
+        // Threshold
+        const isManual = STATE.thresholdMode !== 'auto';
+        let currentThreshold;
+        if (isManual) {
             currentThreshold = STATE.thresholdMode;
-            autoZoomLevel = null;
         } else {
-            const totalSelected    = STATE.selectedExporters.size + STATE.selectedImporters.size;
-            const isCountryFocused = totalSelected > 0 && totalSelected <= 5;
-            const isGroupFocused   = totalSelected > 5;
-            const isRegionFocused  = STATE.region && STATE.region !== 'Global';
-            if (isCountryFocused) {
-                currentThreshold = 10000;   autoZoomLevel = 'Country';
-            } else if (isGroupFocused || isRegionFocused) {
-                currentThreshold = 100000;  autoZoomLevel = 'Group';
-            } else {
-                currentThreshold = 10000000; autoZoomLevel = 'Global';
-            }
+            const sel = STATE.selectedExporters.size + STATE.selectedImporters.size;
+            if (sel > 0 && sel <= 5)                                         currentThreshold = 10000;
+            else if (sel > 5 || (STATE.region && STATE.region !== 'Global')) currentThreshold = 100000;
+            else                                                              currentThreshold = 10000000;
         }
 
-        const modeBadge = isManualThreshold
-            ? '<span class="text-[8px] bg-amber-100 text-amber-700 border border-amber-200 px-1 rounded font-bold">MANUAL</span>'
-            : '<span class="text-[8px] bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD] px-1 rounded font-bold">AUTO</span>';
-
-        const autoTiersHtml = isManualThreshold ? '' : `
-                <div class="space-y-0.5 mt-1.5">
-                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Global'  ? 'text-[#004990] font-bold' : 'text-[#6E6259]'}">
-                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Global'  ? 'bg-[#004990]' : 'bg-[#DED9D5]'}"></span>
-                        <span class="flex-1">Global</span><span class="font-mono">$10M</span>
-                    </div>
-                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Group'   ? 'text-[#004990] font-bold' : 'text-[#6E6259]'}">
-                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Group'   ? 'bg-[#004990]' : 'bg-[#DED9D5]'}"></span>
-                        <span class="flex-1">Region / Group (6+)</span><span class="font-mono">$100k</span>
-                    </div>
-                    <div class="flex items-center gap-1.5 text-[9px] ${autoZoomLevel === 'Country' ? 'text-[#004990] font-bold' : 'text-[#6E6259]'}">
-                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${autoZoomLevel === 'Country' ? 'bg-[#004990]' : 'bg-[#DED9D5]'}"></span>
-                        <span class="flex-1">Country (1–5)</span><span class="font-mono">$10k</span>
-                    </div>
-                </div>`;
-
-        const thresholdHtml = `
-            <div class="mt-2 pt-2 border-t border-[#EBEAE6]">
-                <div class="flex items-center justify-between mb-1">
-                    <div class="text-[9px] text-[#6E6259] font-bold uppercase tracking-wider">Threshold</div>
-                    ${modeBadge}
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-[9px] text-[#231F20]">Min. flow</span>
-                    <span class="text-[10px] text-[#231F20] font-bold font-mono">$${fmtShort(currentThreshold)}</span>
-                </div>
-                ${autoTiersHtml}
-            </div>`;
-
-
         container.innerHTML = `
-            <div class="space-y-1 mt-1">${catHtml}</div>
-            ${widthHtml}
-            ${nodeHtml}
-            ${thresholdHtml}
+            <div class="legend-section">
+                <span class="legend-section-label">Flows</span>
+                <div class="legend-flows">${flowItems}</div>
+            </div>
+            <span class="legend-bar-divider"></span>
+            <div class="legend-section">
+                <span class="legend-section-label">Nodes</span>
+                <div class="legend-nodes">
+                    <span class="legend-nodes-hint">← Imp</span>
+                    <span class="legend-node" style="width:14px;height:14px;background:#ED1847" title="Strong net importer"></span>
+                    <span class="legend-node" style="width:10px;height:10px;background:#F9C0C5" title="Net importer"></span>
+                    <span class="legend-node" style="width:7px;height:7px;background:#F7DFDF"  title="Slight net importer"></span>
+                    <span class="legend-node" style="width:4px;height:4px;background:#DED9D5;border:1px solid #AEA29A" title="Balanced"></span>
+                    <span class="legend-node" style="width:7px;height:7px;background:#E3EDF6"  title="Slight net exporter"></span>
+                    <span class="legend-node" style="width:10px;height:10px;background:#C5DFEF" title="Net exporter"></span>
+                    <span class="legend-node" style="width:14px;height:14px;background:#009EDB" title="Strong net exporter"></span>
+                    <span class="legend-nodes-hint">Exp →</span>
+                </div>
+            </div>
+            <span class="legend-bar-divider"></span>
+            <div class="legend-section">
+                <span class="legend-section-label">Threshold</span>
+                <span class="legend-threshold-badge${isManual ? ' manual' : ''}">${isManual ? 'MANUAL' : 'AUTO'}</span>
+                <span class="legend-threshold-val">$${fmtShort(currentThreshold)}</span>
+            </div>
         `;
 
-        // Total stats
+        // Update stats
         const shownTotal     = d3.sum(netFlows, d => d.netValue);
         const bilateralTotal = STATE.totalBilateral || 0;
         const coverage       = bilateralTotal > 0 ? (shownTotal / bilateralTotal * 100) : 0;
 
-        const statEl       = document.getElementById('stat-value');
-        const bilatEl      = document.getElementById('stat-bilateral');
-        const coverageEl   = document.getElementById('stat-coverage');
-        if (statEl)     statEl.innerText     = '$' + fmtShort(shownTotal);
-        if (bilatEl)    bilatEl.innerText    = '$' + fmtShort(bilateralTotal);
-        if (coverageEl) coverageEl.innerText = `${coverage.toFixed(1)}% of bilateral trade shown`;
+        const statEl    = document.getElementById('stat-value');
+        const bilatEl   = document.getElementById('stat-bilateral');
+        const coverageEl = document.getElementById('stat-coverage');
+        if (statEl)    statEl.innerText    = '$' + fmtShort(shownTotal);
+        if (bilatEl)   bilatEl.innerText   = '$' + fmtShort(bilateralTotal);
+        if (coverageEl) coverageEl.innerText = `${coverage.toFixed(1)}% shown`;
     }
 };

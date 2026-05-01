@@ -1,15 +1,17 @@
 @import 'variables.less';
 
-// ── Legend Panel (left) ────────────────────────────────────────
+// ── Legend Bar (horizontal, between header and KPI) ───────────
 #legend-panel {
   flex-shrink: 0;
-  width: @panel-legend-width;
-  background: #fff;
-  border-right: 1px solid @ungrey-border;
+  background: @unblue-bg;
+  border-bottom: 1px solid @ungrey-border;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   overflow: hidden;
+  min-height: 38px;
 
+  // Mobile: hidden as bar; appears as fixed floating card via mobile.less
   .legend-mobile-header {
     display: none;
     align-items: center;
@@ -43,94 +45,171 @@
     @media (max-width: (@bp-md - 1px)) { display: flex; }
   }
 
-  .legend-title-row {
-    padding: 8px 12px;
-    border-bottom: 1px solid @ungrey-bg;
-    flex-shrink: 0;
-    background: @unblue-bg;
-
-    h3 {
-      font-size: 10px;
-      font-weight: 700;
-      color: @ungrey-dark;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin: 0;
-    }
-  }
-
+  // Legend content: horizontal flex row of sections
   #legend-content {
     flex: 1;
-    overflow-y: auto;
-    padding: 8px 12px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
   }
 
+  // Stats block (right of legend content)
   #total-stats {
-    padding: 8px 12px;
-    border-top: 1px solid @ungrey-bg;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-left: 1px solid @ungrey-border;
     flex-shrink: 0;
-    background: @unblue-bg;
 
     .stat-row {
       display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 2px;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 0;
 
-      .stat-label {
-        font-size: 9px;
-        color: @ungrey-text;
-      }
-
-      .stat-val {
-        font-size: 11px;
-        font-weight: 700;
-        color: @ungrey-dark;
-        font-family: @font-mono;
-      }
-
-      .stat-secondary {
-        font-size: 10px;
-        color: @ungrey-text;
-        font-family: @font-mono;
-      }
+      .stat-label   { font-size: 8px; color: @ungrey-text; }
+      .stat-val     { font-size: 11px; font-weight: 700; color: @ungrey-dark; font-family: @font-mono; }
+      .stat-secondary { font-size: 10px; color: @ungrey-text; font-family: @font-mono; }
     }
 
     #stat-coverage {
-      display: block;
-      text-align: center;
       font-size: 9px;
       color: @ungrey-text;
       font-family: @font-mono;
-      margin-top: 2px;
+      white-space: nowrap;
     }
   }
 
+  // SMEP logo (far right)
   .legend-footer {
-    padding: 8px 12px;
-    border-top: 1px solid @ungrey-bg;
-    flex-shrink: 0;
-    background: @unblue-bg;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 4px;
+    padding: 0 12px;
+    border-left: 1px solid @ungrey-border;
+    flex-shrink: 0;
 
     img {
-      height: 32px;
+      height: 22px;
       width: auto;
       object-fit: contain;
-      opacity: 0.75;
+      opacity: 0.65;
       transition: opacity 0.15s;
       &:hover { opacity: 1; }
     }
-
-    span {
-      font-size: 9px;
-      color: @ungrey-text;
-      font-family: @font-mono;
-    }
   }
+}
+
+// ── Legend bar: rendered content classes ──────────────────────
+.legend-section {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+
+.legend-section-label {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: @ungrey-text;
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+.legend-flows {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.legend-flow-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  transition: opacity 0.2s;
+}
+
+.legend-flow-dot {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.legend-flow-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: @ungrey-dark;
+  font-family: @font-mono;
+}
+
+.legend-flow-stat {
+  font-size: 9px;
+  color: @ungrey-text;
+  font-family: @font-mono;
+}
+
+.legend-bar-divider {
+  width: 1px;
+  height: 22px;
+  background: @ungrey-border;
+  flex-shrink: 0;
+}
+
+.legend-nodes {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+}
+
+.legend-nodes-hint {
+  font-size: 8px;
+  color: @ungrey-text;
+  font-family: @font-mono;
+  white-space: nowrap;
+}
+
+.legend-node {
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.legend-threshold-badge {
+  font-size: 8px;
+  font-weight: 700;
+  background: @unblue-bg;
+  color: @unblue-dark;
+  border: 1px solid @unblue-dark;
+  border-radius: 99px;
+  padding: 1px 5px;
+  white-space: nowrap;
+
+  &.manual {
+    background: #fefce8;
+    color: #92400e;
+    border-color: #fcd34d;
+  }
+}
+
+.legend-threshold-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: @ungrey-dark;
+  font-family: @font-mono;
 }
 
 // ── Insight Side Panel (right) ──────────────────────────────────
