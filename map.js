@@ -849,7 +849,7 @@ export const TradeMap = {
 
         const netFlows = STATE.filteredData || [];
 
-        const _legendKey = `${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${[...STATE.flowFilters].sort().join(',')}`;
+        const _legendKey = `${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}`;
         if (this._lastLegendKey === _legendKey) return;
         this._lastLegendKey = _legendKey;
 
@@ -886,15 +886,8 @@ export const TradeMap = {
 
         // Threshold
         const isManual = STATE.thresholdMode !== 'auto';
-        let currentThreshold;
-        if (isManual) {
-            currentThreshold = STATE.thresholdMode;
-        } else {
-            const sel = STATE.selectedExporters.size + STATE.selectedImporters.size;
-            if (sel > 0 && sel <= 5)                                         currentThreshold = 10000;
-            else if (sel > 5 || (STATE.region && STATE.region !== 'Global')) currentThreshold = 100000;
-            else                                                              currentThreshold = 10000000;
-        }
+        const currentThreshold = STATE.effectiveThreshold ?? (isManual ? STATE.thresholdMode : 10000000);
+        const arcCount = netFlows.length;
 
         container.innerHTML = `
             <div class="legend-section">
@@ -921,6 +914,7 @@ export const TradeMap = {
                 <span class="legend-section-label">Threshold</span>
                 <span class="legend-threshold-badge${isManual ? ' manual' : ''}">${isManual ? 'MANUAL' : 'AUTO'}</span>
                 <span class="legend-threshold-val">$${fmtShort(currentThreshold)}</span>
+                <span class="legend-arc-count">${arcCount} arcs</span>
             </div>
         `;
 

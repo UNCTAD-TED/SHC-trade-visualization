@@ -106,18 +106,9 @@ export const DataLoader = {
         if (STATE.thresholdMode !== 'auto') {
             dynamicThreshold = STATE.thresholdMode;
         } else {
-            const totalSelected    = STATE.selectedExporters.size + STATE.selectedImporters.size;
-            const isCountryFocused = totalSelected > 0 && totalSelected <= 5;
-            const isGroupFocused   = totalSelected > 5;
-            const isRegionFocused  = STATE.region && STATE.region !== 'Global';
-
-            dynamicThreshold = 10000000;
-            if (isCountryFocused) {
-                dynamicThreshold = 10000;
-            } else if (isGroupFocused || isRegionFocused) {
-                dynamicThreshold = 100000;
-            }
+            dynamicThreshold = this.computeAutoThreshold(netFlows);
         }
+        STATE.effectiveThreshold = dynamicThreshold;
 
         // Save pre-threshold totals for legend coverage display
         STATE.totalBilateral      = d3.sum(netFlows, d => d.netValue);
@@ -133,6 +124,35 @@ export const DataLoader = {
         STATE.filteredData = finalFlows;
 
         return finalFlows;
+    },
+
+    // Arc-count-capped adaptive threshold.
+    // Keeps displayed arcs ≤ TARGET_MAX while applying a minimum floor
+    // that scales with selection breadth to suppress noise.
+    computeAutoThreshold(flows, targetMax = 40) {
+        const n = STATE.selectedExporters.size + STATE.selectedImporters.size;
+        const isRegional = STATE.region && STATE.region !== 'Global';
+
+        let floor;
+        if (n === 0 && !isRegional) {
+            floor = 10000000;   // global view: $10M
+        } else if (n <= 3) {
+            floor = 10000;      // 1–3 countries: $10K
+        } else if (n <= 10) {
+            floor = 100000;     // 4–10: $100K
+        } else if (n <= 30) {
+            floor = 500000;     // 11–30: $500K
+        } else {
+            floor = 1000000;    // 31+: $1M
+        }
+        if (isRegional && n === 0) floor = 1000000;
+
+        const aboveFloor = flows.filter(d => d.netValue >= floor);
+        if (aboveFloor.length <= targetMax) return floor;
+
+        // Raise threshold until arc count ≤ targetMax
+        const sorted = aboveFloor.slice().sort((a, b) => b.netValue - a.netValue);
+        return sorted[targetMax - 1].netValue;
     },
 
     computeStatsFromNetFlows(netFlows) {
