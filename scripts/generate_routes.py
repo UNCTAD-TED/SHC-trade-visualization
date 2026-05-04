@@ -168,6 +168,7 @@ def main():
         route["properties"] = {
             "length_km":          round(props.get("length", 0)),
             "traversed_passages": props.get("traversed_passages", []),
+            "origin_iso":         exp,  # どちらの国が座標[0]の起点かを明示
         }
         routes[key] = route
         done += 1

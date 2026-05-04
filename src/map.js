@@ -349,8 +349,13 @@ export const TradeMap = {
 
     // Build the full SVG path for a focused flow:
     // exporter centroid → sea route (direction-corrected) → importer centroid.
+    // Sea routes are only shown for inter-continental flows (different UNCTAD regions).
     // Results are memoized per (exporter, importer) pair; cache is invalidated on resize.
     _buildRoutePath(d) {
+        const expRegion = RegionConfig.getRegion(d.exporter);
+        const impRegion = RegionConfig.getRegion(d.importer);
+        if (expRegion === impRegion || expRegion === 'Other' || impRegion === 'Other') return null;
+
         if (!this._routePathCache) this._routePathCache = new Map();
         const cacheKey = `${d.exporter}|${d.importer}`;
         if (this._routePathCache.has(cacheKey)) return this._routePathCache.get(cacheKey);
@@ -365,14 +370,13 @@ export const TradeMap = {
         const normalized = this.normalizeRoute(route.geometry);
         let segs = normalized.coordinates;
 
-        // Detect direction: compare first route coord to each country's centroid.
-        // If it's closer to the importer the route is stored in reverse.
-        if (expCoord && impCoord && segs.length > 0 && segs[0].length > 0) {
-            const firstGeo = segs[0][0];
-            const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
-            if (dist2(firstGeo, impCoord) < dist2(firstGeo, expCoord)) {
-                segs = segs.map(s => [...s].reverse()).reverse();
-            }
+        // Use the origin_iso property written by generate_routes.py (or the
+        // routes.json patch script) to determine direction reliably.
+        // Centroid-based heuristics break for countries like CAN or USA whose
+        // representative port lies far from the country's geographic centroid.
+        const originIso = route.properties && route.properties.origin_iso;
+        if (originIso && originIso !== d.exporter) {
+            segs = segs.map(s => [...s].reverse()).reverse();
         }
 
         // Extend: prepend exporter centroid to first segment, append importer centroid to last.

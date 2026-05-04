@@ -311,7 +311,7 @@
     <!-- ── Map Footer ── -->
     <footer id="map-footer">
         <p>Source: BACI based on UN Comtrade. Data cover HS&nbsp;6309 (Worn clothing and other worn articles).</p>
-        <p>Note: Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths and may not represent the actual mode of transport used.</p>
+        <p>Note: Sea routes are shown only for flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania) and represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm using representative ports based on UNCTAD PLSCI scores. Flows within the same region are shown as arcs. Routes do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths and may not represent the actual mode of transport used.</p>
         <p class="footer-method-link"><button id="methodology-btn" class="footer-link-btn">Methodology &amp; Data Sources</button></p>
     </footer>
 
@@ -408,10 +408,12 @@
                 <section class="method-section">
                     <h3 class="method-section-title">Maritime Route Visualization</h3>
                     <dl class="method-dl">
+                        <dt>Coverage</dt>
+                        <dd>Sea routes are displayed only for trade flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania). Flows within the same region are shown as straight arcs to avoid visual clutter from short intra-regional routes.</dd>
                         <dt>Algorithm</dt>
                         <dd>Routes are computed using the Eurostat <em>searoute</em> algorithm over a navigable sea graph.</dd>
                         <dt>Port selection</dt>
-                        <dd>Representative ports are chosen based on UNCTAD Liner Shipping Connectivity Index (LSCI) scores, the highest-ranked port in each country is used as the routing node.</dd>
+                        <dd>Representative ports are chosen based on UNCTAD Liner Shipping Connectivity Index (LSCI) scores; the highest-ranked port in each country is used as the routing node. For large countries spanning multiple coasts (United States, Canada, Australia), the nearest coast port to the partner country is selected.</dd>
                         <dt>Disclaimer</dt>
                         <dd>Routes are indicative only. They do not represent actual tracked HS&nbsp;6309 cargo paths, may not reflect the mode of transport used, and should not be used for navigation.</dd>
                     </dl>

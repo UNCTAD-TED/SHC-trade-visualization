@@ -361,8 +361,8 @@
   "EGY": {
     "name": "Alexandria",
     "coords": [
-      -77.0333,
-      38.8
+      29.9167,
+      31.2
     ],
     "plsci": 332.01,
     "source": "PLSCI+WPI"
@@ -978,10 +978,10 @@
     "source": "PLSCI+WPI"
   },
   "PAN": {
-    "name": "Manzanillo",
+    "name": "Manzanillo International Terminal",
     "coords": [
-      -104.3167,
-      19.05
+      -79.7000,
+      9.3500
     ],
     "plsci": 303.03,
     "source": "PLSCI+WPI"
@@ -1041,10 +1041,10 @@
     "source": "PLSCI+WPI"
   },
   "QAT": {
-    "name": "Halmstad",
+    "name": "Hamad Port",
     "coords": [
-      12.8667,
-      56.6667
+      51.5500,
+      25.2800
     ],
     "plsci": 247.88,
     "source": "PLSCI+WPI"
