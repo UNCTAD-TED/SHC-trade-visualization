@@ -89,6 +89,121 @@
   .modal-card { width: 680px; max-width: 95vw; }
 }
 
+// ── Methodology Modal ─────────────────────────────────────────
+#methodology-modal {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  animation: modal-fade-in 0.18s ease;
+
+  .modal-backdrop { position: fixed; }
+
+  .methodology-card {
+    width: 640px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 48px);
+  }
+}
+
+.method-body {
+  font-size: 12px;
+  line-height: 1.6;
+  color: @ungrey-dark;
+}
+
+.method-section {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid @ungrey-bg;
+
+  &.method-section-last {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
+.method-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: @unblue-dark;
+  margin: 0 0 8px;
+}
+
+.method-note {
+  font-size: 11px;
+  color: @ungrey-text;
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.method-dl {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 4px 12px;
+  margin: 0;
+
+  dt {
+    font-size: 11px;
+    font-weight: 600;
+    color: @ungrey-dark;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+  }
+
+  dd {
+    font-size: 11px;
+    color: @ungrey-text;
+    margin: 0;
+    padding: 3px 0;
+  }
+}
+
+.method-flow-dot {
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.method-cite {
+  font-size: 11px;
+  color: @ungrey-text;
+  background: @ungrey-bg;
+  border-left: 3px solid @unblue;
+  padding: 8px 12px;
+  margin: 0;
+  border-radius: 0 @radius-sm @radius-sm 0;
+}
+
+// ── Footer methodology link ────────────────────────────────────
+.footer-method-link {
+  margin-top: 4px;
+}
+
+.footer-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+  color: @unblue-dark;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+
+  &:hover { color: @unblue; }
+}
+
 @keyframes modal-fade-in {
   from { opacity: 0; transform: scale(0.97); }
   to   { opacity: 1; transform: scale(1); }

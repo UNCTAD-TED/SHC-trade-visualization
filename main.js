@@ -111,6 +111,16 @@ const App = {
         const panelCloseBtn = document.getElementById('panel-close-btn');
         if (panelCloseBtn) panelCloseBtn.addEventListener('click', () => this.closeInsightPanel());
 
+        // Sea Route toggle button
+        const searouteBtn = document.getElementById('searoute-btn');
+        if (searouteBtn) searouteBtn.addEventListener('click', () => {
+            if (TradeMap && TradeMap.toggleSeaRoute) TradeMap.toggleSeaRoute();
+        });
+        document.addEventListener('shc:searoute-toggled', (e) => {
+            const btn = document.getElementById('searoute-btn');
+            if (btn) btn.classList.toggle('active', e.detail.active);
+        });
+
         // Mobile legend toggle
         const mobileLegendBtn = document.getElementById('mobile-legend-btn');
         if (mobileLegendBtn) mobileLegendBtn.addEventListener('click', () => this.toggleMobileLegend());
@@ -126,6 +136,19 @@ const App = {
         // Compare modal
         document.getElementById('compare-modal-close').addEventListener('click', () => this.closeCompareModal());
         document.getElementById('compare-modal-backdrop').addEventListener('click', () => this.closeCompareModal());
+
+        // Methodology modal
+        document.getElementById('methodology-btn')?.addEventListener('click', () => this.openMethodologyModal());
+        document.getElementById('methodology-modal-close')?.addEventListener('click', () => this.closeMethodologyModal());
+        document.getElementById('methodology-modal-backdrop')?.addEventListener('click', () => this.closeMethodologyModal());
+
+        // Escape key closes any open modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (!document.getElementById('arc-modal').classList.contains('hidden')) this.closeArcModal();
+            if (!document.getElementById('compare-modal').classList.contains('hidden')) this.closeCompareModal();
+            if (!document.getElementById('methodology-modal').classList.contains('hidden')) this.closeMethodologyModal();
+        });
 
         // モバイルブラウザのUIバーによる高さのズレを修正するためのCSS変数をセット
         const setMobileHeight = () => {
@@ -375,6 +398,14 @@ const App = {
 
         this._currentPanelIso = iso;
         this.hideTooltip();
+
+        // Reset Sea Route button to OFF for each new country
+        const searouteBtn = document.getElementById('searoute-btn');
+        if (searouteBtn) {
+            searouteBtn.disabled = false;
+            searouteBtn.classList.remove('active');
+        }
+
         if (TradeMap && TradeMap.setFocus) {
             // Ensure routes.json is loaded before switching to sea-route rendering
             const doFocus = () => TradeMap.setFocus(iso);
@@ -385,6 +416,9 @@ const App = {
     closeInsightPanel() {
         document.getElementById('insight-panel').classList.remove('open');
         document.body.classList.remove('insight-open');
+
+        const searouteBtn = document.getElementById('searoute-btn');
+        if (searouteBtn) { searouteBtn.disabled = true; searouteBtn.classList.remove('active'); }
 
         // モバイルでヘッダーが再表示されて地図が縮むため、D3マップのサイズ再計算をトリガー
         if (window.innerWidth <= 767) {
@@ -556,6 +590,14 @@ const App = {
     closeCompareModal() {
         document.getElementById('compare-modal').classList.add('hidden');
         this._compareIso = null;
+    },
+
+    openMethodologyModal() {
+        document.getElementById('methodology-modal').classList.remove('hidden');
+    },
+
+    closeMethodologyModal() {
+        document.getElementById('methodology-modal').classList.add('hidden');
     },
 
     _buildCompareContent(isoA, isoB, mf) {

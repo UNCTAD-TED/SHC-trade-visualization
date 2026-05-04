@@ -45,6 +45,7 @@ export const TradeMap = {
 
     // ── Focus mode state (insight panel spotlight)
     focusedIso: null,
+    searouteMode: false,
 
     // When a country is focused/hovered, also highlight these additional territory codes (numeric).
     // UNCTAD treats HKG (344), MAC (446), TWN (158) as part of China (156).
@@ -520,7 +521,7 @@ export const TradeMap = {
             .on("click", (event, d) => { event.stopPropagation(); document.dispatchEvent(new CustomEvent('shc:arc-click', { detail: { exporter: d.exporter, importer: d.importer } })); });
 
         const buildArcD = (d) => {
-            if (focusedIso) {
+            if (focusedIso && this.searouteMode) {
                 const rp = this._buildRoutePath(d);
                 if (rp) return rp;
             }
@@ -672,8 +673,10 @@ export const TradeMap = {
         this.g.selectAll(".trade-arc")
             .attr("d", function(d) {
                 if (d.exporter !== focusedIso && d.importer !== focusedIso) return d3.select(this).attr("d");
-                const rp = self._buildRoutePath(d);
-                if (rp) return rp;
+                if (self.searouteMode) {
+                    const rp = self._buildRoutePath(d);
+                    if (rp) return rp;
+                }
                 const s = STATE.countryCoords[d.exporter];
                 const t = STATE.countryCoords[d.importer];
                 if (!s || !t) return d3.select(this).attr("d");
@@ -730,9 +733,35 @@ export const TradeMap = {
         this._renderParticles(iso, visibleFlows);
     },
 
+    toggleSeaRoute() {
+        this.searouteMode = !this.searouteMode;
+        document.dispatchEvent(new CustomEvent('shc:searoute-toggled', { detail: { active: this.searouteMode } }));
+        if (!this.focusedIso || !this.g) return;
+        const focusedIso = this.focusedIso;
+        const self = this;
+        this.g.selectAll(".trade-arc")
+            .attr("d", function(d) {
+                if (d.exporter !== focusedIso && d.importer !== focusedIso) return d3.select(this).attr("d");
+                if (self.searouteMode) {
+                    const rp = self._buildRoutePath(d);
+                    if (rp) return rp;
+                }
+                const s = STATE.countryCoords[d.exporter];
+                const t = STATE.countryCoords[d.importer];
+                if (!s || !t) return d3.select(this).attr("d");
+                const p1 = self.projection(s);
+                const p2 = self.projection(t);
+                if (!p1 || !p2) return d3.select(this).attr("d");
+                const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+                const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
+                return `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,1 ${p2[0]},${p2[1]}`;
+            });
+    },
+
     clearFocus() {
         if (!this.g) return;
         this.focusedIso = null;
+        this.searouteMode = false;
 
         const self = this;
 

@@ -230,7 +230,13 @@
             <div id="insight-panel">
                 <div class="panel-header">
                     <div class="panel-title-group">
-                        <div id="panel-country-name">—</div>
+                        <div class="panel-country-name-row">
+                            <div id="panel-country-name">—</div>
+                            <button id="searoute-btn" class="searoute-btn" title="Show actual shipping routes (experimental feature)" disabled>
+                                <span class="searoute-btn-label">Sea Route</span>
+                                <span class="searoute-experimental-badge">EXPERIMENTAL</span>
+                            </button>
+                        </div>
                         <div id="panel-country-meta">—</div>
                     </div>
                     <button id="panel-close-btn" class="btn-close" title="Close">
@@ -304,9 +310,103 @@
 
     <!-- ── Map Footer ── -->
     <footer id="map-footer">
-        <p> Source: BACI based on UN Comtrade. Data cover HS&nbsp;6309 (Used or new clothing and other worn articles).</p>
-        <p> Note: Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths and may not represent the actual mode of transport used.</p>
+        <p>Source: BACI based on UN Comtrade. Data cover HS&nbsp;6309 (Worn clothing and other worn articles).</p>
+        <p>Note: Routes displayed when a country is selected represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm, using representative ports based on UNCTAD PLSCI scores. They do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths and may not represent the actual mode of transport used.</p>
+        <p class="footer-method-link"><button id="methodology-btn" class="footer-link-btn">Methodology &amp; Data Sources</button></p>
     </footer>
+
+    <!-- ── Methodology Modal ── -->
+    <div id="methodology-modal" class="hidden">
+        <div class="modal-backdrop" id="methodology-modal-backdrop"></div>
+        <div class="modal-card methodology-card">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">Methodology &amp; Data Sources</div>
+                    <div class="modal-subtitle">Global Second-Hand Clothes Trade Monitor &mdash; Technical Notes</div>
+                </div>
+                <button id="methodology-modal-close" class="btn-close">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="modal-body method-body">
+
+                <section class="method-section">
+                    <h3 class="method-section-title">Data Source</h3>
+                    <dl class="method-dl">
+                        <dt>Database</dt>
+                        <dd>BACI International Trade Database (CEPII), derived from UN Comtrade mirror data. Harmonized bilateral trade flows at the HS 6-digit level.</dd>
+                        <dt>Product coverage</dt>
+                        <dd>HS&nbsp;6309 — <em>Worn clothing and other worn articles.</em> Includes second-hand garments traded in bulk regardless of quality grade.</dd>
+                        <dt>Years available</dt>
+                        <dd>2015–2024 (provisional for the most recent year)</dd>
+                        <dt>Value unit</dt>
+                        <dd>Current USD (thousands, then converted to display units)</dd>
+                    </dl>
+                </section>
+
+                <section class="method-section">
+                    <h3 class="method-section-title">Flow Direction Classification</h3>
+                    <p class="method-note">Countries are classified as <strong>North</strong> (developed) or <strong>South</strong> (developing/least-developed) using the UNCTAD Development Status classification, consistent with UNCTAD flagship publications.</p>
+                    <dl class="method-dl">
+                        <dt><span class="method-flow-dot" style="background:#009EDB"></span> N&rarr;S</dt>
+                        <dd>Export from a developed economy to a developing economy</dd>
+                        <dt><span class="method-flow-dot" style="background:#72BF44"></span> S&rarr;N</dt>
+                        <dd>Export from a developing economy to a developed economy</dd>
+                        <dt><span class="method-flow-dot" style="background:#FBAF17"></span> S&rarr;S</dt>
+                        <dd>Both exporter and importer are developing or least-developed economies</dd>
+                        <dt><span class="method-flow-dot" style="background:#AEA29A"></span> N&rarr;N</dt>
+                        <dd>Both exporter and importer are developed economies</dd>
+                    </dl>
+                </section>
+
+                <section class="method-section">
+                    <h3 class="method-section-title">Trade Flow Calculation</h3>
+                    <dl class="method-dl">
+                        <dt>Net bilateral flow</dt>
+                        <dd>For each country pair (A, B), the net flow equals the larger reported value between A&rarr;B and B&rarr;A exports. The dominant direction determines the arc direction. This reduces double-counting from mirror reporting in UN Comtrade.</dd>
+                        <dt>Arc width</dt>
+                        <dd>Scaled proportionally to the net trade value on a square-root scale to prevent large flows from dominating small ones visually.</dd>
+                    </dl>
+                </section>
+
+                <section class="method-section">
+                    <h3 class="method-section-title">Display Threshold (Auto Mode)</h3>
+                    <p class="method-note">To avoid visual overload, the map limits the number of displayed arcs to a maximum of <strong>40</strong> at a time.</p>
+                    <dl class="method-dl">
+                        <dt>Global view</dt>
+                        <dd>Minimum threshold: $10&thinsp;M. Arcs below this value are hidden.</dd>
+                        <dt>With country selection</dt>
+                        <dd>Floor scales down with selection breadth (1–3 countries: $10&thinsp;K; 4–10: $100&thinsp;K; 11–30: $500&thinsp;K; 31+: $1&thinsp;M). If the number of arcs above the floor exceeds 40, the threshold is raised to the 40th-highest value.</dd>
+                        <dt>Manual thresholds</dt>
+                        <dd>Fixed cut-off values ($10&thinsp;k – $10&thinsp;M) override the automatic algorithm.</dd>
+                    </dl>
+                </section>
+
+                <section class="method-section">
+                    <h3 class="method-section-title">Maritime Route Visualization</h3>
+                    <dl class="method-dl">
+                        <dt>Algorithm</dt>
+                        <dd>Routes are computed using the Eurostat <em>searoute</em> algorithm over a navigable sea graph.</dd>
+                        <dt>Port selection</dt>
+                        <dd>Representative ports are chosen based on UNCTAD Liner Shipping Connectivity Index (LSCI) scores — the highest-ranked port in each country is used as the routing node.</dd>
+                        <dt>Disclaimer</dt>
+                        <dd>Routes are indicative only. They do not represent actual tracked HS&nbsp;6309 cargo paths, may not reflect the mode of transport used, and should not be used for navigation.</dd>
+                    </dl>
+                </section>
+
+                <section class="method-section">
+                    <h3 class="method-section-title">Map Disclaimer</h3>
+                    <p class="method-note">The boundaries and names shown on this map do not imply official endorsement or acceptance by the United Nations. Dotted and dashed lines represent approximate borders for which the final status has not yet been determined. The designation of countries or territories does not imply the expression of any opinion on the part of UNCTAD concerning their legal status.</p>
+                </section>
+
+                <section class="method-section method-section-last">
+                    <h3 class="method-section-title">How to Cite</h3>
+                    <p class="method-cite">UNCTAD (2025). <em>Global Second-Hand Clothes Trade Monitor.</em> United Nations Conference on Trade and Development, Geneva.</p>
+                </section>
+
+            </div>
+        </div>
+    </div>
 
     <!-- ── Mobile Filter Panel (bottom sheet) ── -->
     <div id="mobile-filter-panel">
