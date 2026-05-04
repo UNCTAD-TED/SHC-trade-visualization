@@ -35,37 +35,73 @@ Phase 3: ドキュメント化                  ← 次のステップ
 |------|------|------|
 | 可視化エンジン | **D3.js v7を維持** | Highchartsはアーク描画不可 |
 | バンドラー | **Vite**（webpackではない） | 設定がシンプル、DX優秀 |
-| CSS | **Phase 1はTailwind維持、Phase 2でLESSへ移行** | UNCTAD準拠にはLESSが必要 |
+| CSS | **LESSで管理（`src/styles/`）** | UNCTAD準拠 |
 | Reactへの移行 | **しない** | 不要な複雑化 |
-| UNCTADテンプレート | `react-webpack-un-map/` を参照（同リポジトリ内） | ブランディングの正式参照 |
+| UNCTADテンプレート | `docs/unctad-template/` を参照 | ブランディングの正式参照 |
 
 ---
 
 ## ファイル構成と責務
 
 ```
-index.html          — UIレイアウト全体（Tailwindクラス多数）
-config.js           — CONFIG（定数）、STATE（グローバル状態）、METRIC_FORMAT
-regions.js          — RegionConfig（地域マッピング、ISO-3コード）
-countrySelector.js  — CountrySelector クラス（輸出入国のドロップダウン）
-dataLoader.js       — DataLoader（JSON/fetch、データ加工）
-map.js              — TradeMap（D3地図描画、アーク、ズーム、900行超）
-main.js             — App（UIイベント、パネル、モーダル、1470行超）
-style.css           — カスタムCSS（Tailwindで対応不可な部分）
-server.js           — Express静的サーバー（開発用、Vite移行後は不要）
+index.html              — UIレイアウト全体
+src/
+  config.js             — CONFIG（定数）、STATE（グローバル状態）、METRIC_FORMAT
+  regions.js            — RegionConfig（地域マッピング、ISO-3コード）
+  countrySelector.js    — CountrySelector クラス（輸出入国のドロップダウン）
+  dataLoader.js         — DataLoader（JSON/fetch、データ加工）
+  map.js                — TradeMap（D3地図描画、アーク、ズーム）
+  main.js               — App（UIイベント、パネル、モーダル）エントリーポイント
+  styles/
+    styles.less         — エントリーポイント（他のLESSをimport）
+    variables.less      — UNCTAD変数定義
+    colors.less         — カラーパレット
+    header.less         — ヘッダー
+    kpi.less            — KPIバー
+    panels.less         — サイドパネル
+    insight.less        — インサイトパネル
+    modals.less         — モーダル
+    mobile.less         — モバイル対応
 ```
 
-### データファイル（`data/`）
-- `meta.json` — 国名・ISO・座標のマスター
-- `trend_summary.json` — KPI集計データ
-- `routes.json` — 海上輸送ルート
-- `bilateral_*.json` — 国別二国間貿易履歴
-- `shc_*.json` — 年別貿易フローデータ
+### 静的アセット（`public/` — Viteが配信、唯一の正源）
 
-### アセット（`assets/`）
-- `worldmap-economies-4326.topo.json` — 地図ポリゴン（TopoJSON）
-- `unctad-icon.svg` — UNCTADロゴ
-- `smep-logo.png` — SMEPロゴ
+```
+public/
+  assets/
+    worldmap-economies-4326.topo.json   — 地図ポリゴン（Robinson投影）
+    worldmap-economies-54030.topo.json  — 地図ポリゴン（WGS84）
+    unctad-icon.svg                     — UNCTADロゴ
+    smep-logo.png                       — SMEPロゴ
+  data/
+    meta.json             — 国名・ISO・座標のマスター
+    trend_summary.json    — KPI集計データ
+    routes.json           — 海上輸送ルート
+    bilateral_history.json — 国別二国間貿易履歴
+    {2015..2024}.json     — 年別貿易フローデータ
+    ports.json            — 主要港データ
+    country_classification.json — 国分類（North/South）
+```
+
+### データパイプライン（`scripts/`）
+
+```
+scripts/
+  process_data.py       — BACI CSVからJSONへの変換
+  build_port_db.py      — 港データ構築
+  generate_routes.py    — 海上ルート生成
+  input/                — 生データ（.gitignore対象）
+```
+
+### ドキュメント・参照（`docs/`）
+
+```
+docs/
+  Data visual branding.pdf  — UNCTADビジュアルブランディングガイドライン
+  unctad-template/          — UNCTADテンプレートLESSファイル（参照用）
+    colors.less, variables.less, header.less, footer.less
+    templates/ header.html, footer.html
+```
 
 ---
 

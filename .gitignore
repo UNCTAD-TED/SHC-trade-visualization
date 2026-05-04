@@ -1,3 +1,7 @@
 node_modules/
 dist/
 .DS_Store
+
+# Large raw data files (not needed in version control)
+public/data/BACI.csv
+scripts/input/

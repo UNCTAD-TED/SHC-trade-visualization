@@ -366,6 +366,8 @@
                         <dd>For each country pair (A, B), the net flow equals the larger reported value between A&rarr;B and B&rarr;A exports. The dominant direction determines the arc direction. This reduces double-counting from mirror reporting in UN Comtrade.</dd>
                         <dt>Arc width</dt>
                         <dd>Scaled proportionally to the net trade value on a square-root scale to prevent large flows from dominating small ones visually.</dd>
+                        <dt>Arc curvature</dt>
+                        <dd>All arcs curve in a consistent clockwise direction (SVG <code>sweep-flag = 1</code>). This means eastward flows bend northward and westward flows bend southward, providing a secondary visual cue for flow direction that complements the color encoding.</dd>
                     </dl>
                 </section>
 
@@ -383,12 +385,33 @@
                 </section>
 
                 <section class="method-section">
+                    <h3 class="method-section-title">Partner Concentration (HHI)</h3>
+                    <p class="method-note">Shown in the country detail panel when a country is clicked. Measures how much a country&rsquo;s trade is spread across partners versus concentrated in just a few analogous to asking &ldquo;does this country trade with everyone, or depend heavily on one partner?&rdquo;</p>
+                    <dl class="method-dl">
+                        <dt>Index used</dt>
+                        <dd>Herfindahl&ndash;Hirschman Index (HHI): the sum of squared partner trade shares, scaled to 0&ndash;10&thinsp;000. A score of 10&thinsp;000 means 100% of trade goes to a single partner; a score near 0 means trade is evenly spread across many partners.</dd>
+                        <dt>Formula</dt>
+                        <dd><code>HHI = &sum;(share<sub>i</sub>&sup2;) &times; 10&thinsp;000</code>, where share<sub>i</sub> is each partner&rsquo;s fraction of that country&rsquo;s total bilateral trade value.</dd>
+                        <dt>Interpretation</dt>
+                        <dd>
+                            <span class="method-hhi-band" style="color:#72BF44">&#9632;</span> <strong>Diversified</strong> (0–2&thinsp;000): trade spread across many partners<br>
+                            <span class="method-hhi-band" style="color:#FBAF17">&#9632;</span> <strong>Moderate</strong> (2&thinsp;000–4&thinsp;000): some partners dominate but diversification remains<br>
+                            <span class="method-hhi-band" style="color:#ef4444">&#9632;</span> <strong>Highly concentrated</strong> (&gt;4&thinsp;000): trade heavily dependent on one or two partners
+                        </dd>
+                        <dt>Threshold note</dt>
+                        <dd>These bands are calibrated for international trade dependency analysis. They are deliberately lower than the antitrust thresholds used in competition law (which start at 2&thinsp;500 for &ldquo;concentrated markets&rdquo;), reflecting that even moderate trade concentration poses diversification risks.</dd>
+                        <dt>Data scope</dt>
+                        <dd>Computed from all net bilateral flows for the selected year, regardless of the display threshold. This ensures the score is not distorted by the map&rsquo;s visibility filter.</dd>
+                    </dl>
+                </section>
+
+                <section class="method-section">
                     <h3 class="method-section-title">Maritime Route Visualization</h3>
                     <dl class="method-dl">
                         <dt>Algorithm</dt>
                         <dd>Routes are computed using the Eurostat <em>searoute</em> algorithm over a navigable sea graph.</dd>
                         <dt>Port selection</dt>
-                        <dd>Representative ports are chosen based on UNCTAD Liner Shipping Connectivity Index (LSCI) scores — the highest-ranked port in each country is used as the routing node.</dd>
+                        <dd>Representative ports are chosen based on UNCTAD Liner Shipping Connectivity Index (LSCI) scores, the highest-ranked port in each country is used as the routing node.</dd>
                         <dt>Disclaimer</dt>
                         <dd>Routes are indicative only. They do not represent actual tracked HS&nbsp;6309 cargo paths, may not reflect the mode of transport used, and should not be used for navigation.</dd>
                     </dl>
@@ -506,6 +529,6 @@
         </div><!-- /.sheet-body -->
     </div><!-- /#mobile-filter-panel -->
 
-    <script type="module" src="main.js"></script>
+    <script type="module" src="src/main.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import './src/styles/styles.less';
+import './styles/styles.less';
 import * as d3 from 'd3';
 import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
 import { RegionConfig } from './regions.js';
