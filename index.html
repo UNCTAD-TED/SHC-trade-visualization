@@ -176,19 +176,45 @@
     <!-- ── KPI Bar ── -->
     <div id="kpi-bar">
         <div class="kpi-inner">
-            <div class="kpi-item"><span class="kpi-label">Total</span><span class="kpi-value" id="kpi-total">—</span></div>
+            <div class="kpi-item" title="Active filter: region or country selection">
+                <span class="kpi-label">Filter</span>
+                <span class="kpi-value" id="kpi-scope">Global</span>
+            </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item"><span class="kpi-label">Flows</span><span class="kpi-value" id="kpi-flows">—</span></div>
+            <div class="kpi-item" title="Total trade value of visible flows (USD)">
+                <span class="kpi-label">Volume</span>
+                <span class="kpi-value" id="kpi-total">—</span>
+            </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item"><span class="kpi-label">Countries</span><span class="kpi-value" id="kpi-countries">—</span></div>
+            <div class="kpi-item" title="Number of bilateral trade corridors shown on map">
+                <span class="kpi-label">Corridors</span>
+                <span class="kpi-value" id="kpi-flows">—</span>
+            </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item"><span class="kpi-label">#1 Exporter</span><span class="kpi-value" id="kpi-top-exp" style="color:#0077B6">—</span></div>
+            <div class="kpi-item" title="Number of countries active in the current view">
+                <span class="kpi-label">Countries</span>
+                <span class="kpi-value" id="kpi-countries">—</span>
+            </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item"><span class="kpi-label">#1 Importer</span><span class="kpi-value" id="kpi-top-imp" style="color:#C0392B">—</span></div>
+            <div class="kpi-item kpi-item-col" title="Largest net exporter by trade balance (includes all flows, before threshold)">
+                <span class="kpi-label">#1 Exporter</span>
+                <span class="kpi-value" id="kpi-top-exp" style="color:#0077B6">—</span>
+            </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item"><span class="kpi-label">N→S</span><span class="kpi-value" id="kpi-ns-pct" style="color:#009EDB">—</span></div>
+            <div class="kpi-item kpi-item-col" title="Largest net importer by trade balance (includes all flows, before threshold)">
+                <span class="kpi-label">#1 Importer</span>
+                <span class="kpi-value" id="kpi-top-imp" style="color:#C0392B">—</span>
+            </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item"><span class="kpi-label">S→S</span><span class="kpi-value" id="kpi-ss-pct" style="color:#FBAF17">—</span></div>
+            <div class="kpi-item" title="North-to-South flows as share of total visible trade value">
+                <span class="kpi-label">N→S</span>
+                <span class="kpi-value" id="kpi-ns-pct" style="color:#009EDB">—</span>
+            </div>
+            <div class="kpi-divider"></div>
+            <div class="kpi-item" title="South-to-South flows as share of total visible trade value">
+                <span class="kpi-label">S→S</span>
+                <span class="kpi-value" id="kpi-ss-pct" style="color:#FBAF17">—</span>
+            </div>
         </div>
     </div>
 

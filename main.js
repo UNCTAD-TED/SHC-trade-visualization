@@ -282,6 +282,7 @@ const App = {
     updateKPIBar() {
         const flows = STATE.filteredData || [];
         const stats = STATE.nodeStats || {};
+        const rawStats = STATE.rawNodeStats || stats;
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
 
         const total = d3.sum(flows, d => d.netValue);
@@ -297,7 +298,7 @@ const App = {
         const topExpEl = document.getElementById('kpi-top-exp');
         const topImpEl = document.getElementById('kpi-top-imp');
         if (topExpEl || topImpEl) {
-            const sortedByBalance = Object.entries(stats).sort((a, b) => b[1].netBalance - a[1].netBalance);
+            const sortedByBalance = Object.entries(rawStats).sort((a, b) => b[1].netBalance - a[1].netBalance);
             if (topExpEl) {
                 if (sortedByBalance.length > 0 && sortedByBalance[0][1].netBalance > 0) {
                     const name = STATE.countryNames[sortedByBalance[0][0]] || sortedByBalance[0][0];
@@ -317,6 +318,9 @@ const App = {
             }
         }
 
+        const scopeEl = document.getElementById('kpi-scope');
+        if (scopeEl) scopeEl.textContent = this._buildScopeText();
+
         let nsTotal = 0, ssTotal = 0;
         flows.forEach(d => {
             if (d.flowCategory === 'north-south') nsTotal += d.netValue;
@@ -327,6 +331,22 @@ const App = {
 
         const ssPctEl = document.getElementById('kpi-ss-pct');
         if (ssPctEl) ssPctEl.textContent = total > 0 ? Math.round(ssTotal / total * 100) + '%' : '—';
+    },
+
+    _buildScopeText() {
+        const region = STATE.region && STATE.region !== 'Global' ? STATE.region : null;
+        const nExp = STATE.selectedExporters?.size || 0;
+        const nImp = STATE.selectedImporters?.size || 0;
+        if (!region && nExp === 0 && nImp === 0) return 'Global';
+        const parts = [];
+        if (region) {
+            parts.push(region);
+            if (nExp === 0 && nImp === 0) parts.push('Intra');
+        }
+        if (nExp > 0 && nImp > 0) parts.push(`${nExp} Exp · ${nImp} Imp`);
+        else if (nExp > 0) parts.push(`${nExp} Exporters`);
+        else if (nImp > 0) parts.push(`${nImp} Importers`);
+        return parts.join(' · ');
     },
 
     // ── P1: Insight Side Panel ──────────────────────────────────────

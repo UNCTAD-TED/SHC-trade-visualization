@@ -113,6 +113,7 @@ export const DataLoader = {
         // Save pre-threshold totals for legend coverage display
         STATE.totalBilateral      = d3.sum(netFlows, d => d.netValue);
         STATE.totalBilateralCount = netFlows.length;
+        STATE.rawNodeStats        = this.computeStatsFromNetFlows(netFlows);
 
         const thresholded = netFlows.filter(d => d.netValue >= dynamicThreshold);
 
