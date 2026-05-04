@@ -21,12 +21,16 @@ export const DataLoader = {
             }
             STATE.geoData = topojson.feature(world, world.objects.economies);
 
-            // Convert disputed/special border layers to GeoJSON for rendering
+            // Convert border and point layers to GeoJSON for rendering
             STATE.borderLayers = {
+                plain:      topojson.feature(world, world.objects['plain-borders']),
                 dashed:     topojson.feature(world, world.objects['dashed-borders']),
                 dotted:     topojson.feature(world, world.objects['dotted-borders']),
                 dashDotted: topojson.feature(world, world.objects['dash-dotted-borders']),
             };
+            STATE.countryPoints = world.objects['economies-point']
+                ? topojson.feature(world, world.objects['economies-point'])
+                : null;
 
             // Populate coords/names from TopoJSON centroids first
             this.processGeoData(STATE.geoData);

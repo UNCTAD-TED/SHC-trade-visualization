@@ -88,7 +88,23 @@
       26.5167
     ],
     "plsci": 177.44,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Nassau",
+        "coords": [
+          -77.35,
+          25.0667
+        ]
+      },
+      {
+        "name": "Freeport, Grand Bahama",
+        "coords": [
+          -78.7,
+          26.55
+        ]
+      }
+    ]
   },
   "BGD": {
     "name": "Chittagong",
@@ -240,7 +256,23 @@
       10.4167
     ],
     "plsci": 358.73,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Cartagena",
+        "coords": [
+          -75.55,
+          10.4
+        ]
+      },
+      {
+        "name": "Port of Buenaventura",
+        "coords": [
+          -77.0333,
+          3.8833
+        ]
+      }
+    ]
   },
   "COM": {
     "name": "Moutsamoudu",
@@ -266,7 +298,23 @@
       -83.0333,
       10.0167
     ],
-    "source": "manual"
+    "source": "manual",
+    "alt_ports": [
+      {
+        "name": "Puerto Moin / Limon",
+        "coords": [
+          -83.0333,
+          10.0167
+        ]
+      },
+      {
+        "name": "Puerto Caldera",
+        "coords": [
+          -84.7167,
+          9.9167
+        ]
+      }
+    ]
   },
   "CIV": {
     "name": "Abidjan",
@@ -293,7 +341,23 @@
       22.9833
     ],
     "plsci": 51.48,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Havana",
+        "coords": [
+          -82.35,
+          23.13
+        ]
+      },
+      {
+        "name": "Port of Santiago de Cuba",
+        "coords": [
+          -75.82,
+          20.0
+        ]
+      }
+    ]
   },
   "CUW": {
     "name": "Willemstad",
@@ -365,7 +429,23 @@
       38.8
     ],
     "plsci": 332.01,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Alexandria",
+        "coords": [
+          29.8833,
+          31.2
+        ]
+      },
+      {
+        "name": "Port of Suez",
+        "coords": [
+          32.55,
+          29.9667
+        ]
+      }
+    ]
   },
   "SLV": {
     "name": "Acajutla",
@@ -427,7 +507,23 @@
       49.4833
     ],
     "plsci": 464.71,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Le Havre",
+        "coords": [
+          0.1083,
+          49.4944
+        ]
+      },
+      {
+        "name": "Port of Marseille",
+        "coords": [
+          5.35,
+          43.3
+        ]
+      }
+    ]
   },
   "GUF": {
     "name": "Degrad des Cannes",
@@ -543,7 +639,23 @@
       13.9167
     ],
     "plsci": 153.56,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Puerto Quetzal",
+        "coords": [
+          -90.7833,
+          13.9167
+        ]
+      },
+      {
+        "name": "Puerto Barrios",
+        "coords": [
+          -88.6,
+          15.7167
+        ]
+      }
+    ]
   },
   "GIN": {
     "name": "Conakry",
@@ -579,7 +691,23 @@
       18.55
     ],
     "plsci": 55.26,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Port-au-Prince",
+        "coords": [
+          -72.35,
+          18.55
+        ]
+      },
+      {
+        "name": "Port of Cap-Haitien",
+        "coords": [
+          -72.2,
+          19.75
+        ]
+      }
+    ]
   },
   "HND": {
     "name": "Puerto Cortes",
@@ -588,7 +716,23 @@
       15.8333
     ],
     "plsci": 140.88,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Puerto Cortes",
+        "coords": [
+          -87.95,
+          15.8333
+        ]
+      },
+      {
+        "name": "Puerto San Lorenzo",
+        "coords": [
+          -87.45,
+          13.4167
+        ]
+      }
+    ]
   },
   "ISL": {
     "name": "Reykjavik",
@@ -660,7 +804,23 @@
       44.4
     ],
     "plsci": 417.75,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Genoa",
+        "coords": [
+          8.95,
+          44.4167
+        ]
+      },
+      {
+        "name": "Port of Trieste",
+        "coords": [
+          13.7667,
+          45.6333
+        ]
+      }
+    ]
   },
   "JAM": {
     "name": "Kingston",
@@ -669,7 +829,23 @@
       17.9667
     ],
     "plsci": 302.75,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Kingston",
+        "coords": [
+          -76.7833,
+          17.9667
+        ]
+      },
+      {
+        "name": "Port of Montego Bay",
+        "coords": [
+          -77.9167,
+          18.4667
+        ]
+      }
+    ]
   },
   "JPN": {
     "name": "Yokohama Ko",
@@ -704,8 +880,7 @@
       172.92,
       1.37
     ],
-    "plsci": 26.12,
-    "source": "PLSCI+WPI"
+    "source": "manual"
   },
   "LVA": {
     "name": "Riga",
@@ -840,7 +1015,23 @@
       19.05
     ],
     "plsci": 268.18,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Veracruz",
+        "coords": [
+          -96.1342,
+          19.2
+        ]
+      },
+      {
+        "name": "Port of Manzanillo",
+        "coords": [
+          -104.3167,
+          19.05
+        ]
+      }
+    ]
   },
   "MNE": {
     "name": "Bar",
@@ -921,7 +1112,23 @@
       12.4833
     ],
     "plsci": 52.09,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Corinto",
+        "coords": [
+          -87.1833,
+          12.4833
+        ]
+      },
+      {
+        "name": "Port of Bluefields",
+        "coords": [
+          -83.7667,
+          12.0
+        ]
+      }
+    ]
   },
   "NIU": {
     "name": "Alofi",
@@ -969,13 +1176,12 @@
     "source": "PLSCI+WPI"
   },
   "PLW": {
-    "name": "Malakal Harbor",
+    "name": "Malakal Harbor, Palau",
     "coords": [
       134.46,
       7.34
     ],
-    "plsci": 11.07,
-    "source": "PLSCI+WPI"
+    "source": "manual"
   },
   "PAN": {
     "name": "Manzanillo",
@@ -984,7 +1190,23 @@
       19.05
     ],
     "plsci": 303.03,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Colon",
+        "coords": [
+          -79.9,
+          9.35
+        ]
+      },
+      {
+        "name": "Port of Balboa",
+        "coords": [
+          -79.5667,
+          8.95
+        ]
+      }
+    ]
   },
   "PNG": {
     "name": "Lae",
@@ -1074,7 +1296,30 @@
       43.1167
     ],
     "plsci": 191.62,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Saint Petersburg",
+        "coords": [
+          30.25,
+          59.9333
+        ]
+      },
+      {
+        "name": "Port of Vladivostok",
+        "coords": [
+          131.8833,
+          43.1
+        ]
+      },
+      {
+        "name": "Port of Novorossiysk",
+        "coords": [
+          37.7833,
+          44.7167
+        ]
+      }
+    ]
   },
   "KNA": {
     "name": "Basseterre",
@@ -1119,7 +1364,23 @@
       21.4833
     ],
     "plsci": 393.63,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Jeddah",
+        "coords": [
+          39.1833,
+          21.4833
+        ]
+      },
+      {
+        "name": "Port of Dammam",
+        "coords": [
+          50.15,
+          26.4333
+        ]
+      }
+    ]
   },
   "SEN": {
     "name": "Dakar",
@@ -1191,7 +1452,23 @@
       -29.8667
     ],
     "plsci": 215.4,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Cape Town",
+        "coords": [
+          18.4333,
+          -33.9
+        ]
+      },
+      {
+        "name": "Port of Durban",
+        "coords": [
+          31.0292,
+          -29.8579
+        ]
+      }
+    ]
   },
   "ESP": {
     "name": "Valencia",
@@ -1200,7 +1477,23 @@
       39.45
     ],
     "plsci": 589.48,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Valencia",
+        "coords": [
+          -0.3167,
+          39.45
+        ]
+      },
+      {
+        "name": "Port of Algeciras",
+        "coords": [
+          -5.45,
+          36.1333
+        ]
+      }
+    ]
   },
   "LKA": {
     "name": "Colombo",
@@ -1281,7 +1574,23 @@
       10.65
     ],
     "plsci": 98.16,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Spain",
+        "coords": [
+          -61.5167,
+          10.65
+        ]
+      },
+      {
+        "name": "Port of Scarborough, Tobago",
+        "coords": [
+          -60.7333,
+          11.1833
+        ]
+      }
+    ]
   },
   "TUN": {
     "name": "Rades",
@@ -1299,7 +1608,23 @@
       40.9667
     ],
     "plsci": 447.99,
-    "source": "PLSCI+WPI"
+    "source": "PLSCI+WPI",
+    "alt_ports": [
+      {
+        "name": "Port of Istanbul",
+        "coords": [
+          29.0,
+          41.0167
+        ]
+      },
+      {
+        "name": "Port of Mersin",
+        "coords": [
+          34.6333,
+          36.8
+        ]
+      }
+    ]
   },
   "TCA": {
     "name": "Grand Turk",
@@ -1455,7 +1780,23 @@
       -69.6167,
       18.4333
     ],
-    "source": "manual"
+    "source": "manual",
+    "alt_ports": [
+      {
+        "name": "Port of Caucedo",
+        "coords": [
+          -69.6167,
+          18.4333
+        ]
+      },
+      {
+        "name": "Port of Puerto Plata",
+        "coords": [
+          -70.69,
+          19.82
+        ]
+      }
+    ]
   },
   "FJI": {
     "name": "Port of Suva",

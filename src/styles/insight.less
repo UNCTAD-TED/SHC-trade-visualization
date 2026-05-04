@@ -1,0 +1,362 @@
+@import 'variables.less';
+
+// ── Shared panel content — data insight sections ───────────────
+.si-section {
+  margin-bottom: 14px;
+
+  & + .si-section {
+    border-top: 1px solid @ungrey-bg;
+    padding-top: 14px;
+  }
+}
+
+.si-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: @ungrey-text;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.si-sublabel {
+  font-size: 8px;
+  color: @ungrey;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+// ── KPI grid (3-col for arc modal, 2-col for insight panel) ──
+.si-kpi-grid {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+
+  &.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  &.cols-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+.si-kpi-card {
+  border-radius: @radius-lg;
+  padding: 8px 10px;
+  text-align: center;
+
+  .si-kpi-label {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 3px;
+  }
+
+  .si-kpi-value {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: @font-mono;
+    color: @ungrey-dark;
+  }
+
+  &.exp {
+    background: rgba(0, 119, 184, 0.09);
+    border: 1px solid rgba(0, 119, 184, 0.22);
+    .si-kpi-label { color: @unblue-dark; }
+  }
+
+  &.net {
+    background: @unblue-bg;
+    border: 1px solid @ungrey-border;
+    .si-kpi-label { color: @ungrey-text; }
+  }
+
+  &.imp {
+    background: rgba(237, 24, 71, 0.07);
+    border: 1px solid rgba(237, 24, 71, 0.18);
+    .si-kpi-label { color: @unred-dark; }
+  }
+}
+
+// ── Inline badge (flow category, etc.) ───────────────────────
+.si-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 99px;
+  border: 1px solid;
+}
+
+// ── Chart legend ──────────────────────────────────────────────
+.si-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+
+  .si-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .si-legend-swatch {
+      width: 12px;
+      height: 2px;
+      border-radius: 1px;
+      flex-shrink: 0;
+    }
+
+    span { font-size: 9px; color: @ungrey-text; }
+  }
+}
+
+// ── Data table ────────────────────────────────────────────────
+.si-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    padding: 3px 8px;
+    font-size: 9px;
+    color: @ungrey-text;
+    font-weight: 700;
+    border-bottom: 1px solid @ungrey-border;
+
+    &.ar { text-align: right; }
+    &.ac { text-align: center; }
+    &.al { text-align: left; }
+  }
+
+  td {
+    padding: 4px 8px;
+    font-size: 10px;
+    font-family: @font-mono;
+
+    &.ar { text-align: right; }
+    &.ac { text-align: center; }
+    &.al { text-align: left; }
+    &.bold { font-weight: 700; }
+    &.muted { color: @ungrey-text; }
+    &.cur { color: @unblue-dark; font-weight: 700; }
+  }
+
+  tr:hover td { background: @unblue-bg; }
+  tr.row-cur td { background: rgba(0, 119, 184, 0.08); }
+}
+
+// ── Narrative / Auto-Insights box ────────────────────────────
+.si-narrative-box {
+  background: rgba(0, 73, 144, 0.06);
+  border: 1px solid rgba(0, 73, 144, 0.14);
+  border-radius: @radius-lg;
+  padding: 12px;
+  margin-bottom: 14px;
+
+  .si-narrative-title {
+    font-size: 9px;
+    font-weight: 700;
+    color: @unblue-dark;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+
+  p {
+    font-size: 11px;
+    color: @ungrey-dark;
+    line-height: 1.5;
+    margin: 0 0 6px;
+
+    &:last-child { margin-bottom: 0; }
+  }
+}
+
+// ── Role badge ────────────────────────────────────────────────
+.si-role-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.si-role-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 14px;
+  border-radius: 99px;
+
+  &.exp { background: rgba(0, 158, 219, 0.12); color: @unblue; }
+  &.imp { background: rgba(237, 24, 71, 0.10); color: @unred-dark; }
+}
+
+// ── Card box (gauge, charts) ──────────────────────────────────
+.si-card {
+  background: @unblue-bg;
+  border: 1px solid @ungrey-border;
+  border-radius: @radius-lg;
+  padding: 12px;
+}
+
+// ── Trading partner list ──────────────────────────────────────
+.si-partners {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.si-partner-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  .si-rank {
+    font-size: 9px;
+    font-family: @font-mono;
+    color: @ungrey-text;
+    flex-shrink: 0;
+    min-width: 28px;
+  }
+
+  .si-arrow {
+    font-weight: 700;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .si-name {
+    flex: 1;
+    font-size: 11px;
+    color: @ungrey-dark;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .si-bar-wrap {
+    width: 36px;
+    height: 5px;
+    background: @ungrey-bg;
+    border-radius: 99px;
+    overflow: hidden;
+    flex-shrink: 0;
+
+    .si-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      opacity: 0.75;
+    }
+  }
+
+  .si-split {
+    font-size: 9px;
+    font-family: @font-mono;
+    font-weight: 700;
+    flex-shrink: 0;
+    width: 34px;
+    text-align: right;
+  }
+
+  .si-val {
+    font-size: 10px;
+    font-family: @font-mono;
+    color: @ungrey-text;
+    width: 44px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .si-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+
+  &:hover .si-actions { opacity: 1; }
+}
+
+// ── Action buttons ────────────────────────────────────────────
+.si-btn {
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: @radius-sm;
+  background: @ungrey-bg;
+  color: @ungrey-text;
+  border: none;
+  cursor: pointer;
+  font-family: @font-family;
+  transition: background 0.12s, color 0.12s;
+
+  &:hover { background: @unblue-dark; color: #fff; }
+  &.cmp:hover { background: #b45309; }
+}
+
+// ── Flow composition bar ──────────────────────────────────────
+.si-flow-bar {
+  display: flex;
+  height: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  gap: 1px;
+  margin-bottom: 8px;
+}
+
+.si-comp-rows { display: flex; flex-direction: column; gap: 4px; }
+
+.si-comp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .si-comp-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .si-comp-label { flex: 1; font-size: 10px; color: @ungrey-dark; }
+  .si-comp-pct { font-size: 10px; font-weight: 700; font-family: @font-mono; }
+}
+
+// ── HHI stats row ─────────────────────────────────────────────
+.si-hhi-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid @ungrey-border;
+  text-align: center;
+
+  .hhi-l { font-size: 8px; color: @ungrey-text; text-transform: uppercase; font-weight: 700; }
+  .hhi-v { font-size: 12px; font-weight: 700; font-family: @font-mono; color: @ungrey-dark; }
+  .hhi-s { font-size: 8px; color: @ungrey-text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+// ── Chart footer legend (polar / butterfly) ───────────────────
+.si-chart-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+
+  .si-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .si-legend-swatch { width: 10px; height: 3px; border-radius: 2px; }
+    span { font-size: 9px; color: @ungrey-dark; }
+  }
+}
+
+// ── Partners header row ───────────────────────────────────────
+.si-partners-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+
+  .si-partners-hint { font-size: 8px; color: @ungrey; font-style: italic; }
+}

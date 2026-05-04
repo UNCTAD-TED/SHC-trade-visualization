@@ -46,9 +46,9 @@ export const TradeMap = {
     // ── Focus mode state (insight panel spotlight)
     focusedIso: null,
 
-    // When a country is focused, also highlight these additional territory codes (numeric)
-    // China (156) includes Taiwan Province of China (158) per UNCTAD political position
-    _territoryAliases: { 'CHN': ['158'] },
+    // When a country is focused/hovered, also highlight these additional territory codes (numeric).
+    // UNCTAD treats HKG (344), MAC (446), TWN (158) as part of China (156).
+    _territoryAliases: { 'CHN': ['158', '344', '446'] },
 
     // Lazy-computed reverse of isoMap: iso3 → numeric string
     _reverseIsoMap: null,
@@ -58,6 +58,28 @@ export const TradeMap = {
 
     // ── Legend dirty-check: skip full DOM rebuild when inputs haven't changed
     _lastLegendKey: null,
+
+    // Returns the set of numeric code strings that should be co-highlighted with the given code.
+    // Covers forward (CHN → HKG/MAC/TWN) and reverse (HKG → CHN/MAC/TWN) lookups.
+    _getHoverGroup(codeStr) {
+        if (!this._reverseIsoMap) {
+            this._reverseIsoMap = {};
+            Object.entries(this.isoMap).forEach(([num, iso3]) => { this._reverseIsoMap[iso3] = num; });
+        }
+        const group = new Set([codeStr]);
+        const iso3 = this.isoMap[codeStr];
+        if (iso3) {
+            (this._territoryAliases[iso3] || []).forEach(c => group.add(String(c)));
+        }
+        for (const [mainIso, aliasList] of Object.entries(this._territoryAliases)) {
+            if (aliasList.includes(codeStr)) {
+                const mainCode = this._reverseIsoMap[mainIso];
+                if (mainCode) group.add(String(mainCode));
+                aliasList.forEach(c => group.add(String(c)));
+            }
+        }
+        return group;
+    },
 
     // ── Shared compact number formatter (no currency symbol) used in renderLegend
     _fmtShort(v) {
@@ -122,20 +144,16 @@ export const TradeMap = {
 
     updateProjection() {
         this._routePathCache = null; // projection changes → cached SVG paths are stale
-        // 1. 正距円筒図法の特性（横360度:縦180度）に合わせ、横・縦それぞれのベーススケールを計算
-        const baseScaleX = this.width / 6.28;
-        const baseScaleY = this.height / 3.14;
 
-        // 2. 画面が縦長か横長かを判定
         const isPortrait = this.height > this.width;
-        
-        // 3. 縦長画面（スマホ）なら縦幅基準を採用し、横長画面（PC）なら横幅基準を採用する
-        const finalScale = isPortrait ? baseScaleY * 1.1 : baseScaleX;
 
-        this.projection = d3.geoEquirectangular()
-            .scale(finalScale)
-            // 縦長画面の場合は地図の中心を少し上にずらしてUIと被らないように見やすく調整
-            .translate([this.width / 2, this.height / (isPortrait ? 2.2 : 1.8)]);
+        // fitExtent automatically calculates scale and translate for any projection.
+        // Leave vertical margin at top/bottom so the map doesn't overlap UI panels.
+        const yTop = this.height * (isPortrait ? 0.02 : 0.06);
+        const yBot = this.height * (isPortrait ? 0.02 : 0.12);
+
+        this.projection = d3.geoNaturalEarth1()
+            .fitExtent([[0, yTop], [this.width, this.height - yBot]], { type: 'Sphere' });
 
         this.path = d3.geoPath().projection(this.projection);
     },
@@ -202,8 +220,23 @@ export const TradeMap = {
             .attr("stroke", "#DED9D5")
             .attr("stroke-width", 0.5)
             .style("transition", "fill 0.2s ease")
-            .on("mouseover", function() { d3.select(this).attr("fill", "#EBEAE6"); })
-            .on("mouseout",  function() { d3.select(this).attr("fill", "#FAFAFA"); });
+            .on("mouseover", (event, d) => {
+                if (!d || !d.properties) return;
+                const group = this._getHoverGroup(String(d.properties.code));
+                this.g.selectAll("path.land")
+                    .filter(ld => ld && ld.properties && group.has(String(ld.properties.code)))
+                    .attr("fill", "#EBEAE6");
+            })
+            .on("mouseout", (event, d) => {
+                if (!d || !d.properties) return;
+                const group = this._getHoverGroup(String(d.properties.code));
+                const focusCode = this.focusedIso && this._reverseIsoMap && this._reverseIsoMap[this.focusedIso];
+                const focusAliases = this.focusedIso ? (this._territoryAliases[this.focusedIso] || []) : [];
+                const focusGroup = new Set([focusCode, ...focusAliases].filter(Boolean));
+                this.g.selectAll("path.land")
+                    .filter(ld => ld && ld.properties && group.has(String(ld.properties.code)))
+                    .attr("fill", ld => focusGroup.has(String(ld.properties.code)) ? "#EAF4FB" : "#FAFAFA");
+            });
 
         landsEnter.merge(lands)
             .attr("fill", "#FAFAFA")
@@ -212,17 +245,18 @@ export const TradeMap = {
         this._renderBorderLayers(landLayer);
     },
 
-    // Render disputed/special border lines (dashed, dotted, dash-dotted) from TopoJSON layers
+    // Render border lines and small-island point features from TopoJSON layers
     _renderBorderLayers(landLayer) {
         if (!STATE.borderLayers) return;
 
         const specs = [
-            { key: 'dashed',     cls: 'border-dashed',      dasharray: '4,3'        },
-            { key: 'dotted',     cls: 'border-dotted',      dasharray: '1.5,2.5'    },
-            { key: 'dashDotted', cls: 'border-dash-dotted', dasharray: '5,2,1.5,2'  },
+            { key: 'plain',      cls: 'border-plain',       dasharray: null,          stroke: '#C8C2BB', width: 0.4 },
+            { key: 'dashed',     cls: 'border-dashed',      dasharray: '4,3',         stroke: '#9B9189', width: 0.5 },
+            { key: 'dotted',     cls: 'border-dotted',      dasharray: '1.5,2.5',     stroke: '#9B9189', width: 0.5 },
+            { key: 'dashDotted', cls: 'border-dash-dotted', dasharray: '5,2,1.5,2',  stroke: '#9B9189', width: 0.5 },
         ];
 
-        specs.forEach(({ key, cls, dasharray }) => {
+        specs.forEach(({ key, cls, dasharray, stroke, width }) => {
             const features = STATE.borderLayers[key];
             if (!features) return;
 
@@ -231,17 +265,46 @@ export const TradeMap = {
 
             paths.exit().remove();
 
-            paths.enter().append("path")
+            const entered = paths.enter().append("path")
                 .attr("class", `border ${cls}`)
                 .attr("fill", "none")
-                .attr("stroke", "#9B9189")
-                .attr("stroke-width", 0.5)
-                .attr("stroke-dasharray", dasharray)
+                .attr("stroke", stroke)
+                .attr("stroke-width", width)
                 .attr("stroke-linecap", "round")
-                .style("pointer-events", "none")
-                .merge(paths)
-                .attr("d", this.path);
+                .style("pointer-events", "none");
+
+            if (dasharray) entered.attr("stroke-dasharray", dasharray);
+
+            entered.merge(paths).attr("d", this.path);
         });
+
+        // Render tiny-island-nation dots (economies-point layer).
+        // Only draw a dot if the economy has no polygon counterpart — the 4326 file
+        // includes points for every economy, so we must exclude those already drawn as polygons.
+        if (STATE.countryPoints && STATE.geoData) {
+            const polygonCodes = new Set(
+                STATE.geoData.features.map(f => String(f.properties.code))
+            );
+            const pointOnlyFeatures = STATE.countryPoints.features.filter(
+                f => !polygonCodes.has(String(f.properties && f.properties.code))
+            );
+
+            const dots = landLayer.selectAll("circle.economy-point")
+                .data(pointOnlyFeatures, d => d.properties && d.properties.code);
+
+            dots.exit().remove();
+
+            dots.enter().append("circle")
+                .attr("class", "economy-point")
+                .attr("r", 2)
+                .attr("fill", "#FAFAFA")
+                .attr("stroke", "#DED9D5")
+                .attr("stroke-width", 0.5)
+                .style("pointer-events", "none")
+                .merge(dots)
+                .attr("cx", d => (this.projection(d.geometry.coordinates) || [])[0])
+                .attr("cy", d => (this.projection(d.geometry.coordinates) || [])[1]);
+        }
     },
 
     // ── Flow rendering (Export Value / 2D only)
@@ -282,22 +345,6 @@ export const TradeMap = {
 
         const expCoord = STATE.countryCoords[d.exporter];
         const impCoord = STATE.countryCoords[d.importer];
-
-        // Detour filter: if the sea route is >4x the centroid straight-line distance,
-        // the pair likely trades overland — fall back to circular arc.
-        if (expCoord && impCoord && route.properties?.length_km) {
-            const toRad = deg => deg * Math.PI / 180;
-            const dLat = toRad(impCoord[1] - expCoord[1]);
-            const dLon = toRad(impCoord[0] - expCoord[0]);
-            const a = Math.sin(dLat / 2) ** 2
-                    + Math.cos(toRad(expCoord[1])) * Math.cos(toRad(impCoord[1]))
-                    * Math.sin(dLon / 2) ** 2;
-            const directKm = 2 * 6371 * Math.asin(Math.sqrt(a));
-            if (directKm > 300 && route.properties.length_km / directKm > 4.0) {
-                this._routePathCache.set(cacheKey, null);
-                return null;
-            }
-        }
 
         const normalized = this.normalizeRoute(route.geometry);
         let segs = normalized.coordinates;
@@ -383,8 +430,8 @@ export const TradeMap = {
         const p98NetFlows   = d3.quantile(sortedNetFlows, 0.98) || d3.max(sortedNetFlows) || 1;
 
         //need to adjust the size
-        const maxRadius    = Math.max(Math.min(this.width * 0.015, 28), 8);
-        const maxEdgeWidth = Math.max(Math.min(this.width * 0.008, 16), 6);
+        const maxRadius    = Math.max(Math.min(this.width * 0.010, 20), 1);
+        const maxEdgeWidth = Math.max(Math.min(this.width * 0.008, 12), 1);
 
         const radiusScale = d3.scaleSqrt()
             .domain([0, p98Gross])

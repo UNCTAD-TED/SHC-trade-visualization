@@ -1,0 +1,50 @@
+<!--
+  UNCTAD Header — copy-paste snippet
+  CSS: @import 'unctad-template/header.less';
+  Font: <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  Logo: place unctad-icon.svg in your assets/ directory
+-->
+
+<header id="main-header">
+    <div class="header-inner">
+
+        <!-- Row 1: Logo + Title (required) -->
+        <div class="header-title">
+            <img src="assets/unctad-icon.svg" alt="UNCTAD" class="header-logo">
+            <div class="header-text">
+                <h3>Your Application Title Here</h3>
+                <h4>UNCTAD &middot; Data: Source Name</h4>
+            </div>
+        </div>
+
+        <!--
+          Row 2: Application controls (optional, desktop-only)
+          Use .ctrl-pill to group related controls.
+          Use .ctrl-divider between groups.
+          Use .btn-toggle with class "active" for the selected state.
+          Use .ctrl-select for <select> elements.
+          Use .picker-wrapper + .picker-btn + .picker-menu for searchable dropdowns.
+        -->
+        <div class="header-controls">
+
+            <!-- Example: toggle button group -->
+            <div class="ctrl-pill">
+                <button class="btn-toggle active" data-value="all">All</button>
+                <button class="btn-toggle" data-value="option-a">Option A</button>
+                <button class="btn-toggle" data-value="option-b">Option B</button>
+            </div>
+
+            <div class="ctrl-divider"></div>
+
+            <!-- Example: year selector -->
+            <div class="ctrl-pill">
+                <select class="ctrl-select" id="year-select">
+                    <option value="2024" selected>2024</option>
+                    <option value="2023">2023</option>
+                </select>
+            </div>
+
+        </div><!-- /.header-controls -->
+
+    </div><!-- /.header-inner -->
+</header>
