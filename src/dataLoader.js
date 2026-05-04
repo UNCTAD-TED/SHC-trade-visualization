@@ -5,6 +5,9 @@ import { RegionConfig } from './regions.js';
 import { TradeMap } from './map.js';
 
 export const DataLoader = {
+    // Cache key for pre-threshold stats (year|region|exporters|importers).
+    // Threshold and flow-category changes must not trigger a recompute.
+    _preThresholdKey: null,
 
     async loadAll() {
         try {
@@ -110,10 +113,16 @@ export const DataLoader = {
         }
         STATE.effectiveThreshold = dynamicThreshold;
 
-        // Save pre-threshold totals for legend coverage display
-        STATE.totalBilateral      = d3.sum(netFlows, d => d.netValue);
-        STATE.totalBilateralCount = netFlows.length;
-        STATE.rawNodeStats        = this.computeStatsFromNetFlows(netFlows);
+        // Save pre-threshold totals for legend coverage display.
+        // These only depend on year/region/selection, not on threshold or flow-category filters,
+        // so skip the recompute when only those UI controls changed.
+        const preKey = `${STATE.year}|${STATE.region}|${[...STATE.selectedExporters].sort()}|${[...STATE.selectedImporters].sort()}`;
+        if (this._preThresholdKey !== preKey) {
+            this._preThresholdKey     = preKey;
+            STATE.totalBilateral      = d3.sum(netFlows, d => d.netValue);
+            STATE.totalBilateralCount = netFlows.length;
+            STATE.rawNodeStats        = this.computeStatsFromNetFlows(netFlows);
+        }
 
         const thresholded = netFlows.filter(d => d.netValue >= dynamicThreshold);
 

@@ -60,6 +60,10 @@ export const TradeMap = {
     // ── Legend dirty-check: skip full DOM rebuild when inputs haven't changed
     _lastLegendKey: null,
 
+    // ── Zoom rAF batching: pending transform so expensive selectAll runs once per frame
+    _zoomRaf: null,
+    _pendingZoomK: 1,
+
     // Returns the fill for a land polygon, applying special fills for disputed territories.
     _specialFill(d, defaultFill) {
         if (d?.properties?.code === 'C00002') return 'url(#aksai-chin-hatch)';
@@ -135,17 +139,26 @@ export const TradeMap = {
         this.zoomBehavior = d3.zoom()
             .scaleExtent([0.2, 8])
             .on("zoom", (event) => {
+                // Apply the transform immediately so panning feels instant.
                 this.g.attr("transform", event.transform);
-                const k = event.transform.k;
-                this.g.selectAll(".land, .graticule, .border").attr("stroke-width", 0.5 / k);
-                this.g.selectAll(".trade-arc").attr("stroke-width", function() {
-                    return (+d3.select(this).attr("data-original-width") || 1) / k;
+                this._pendingZoomK = event.transform.k;
+
+                // Batch the expensive per-element selectAll updates to one rAF per frame.
+                if (this._zoomRaf) return;
+                this._zoomRaf = requestAnimationFrame(() => {
+                    this._zoomRaf = null;
+                    const k = this._pendingZoomK;
+                    this.g.selectAll(".land, .graticule, .border").attr("stroke-width", 0.5 / k);
+                    this.g.selectAll(".trade-arc").attr("stroke-width", function() {
+                        return (+this.getAttribute("data-original-width") || 1) / k;
+                    });
+                    this.g.selectAll(".country-node").attr("r", function() {
+                        return (+this.getAttribute("data-original-radius") || 3) / k;
+                    }).attr("stroke-width", 1.5 / k);
+                    this.g.selectAll(".map-label")
+                        .attr("font-size", (8.5 / Math.sqrt(k)) + "px")
+                        .attr("stroke-width", 2.5 / k);
                 });
-                this.g.selectAll(".country-node").attr("r", function() {
-                    return (+d3.select(this).attr("data-original-radius") || 3) / k;
-                }).attr("stroke-width", 1.5 / k);
-                this.g.selectAll(".map-label").attr("font-size", (8.5 / Math.sqrt(k)) + "px")
-                    .attr("stroke-width", 2.5 / k);
             });
         this.svg.call(this.zoomBehavior);
     },
@@ -255,7 +268,7 @@ export const TradeMap = {
             });
 
         landsEnter.merge(lands)
-            .attr("fill", "#FAFAFA")
+            .attr("fill", d => this._specialFill(d, "#FAFAFA"))
             .attr("d", this.path);
 
         this._renderBorderLayers(landLayer);
@@ -673,30 +686,30 @@ export const TradeMap = {
         const focusedIso = iso;
         const self = this;
 
-        // Update path shapes immediately (before opacity fade) to avoid D3 path interpolation glitch
-        this.g.selectAll(".trade-arc")
-            .attr("d", function(d) {
-                if (d.exporter !== focusedIso && d.importer !== focusedIso) return d3.select(this).attr("d");
+        // Update path shapes immediately (before opacity fade) to avoid D3 path interpolation glitch.
+        // Cache the selection to avoid traversing the DOM twice.
+        const focusArcs = this.g.selectAll(".trade-arc");
+        focusArcs.attr("d", function(d) {
+                if (d.exporter !== focusedIso && d.importer !== focusedIso) return this.getAttribute("d");
                 if (self.searouteMode) {
                     const rp = self._buildRoutePath(d);
                     if (rp) return rp;
                 }
                 const s = STATE.countryCoords[d.exporter];
                 const t = STATE.countryCoords[d.importer];
-                if (!s || !t) return d3.select(this).attr("d");
+                if (!s || !t) return this.getAttribute("d");
                 const p1 = self.projection(s);
                 const p2 = self.projection(t);
-                if (!p1 || !p2) return d3.select(this).attr("d");
+                if (!p1 || !p2) return this.getAttribute("d");
                 const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
                 const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
                 return `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,1 ${p2[0]},${p2[1]}`;
             });
 
-        // Then animate only opacity
-        this.g.selectAll(".trade-arc")
-            .transition().duration(450)
+        // Then animate only opacity (same selection object, no second DOM traversal)
+        focusArcs.transition().duration(450)
             .style("opacity", function(d) {
-                const base = +d3.select(this).attr("data-base-opacity") || 0.5;
+                const base = +this.getAttribute("data-base-opacity") || 0.5;
                 if (d.exporter === focusedIso || d.importer === focusedIso) return base;
                 return 0;
             });
@@ -730,7 +743,8 @@ export const TradeMap = {
                 return (d && highlightCodes.has(String(d.properties.code))) ? 1 : 0.35;
             })
             .attr("fill", function(d) {
-                return (d && highlightCodes.has(String(d.properties.code))) ? "#EAF4FB" : "#FAFAFA";
+                const base = (d && highlightCodes.has(String(d.properties.code))) ? "#EAF4FB" : "#FAFAFA";
+                return self._specialFill(d, base);
             });
 
         this._renderHalo(iso);
@@ -769,25 +783,25 @@ export const TradeMap = {
 
         const self = this;
 
-        // Snap path shapes back to circular arcs immediately, before opacity animates in
-        this.g.selectAll(".trade-arc")
-            .attr("d", function(d) {
+        // Snap path shapes back to circular arcs immediately, before opacity animates in.
+        // Cache selection to avoid traversing the DOM twice.
+        const clearArcs = this.g.selectAll(".trade-arc");
+        clearArcs.attr("d", function(d) {
                 const s = STATE.countryCoords[d.exporter];
                 const t = STATE.countryCoords[d.importer];
-                if (!s || !t) return d3.select(this).attr("d");
+                if (!s || !t) return this.getAttribute("d");
                 const p1 = self.projection(s);
                 const p2 = self.projection(t);
-                if (!p1 || !p2) return d3.select(this).attr("d");
+                if (!p1 || !p2) return this.getAttribute("d");
                 const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
                 const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
                 return `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,1 ${p2[0]},${p2[1]}`;
             });
 
-        // Then fade opacity back in
-        this.g.selectAll(".trade-arc")
-            .transition().duration(400)
+        // Then fade opacity back in (same selection, no second DOM traversal)
+        clearArcs.transition().duration(400)
             .style("opacity", function() {
-                return +d3.select(this).attr("data-base-opacity") || 0.5;
+                return +this.getAttribute("data-base-opacity") || 0.5;
             });
 
         this.g.selectAll(".country-node")
@@ -799,7 +813,7 @@ export const TradeMap = {
         this.g.selectAll(".land")
             .transition().duration(400)
             .style("opacity", 1)
-            .attr("fill", "#FAFAFA");
+            .attr("fill", d => this._specialFill(d, "#FAFAFA"));
 
         this._clearHalo();
         this._clearParticles();

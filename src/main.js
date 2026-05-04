@@ -89,7 +89,9 @@ const App = {
                 const val = e.target.dataset.threshold;
                 STATE.thresholdMode = val === 'auto' ? 'auto' : +val;
                 this.updateUIClasses('.threshold-btn', e.target);
-                this.updateDashboard(false);
+                // 50ms debounce: prevents overlapping D3 transitions when buttons are clicked rapidly
+                clearTimeout(this._filterDebounce);
+                this._filterDebounce = setTimeout(() => this.updateDashboard(false), 50);
             });
         });
 
@@ -99,7 +101,8 @@ const App = {
                 const val = e.target.value;
                 if (e.target.checked) STATE.flowFilters.add(val);
                 else STATE.flowFilters.delete(val);
-                this.updateDashboard(false);
+                clearTimeout(this._filterDebounce);
+                this._filterDebounce = setTimeout(() => this.updateDashboard(false), 50);
             });
         });
 
@@ -321,19 +324,23 @@ const App = {
         const topExpEl = document.getElementById('kpi-top-exp');
         const topImpEl = document.getElementById('kpi-top-imp');
         if (topExpEl || topImpEl) {
-            const sortedByBalance = Object.entries(rawStats).sort((a, b) => b[1].netBalance - a[1].netBalance);
+            // Single O(n) pass instead of O(n log n) sort — we only need the extremes.
+            let topExp = null, topImp = null;
+            for (const [iso, st] of Object.entries(rawStats)) {
+                if (!topExp || st.netBalance > topExp[1].netBalance) topExp = [iso, st];
+                if (!topImp || st.netBalance < topImp[1].netBalance) topImp = [iso, st];
+            }
             if (topExpEl) {
-                if (sortedByBalance.length > 0 && sortedByBalance[0][1].netBalance > 0) {
-                    const name = STATE.countryNames[sortedByBalance[0][0]] || sortedByBalance[0][0];
+                if (topExp && topExp[1].netBalance > 0) {
+                    const name = STATE.countryNames[topExp[0]] || topExp[0];
                     topExpEl.textContent = name.length > 16 ? name.slice(0, 15) + '…' : name;
                 } else {
                     topExpEl.textContent = '—';
                 }
             }
             if (topImpEl) {
-                const last = sortedByBalance[sortedByBalance.length - 1];
-                if (last && last[1].netBalance < 0) {
-                    const name = STATE.countryNames[last[0]] || last[0];
+                if (topImp && topImp[1].netBalance < 0) {
+                    const name = STATE.countryNames[topImp[0]] || topImp[0];
                     topImpEl.textContent = name.length > 16 ? name.slice(0, 15) + '…' : name;
                 } else {
                     topImpEl.textContent = '—';
@@ -880,7 +887,7 @@ const App = {
 
         const catTotals = {};
         let countryTotal = 0;
-        STATE.filteredData.forEach(d => {
+        (STATE.yearCache[STATE.year] || []).forEach(d => {
             if (d.exporter === iso || d.importer === iso) {
                 catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
                 countryTotal += d.netValue;
@@ -1211,7 +1218,7 @@ const App = {
 
         const catTotals = {};
         let countryTotal = 0;
-        STATE.filteredData.forEach(d => {
+        (STATE.yearCache[STATE.year] || []).forEach(d => {
             if (d.exporter === iso || d.importer === iso) {
                 catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
                 countryTotal += d.netValue;
@@ -1352,7 +1359,7 @@ const App = {
 
         const catTotals = {};
         let countryTotal = 0;
-        STATE.filteredData.forEach(d => {
+        (STATE.yearCache[STATE.year] || []).forEach(d => {
             if (d.exporter === iso || d.importer === iso) {
                 catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
                 countryTotal += d.netValue;
