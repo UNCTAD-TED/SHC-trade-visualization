@@ -242,14 +242,31 @@ const App = {
         });
 
         search.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            menu.querySelectorAll('.country-option').forEach(item => {
-                const text = item.innerText.toLowerCase();
-                item.style.display = text.includes(term) ? 'flex' : 'none';
-            });
-            menu.querySelectorAll('.group-option').forEach(item => {
-                item.style.display = term ? 'none' : 'flex';
-            });
+            const term = e.target.value.toLowerCase().trim();
+            if (!term) {
+                // Restore default: show group rows, collapse all children
+                menu.querySelectorAll('.picker-section-header, .group-option, .country-option')
+                    .forEach(el => el.style.display = '');
+                menu.querySelectorAll('.group-children').forEach(c => {
+                    c.classList.add('hidden');
+                    c.style.display = '';
+                });
+                menu.querySelectorAll('.group-toggle').forEach(t => {
+                    t.setAttribute('aria-expanded', 'false');
+                });
+            } else {
+                // Search mode: hide group rows/headers, expand all children, filter countries
+                menu.querySelectorAll('.picker-section-header, .group-option')
+                    .forEach(el => el.style.display = 'none');
+                menu.querySelectorAll('.group-children').forEach(c => {
+                    c.classList.remove('hidden');
+                    c.style.display = 'block';
+                });
+                menu.querySelectorAll('.country-option').forEach(item => {
+                    const text = item.innerText.toLowerCase();
+                    item.style.display = text.includes(term) ? 'flex' : 'none';
+                });
+            }
         });
 
         clearAll.addEventListener('click', () => {

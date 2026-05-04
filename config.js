@@ -14,7 +14,7 @@ export const CONFIG = {
     // Flow category base colors (North = Developed, South = Developing/LDC)
     flowColors: {
         'north-south': '#009EDB',  // UNCTAD Blue
-        'south-north': '#ED1847',  // UNCTAD Red
+        'south-north': '#72BF44',  // UNCTAD Green
         'south-south': '#FBAF17',  // UNCTAD Yellow
         'north-north': '#AEA29A',  // UNCTAD Warm Grey
     },

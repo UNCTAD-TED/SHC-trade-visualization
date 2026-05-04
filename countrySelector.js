@@ -1,6 +1,5 @@
-// countrySelector.js - Hierarchical country selection (Alpha-3, 3-level hierarchy)
+// countrySelector.js - Hierarchical country selection with collapsible groups
 
-// ExporterとImporter両方のセレクターが同じJSONをfetchしないようモジュールレベルでキャッシュ
 let _classificationCache = null;
 
 class CountrySelector {
@@ -27,12 +26,9 @@ class CountrySelector {
                 _classificationCache = await response.json();
             }
             this.classificationData = _classificationCache;
-
             this.allCountries = Object.keys(this.classificationData.countries)
                 .map(code => ({ code, name: this.classificationData.countries[code].name }))
                 .sort((a, b) => a.name.localeCompare(b.name));
-
-            console.log(`Country classification loaded: ${this.allCountries.length} countries`);
         } catch (error) {
             console.error('Failed to load country classification:', error);
         }
@@ -50,85 +46,113 @@ class CountrySelector {
         if (!list) return;
         list.innerHTML = '';
 
-        this.addSectionHeader(list, '🌍 Geographic Regions');
-
+        // ── Geographic Regions ────────────────────────────────────
+        this._addSectionHeader(list, '🌍 Geographic Regions');
         const regionOrder = ['5100', '5200', '5300', '5400', '5500'];
         regionOrder.forEach(contCode => {
             const cont = this.classificationData.regions[contCode];
             if (!cont) return;
-
-            this.addGroupOption(list, {
+            const continentCountries = this.getCountriesInRegion(contCode);
+            const { childContainer } = this._addGroupRow(list, {
                 label: `${cont.name} (All)`,
-                countries: this.getCountriesInRegion(contCode),
-                indent: 0, icon: '▶'
+                countries: continentCountries,
+                indent: 0,
+                icon: '▶',
             });
-
             (cont.subregions || []).forEach(sub => {
-                this.addGroupOption(list, {
+                const subCountries = this.getCountriesInRegion(sub.code);
+                const { childContainer: subChild } = this._addGroupRow(childContainer, {
                     label: sub.name,
-                    countries: this.getCountriesInRegion(sub.code),
-                    indent: 1, icon: '└'
+                    countries: subCountries,
+                    indent: 1,
+                    icon: '└',
                 });
-
-                (sub.subsubregions || []).forEach(subsub => {
-                    this.addGroupOption(list, {
-                        label: subsub.name,
-                        countries: this.getCountriesInRegion(subsub.code),
-                        indent: 2, icon: '  └'
+                if ((sub.subsubregions || []).length > 0) {
+                    sub.subsubregions.forEach(subsub => {
+                        const subsubCountries = this.getCountriesInRegion(subsub.code);
+                        const { childContainer: subsubChild } = this._addGroupRow(subChild, {
+                            label: subsub.name,
+                            countries: subsubCountries,
+                            indent: 2,
+                            icon: '  └',
+                        });
+                        this._addSortedCountries(subsubChild, subsubCountries, 3);
                     });
-                });
+                } else {
+                    this._addSortedCountries(subChild, subCountries, 2);
+                }
             });
         });
 
-        this.addSectionHeader(list, '📊 Development Status');
+        // ── Development Status ────────────────────────────────────
+        this._addSectionHeader(list, '📊 Development Status');
         ['1500', '1400', '1610'].forEach(devCode => {
             const devGroup = this.classificationData.development[devCode];
             if (!devGroup) return;
-            this.addGroupOption(list, {
+            const { childContainer } = this._addGroupRow(list, {
                 label: devGroup.name,
                 countries: devGroup.countries,
-                indent: 0, icon: '▶'
+                indent: 0,
+                icon: '▶',
             });
+            this._addSortedCountries(childContainer, devGroup.countries, 1);
         });
-
-        this.addSectionHeader(list, '🌐 All Countries');
-        this.allCountries.forEach(c => this.addCountryOption(list, c.code, c.name));
     }
 
-    addSectionHeader(parent, title) {
+    _addSectionHeader(parent, title) {
         const div = document.createElement('div');
-        div.className = 'px-2 py-1.5 text-[9px] font-bold text-[#718096] uppercase tracking-wider bg-[#F5F7FA] border-b border-[#E2E8F0] sticky top-0 z-10';
+        div.className = 'picker-section-header';
         div.textContent = title;
         parent.appendChild(div);
     }
 
-    addGroupOption(parent, { label, countries, indent, icon }) {
-        const div = document.createElement('div');
-        div.className = 'group-option flex items-center gap-2 py-1.5 text-xs rounded cursor-pointer hover:bg-[#F0F4F8] border-b border-[#E2E8F0]/60';
-        div.style.paddingLeft = `${8 + indent * 14}px`;
-        div.style.paddingRight = '8px';
+    // Builds a group row with expand toggle. Returns { wrapper, childContainer }.
+    _addGroupRow(parent, { label, countries, indent, icon }) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'group-wrapper';
+
+        const row = document.createElement('div');
+        row.className = 'group-option';
+        row.style.paddingLeft = `${8 + indent * 14}px`;
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'group-toggle';
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.textContent = '▶';
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.className = 'accent-[#004990] flex-shrink-0 group-checkbox';
+        checkbox.className = 'custom-checkbox group-checkbox';
         checkbox.dataset.groupCountries = countries.join(',');
 
         const iconSpan = document.createElement('span');
-        iconSpan.className = 'text-[#9CA3AF] text-[10px] font-mono flex-shrink-0';
+        iconSpan.className = 'group-icon';
         iconSpan.textContent = icon;
 
         const labelSpan = document.createElement('span');
-        labelSpan.className = 'flex-1 font-semibold text-[#1a2332]';
+        labelSpan.className = 'group-label';
         labelSpan.textContent = label;
 
         const countSpan = document.createElement('span');
-        countSpan.className = 'text-[9px] text-[#718096] font-mono bg-[#E5E7EB] px-1 rounded';
+        countSpan.className = 'group-count';
         countSpan.textContent = countries.length;
 
-        div.appendChild(checkbox);
-        div.appendChild(iconSpan);
-        div.appendChild(labelSpan);
-        div.appendChild(countSpan);
+        row.appendChild(toggle);
+        row.appendChild(checkbox);
+        row.appendChild(iconSpan);
+        row.appendChild(labelSpan);
+        row.appendChild(countSpan);
+
+        const childContainer = document.createElement('div');
+        childContainer.className = 'group-children hidden';
+
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const expanded = toggle.getAttribute('aria-expanded') === 'true';
+            toggle.setAttribute('aria-expanded', String(!expanded));
+            childContainer.classList.toggle('hidden');
+        });
 
         checkbox.addEventListener('change', (e) => {
             e.stopPropagation();
@@ -140,38 +164,59 @@ class CountrySelector {
             this.updateSelection();
         });
 
-        div.addEventListener('click', (e) => {
-            if (e.target === checkbox) return;
+        row.addEventListener('click', (e) => {
+            if (e.target === checkbox || e.target === toggle) return;
             checkbox.checked = !checkbox.checked;
             checkbox.dispatchEvent(new Event('change'));
         });
 
-        parent.appendChild(div);
+        wrapper.appendChild(row);
+        wrapper.appendChild(childContainer);
+        parent.appendChild(wrapper);
+
+        return { wrapper, childContainer };
     }
 
-    addCountryOption(parent, code, name) {
-        const label = document.createElement('label');
-        label.className = 'country-option flex items-center gap-2 px-2 py-1 text-xs rounded cursor-pointer hover:bg-[#F5F7FA]';
+    _addSortedCountries(container, codes, indentLevel) {
+        const sorted = codes
+            .map(code => ({ code, name: this.classificationData.countries[code]?.name || code }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        sorted.forEach(c => this._addCountryItem(container, c.code, c.name, indentLevel));
+    }
+
+    _addCountryItem(parent, code, name, indentLevel = 0) {
+        const item = document.createElement('div');
+        item.className = 'country-option';
+        item.style.paddingLeft = `${8 + indentLevel * 14}px`;
+
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.className = 'accent-[#004990] flex-shrink-0';
+        checkbox.className = 'custom-checkbox';
         checkbox.dataset.country = code;
         checkbox.checked = this.selectedCountries.has(code);
         checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
             if (e.target.checked) this.selectedCountries.add(code);
             else this.selectedCountries.delete(code);
             this.updateSelection();
         });
         this._checkboxByCode[code] = checkbox;
+
         const span = document.createElement('span');
-        span.className = 'text-[#1a2332]';
         span.textContent = name;
-        label.appendChild(checkbox);
-        label.appendChild(span);
-        parent.appendChild(label);
+
+        item.appendChild(checkbox);
+        item.appendChild(span);
+
+        item.addEventListener('click', (e) => {
+            if (e.target === checkbox) return;
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event('change'));
+        });
+
+        parent.appendChild(item);
     }
 
-    // Shared UI synchronization (label, checkboxes, badge, button border)
     _syncUI() {
         const labelEl = document.getElementById(this.labelId);
         const count = this.selectedCountries.size;
@@ -184,7 +229,6 @@ class CountrySelector {
         } else {
             labelEl.textContent = `${count} Countries`;
         }
-        // Use cached element references to avoid querySelectorAll over potentially 200+ checkboxes
         for (const [code, cb] of Object.entries(this._checkboxByCode)) {
             const should = this.selectedCountries.has(code);
             if (cb.checked !== should) cb.checked = should;
@@ -197,11 +241,8 @@ class CountrySelector {
             badge.classList.toggle('hidden', count === 0);
         }
         if (btn) {
-            btn.classList.toggle('border-[#004990]', count > 0);
-            btn.classList.toggle('border-[#CBD5E0]', count === 0);
+            btn.classList.toggle('has-selection', count > 0);
         }
-
-        // Sync mobile filter panel button
         const mLabel = document.getElementById(`m-${this.elementId}-label`);
         if (mLabel) mLabel.textContent = labelEl.textContent;
         const mBadge = document.getElementById(`m-${this.elementId}-count`);
@@ -210,10 +251,7 @@ class CountrySelector {
             mBadge.classList.toggle('hidden', count === 0);
         }
         const mBtn = document.getElementById(`m-${this.elementId}-btn`);
-        if (mBtn) {
-            mBtn.classList.toggle('border-[#004990]', count > 0);
-            mBtn.classList.toggle('border-[#CBD5E0]', count === 0);
-        }
+        if (mBtn) mBtn.classList.toggle('has-selection', count > 0);
     }
 
     updateSelection() {
@@ -221,7 +259,6 @@ class CountrySelector {
         document.dispatchEvent(new CustomEvent('shc:selection-change'));
     }
 
-    // Update selection state + UI without triggering a dashboard update (used by region/year handlers)
     setCountries(codes) {
         this.selectedCountries = new Set(codes);
         this._syncUI();

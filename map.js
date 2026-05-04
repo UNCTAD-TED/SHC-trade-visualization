@@ -59,6 +59,12 @@ export const TradeMap = {
     // ── Legend dirty-check: skip full DOM rebuild when inputs haven't changed
     _lastLegendKey: null,
 
+    // Returns the fill for a land polygon, applying special fills for disputed territories.
+    _specialFill(d, defaultFill) {
+        if (d?.properties?.code === 'C00002') return 'url(#aksai-chin-hatch)';
+        return defaultFill;
+    },
+
     // Returns the set of numeric code strings that should be co-highlighted with the given code.
     // Covers forward (CHN → HKG/MAC/TWN) and reverse (HKG → CHN/MAC/TWN) lookups.
     _getHoverGroup(codeStr) {
@@ -112,7 +118,16 @@ export const TradeMap = {
             .style("z-index", "1")
             .style("touch-action", "none"); // スマホでのブラウザスクロールを無効化し、地図のパン操作を可能にする
 
-        this.svg.append("defs");
+        const defs = this.svg.append("defs");
+        const hatch = defs.append("pattern")
+            .attr("id", "aksai-chin-hatch")
+            .attr("patternUnits", "userSpaceOnUse")
+            .attr("width", 2).attr("height", 2)
+            .attr("patternTransform", "rotate(45)");
+        hatch.append("rect").attr("width", 2).attr("height", 2).attr("fill", "#F0EDE8");
+        hatch.append("line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 2)
+            .attr("stroke", "#AEA29A").attr("stroke-width", 0.8);
+
         this.g = this.svg.append("g");
         this._graticuleGeo = d3.geoGraticule()(); // GeoJSONは不変なので一度だけ生成
 
@@ -225,7 +240,7 @@ export const TradeMap = {
                 const group = this._getHoverGroup(String(d.properties.code));
                 this.g.selectAll("path.land")
                     .filter(ld => ld && ld.properties && group.has(String(ld.properties.code)))
-                    .attr("fill", "#EBEAE6");
+                    .attr("fill", ld => this._specialFill(ld, "#EBEAE6"));
             })
             .on("mouseout", (event, d) => {
                 if (!d || !d.properties) return;
@@ -235,7 +250,7 @@ export const TradeMap = {
                 const focusGroup = new Set([focusCode, ...focusAliases].filter(Boolean));
                 this.g.selectAll("path.land")
                     .filter(ld => ld && ld.properties && group.has(String(ld.properties.code)))
-                    .attr("fill", ld => focusGroup.has(String(ld.properties.code)) ? "#EAF4FB" : "#FAFAFA");
+                    .attr("fill", ld => this._specialFill(ld, focusGroup.has(String(ld.properties.code)) ? "#EAF4FB" : "#FAFAFA"));
             });
 
         landsEnter.merge(lands)
