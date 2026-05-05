@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/SHC-tradeMap-UNCTADstyled/',
+  base: '/SHC-trade-visualization/',
   root: '.',
   publicDir: 'public',
   server: {
