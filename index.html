@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Second-Hand Clothes Trade Monitor</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css">
     <style>
         /* 1. KPIバーの上の線を非表示にする */
         #main-header { border-bottom: none !important; }
@@ -18,6 +19,136 @@
         /* 3. KPIバーとLegendの背景色を変更する */
         #kpi-bar, #legend-panel {
             background-color: #f2f8fc !important;
+        }
+
+        /* ── Animate button ── */
+        #anim-btn {
+            display: flex; align-items: center; gap: 5px;
+            padding: 3px 10px; font-size: 12px; font-family: Inter, Arial, sans-serif;
+            border: 1px solid #009edb; border-radius: 5px;
+            background: transparent; color: #009edb; cursor: pointer; white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+        }
+        #anim-btn:hover { background: #009edb; color: #fff; }
+
+        /* ── Right-side anim controls (hidden normally) ── */
+        #anim-header-right {
+            display: none; align-items: center; gap: 16px; flex-shrink: 0;
+        }
+        #anim-smep-logo {
+            height: 28px; width: auto; opacity: 0.65;
+        }
+        #anim-stop-btn {
+            display: flex; align-items: center; gap: 5px;
+            padding: 3px 12px; font-size: 12px; font-family: Inter, Arial, sans-serif;
+            border: none; border-radius: 5px; background: #eb1f48;
+            color: #fff; cursor: pointer; white-space: nowrap;
+        }
+
+        /* ── Animation mode: hide controls ── */
+        body.anim-mode .header-controls,
+        body.anim-mode #legend-panel,
+        body.anim-mode #kpi-bar,
+        body.anim-mode #map-footer,
+        body.anim-mode #insight-panel,
+        body.anim-mode #arc-modal,
+        body.anim-mode #compare-modal,
+        body.anim-mode #mobile-legend-btn,
+        body.anim-mode #fit-screen-btn,
+        body.anim-mode #mobile-filter-btn { display: none !important; }
+
+        /* Switch header to single row and show right controls */
+        body.anim-mode #main-header  { border-bottom: 1px solid #ded9d5 !important; }
+        body.anim-mode .header-inner {
+            flex-direction: row !important;
+            align-items: center !important;
+        }
+        body.anim-mode .header-title {
+            padding: 6px 0 !important;  /* ギャップを詰める */
+            flex: 1;
+        }
+        body.anim-mode #anim-header-right { display: flex !important; }
+
+        /* ── Bar chart race panel (left fixed panel) ── */
+        #anim-panel {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 272px;
+            background: #fff;
+            border-right: 1px solid #ded9d5;
+            border-radius: 0;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.07);
+            z-index: 20;
+            font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Panel header — year display */
+        .ap-header {
+            display: flex; align-items: baseline; gap: 8px;
+            padding: 10px 14px 8px;
+            border-bottom: 1px solid #ebeae6;
+            flex-shrink: 0;
+        }
+        #ap-year { font-size: 28px; font-weight: 700; color: #004990; line-height: 1; }
+        .ap-range { font-size: 11px; color: #aea29a; }
+
+        /* Each section (export / import) fills available height equally */
+        .ap-section {
+            display: flex; flex-direction: column;
+            flex: 1; min-height: 0;
+            padding: 7px 12px 4px;
+        }
+        .ap-label {
+            font-size: 10px; font-weight: 600; letter-spacing: 1px;
+            margin-bottom: 4px; flex-shrink: 0;
+        }
+        .ap-export { color: #009edb; }
+        .ap-import { color: #72bf44; }
+
+        /* Chart area: fills remaining section height, clips overflowing rows */
+        .ap-chart { position: relative; flex: 1; min-height: 200px; overflow: hidden; }
+
+        /* Divider between export and import */
+        .ap-sep { height: 1px; background: #ebeae6; flex-shrink: 0; }
+
+        /* Timeline at the bottom */
+        .ap-timeline-wrap { padding: 7px 12px 10px; flex-shrink: 0; }
+        .ap-tl-track { height: 3px; background: #ebeae6; border-radius: 2px; overflow: hidden; }
+        #ap-tl-fill {
+            height: 100%; background: #009edb; border-radius: 2px;
+            width: 0%; transition: width 0.75s ease;
+        }
+
+        /* ── Bar chart row elements ── */
+        .ap-row {
+            position: absolute; left: 0; top: 0; width: 100%;
+            height: 27px; display: flex; align-items: center;
+            will-change: transform, opacity;
+        }
+
+        /* Flag icon + ISO3 label */
+        .ap-flag {
+            width: 66px; flex-shrink: 0;
+            font-size: 11.5px; color: #231f20;
+            white-space: nowrap; overflow: hidden; line-height: 27px;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .ap-flag .fi {
+            width: 16px; height: 12px;
+            flex-shrink: 0; border-radius: 1px;
+        }
+
+        /* Bar */
+        .ap-bar-wrap { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; }
+        .ap-bar { height: 7px; border-radius: 0; opacity: 0.82; flex-shrink: 0; min-width: 2px; }
+
+        /* Value label */
+        .ap-val {
+            font-size: 10px; font-family: Inter, monospace;
+            color: #6e6259; white-space: nowrap; flex-shrink: 0;
         }
     </style>
 </head>
@@ -144,7 +275,17 @@
                     </div>
                 </div>
 
+                <div class="ctrl-divider"></div>
+                <button id="anim-btn" title="Auto-play 2015–2024 with bar chart race">&#9654; Animate</button>
+
             </div><!-- /.header-controls -->
+
+            <!-- Right-side controls — only visible during animation mode -->
+            <div id="anim-header-right">
+              <img id="anim-smep-logo" src="/assets/smep-logo.png" alt="SMEP / UNCTAD / UK Aid" />
+              <button id="anim-stop-btn" title="Stop animation">&#9632; Stop</button>
+            </div>
+
         </div><!-- /.header-inner -->
     </header>
 

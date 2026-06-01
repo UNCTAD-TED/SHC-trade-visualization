@@ -1,6 +1,7 @@
 import './styles/styles.less';
 import * as d3 from 'd3';
 import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
+import { startAnimation, stopAnimation } from './sns/animationMode.js';
 import { RegionConfig } from './regions.js';
 import { CountrySelector } from './countrySelector.js';
 import { DataLoader } from './dataLoader.js';
@@ -203,6 +204,18 @@ const App = {
 
         // Sync initial active state to mobile panel buttons
         this.syncMobileFilterState();
+
+        // ── Animation mode ────────────────────────────────────
+        document.getElementById('anim-btn')?.addEventListener('click', startAnimation);
+        document.getElementById('anim-stop-btn')?.addEventListener('click', stopAnimation);
+
+        document.addEventListener('shc:animation-stopped', () => {
+            // Restore threshold UI and re-render dashboard
+            const threshVal = STATE.thresholdMode === 'auto' ? 'auto' : String(STATE.thresholdMode);
+            const threshBtn = document.querySelector(`.threshold-btn[data-threshold="${threshVal}"]`);
+            if (threshBtn) this.updateUIClasses('.threshold-btn', threshBtn);
+            this.updateDashboard();
+        });
     },
 
     setupHierarchicalDropdown(prefix, selector) {
