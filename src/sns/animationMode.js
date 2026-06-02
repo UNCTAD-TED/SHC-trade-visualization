@@ -27,8 +27,8 @@ const NODE_EXP   = 0.9;      // scale exponent (0.5 = sqrt, like the original da
 const NODE_TOP_Q = 0.98;     // quantile used as the upper anchor for node radius
 
 // ── Bar chart encoding ────────────────────────────────────────────
-const BAR_MAX = 130;         // px — bar width when a country is at 100% of the year's max value
-const BAR_H   = 12;           // px — bar height (overrides .ap-bar CSS height)
+const BAR_MAX = 300;         // px — fallback max bar width (used when container width is unknown)
+const BAR_H   = 20;          // px — bar height (overrides .ap-bar CSS height)
 
 let _interval      = null;
 let _index         = 0;
@@ -81,6 +81,11 @@ export async function startAnimation() {
   document.body.classList.add('anim-mode');
   _injectOverlays();
 
+  // Wait two rAF frames so the browser applies the flex layout (panel takes --anim-panel-w,
+  // map-container gets the remaining width), then recalculate the map projection.
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  TradeMap.init();
+
   // Hide the dashboard's own flow/node/label layers — animation draws its own arcs
   if (TradeMap.g) {
     TradeMap.g.selectAll('.flow-layer, .node-layer, .label-layer')
@@ -124,7 +129,13 @@ export function stopAnimation() {
   }
 
   STATE.thresholdMode = _savedThreshold;
-  document.dispatchEvent(new CustomEvent('shc:animation-stopped'));
+
+  // Wait for the browser to restore the full-width map layout, then
+  // recalculate the projection before the dashboard re-renders flows.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    TradeMap.init();
+    document.dispatchEvent(new CustomEvent('shc:animation-stopped'));
+  }));
 }
 
 // ── Internal helpers ──────────────────────────────────────────
@@ -350,9 +361,17 @@ function _renderRace(containerId, ranks, color) {
   const g = d3.select(`#${containerId}`);
   if (g.empty() || !ranks) return;
 
+  // Compute max bar width from the actual container width at render time so bars
+  // always fill the available space regardless of --anim-panel-w.
+  // Subtract: flag label (66px) + value text (~44px) + gaps (5px + 4px) + section padding (24px).
+  const containerEl = document.getElementById(containerId);
+  const barMax = containerEl?.offsetWidth > 0
+    ? Math.max(containerEl.offsetWidth - 66 - 44 - 33, 40)
+    : BAR_MAX;
+
   const top     = ranks.slice(0, 10);
   const maxVal  = d3.max(top, d => d.value) || 1;
-  const bw      = v => Math.max((v / maxVal) * BAR_MAX, 2);
+  const bw      = v => Math.max((v / maxVal) * barMax, 2);
   const rankMap = new Map(top.map((d, i) => [d.iso, i]));
 
   const rows = g.selectAll('.ap-row').data(top, d => d.iso);

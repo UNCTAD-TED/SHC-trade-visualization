@@ -69,7 +69,34 @@
         }
         body.anim-mode #anim-header-right { display: flex !important; }
 
-        /* ── Bar chart race panel (left fixed panel) ── */
+        /* ── Panel / map split ratio ───────────────────────────────
+           25% = 1:3  |  30% = 3:7  |  35% = 1:2                 */
+        body.anim-mode { --anim-panel-w: 30%; }
+
+        body.anim-mode .map-area {
+            display: flex !important;
+            flex-direction: row !important;
+        }
+        body.anim-mode #map-container {
+            position: relative !important;
+            inset: auto !important;
+            width: auto !important;
+            height: 100% !important;
+            flex: 1;
+            min-width: 0;
+            order: 1;
+        }
+        body.anim-mode #anim-panel {
+            position: relative !important;
+            left: auto !important; top: auto !important; bottom: auto !important;
+            width: var(--anim-panel-w) !important;
+            height: 100% !important;
+            flex-shrink: 0;
+            border-radius: 0 !important;
+            order: 2;
+        }
+
+        /* ── Bar chart race panel (base styles) ── */
         #anim-panel {
             position: absolute;
             left: 0; top: 0; bottom: 0;
@@ -95,10 +122,10 @@
         #ap-year { font-size: 28px; font-weight: 700; color: #004990; line-height: 1; }
         .ap-range { font-size: 11px; color: #aea29a; }
 
-        /* Each section (export / import) fills available height equally */
+        /* Each section — fixed height, no flex growth */
         .ap-section {
             display: flex; flex-direction: column;
-            flex: 1; min-height: 0;
+            flex-shrink: 0;
             padding: 7px 12px 4px;
         }
         .ap-label {
@@ -108,8 +135,8 @@
         .ap-export { color: #009edb; }
         .ap-import { color: #72bf44; }
 
-        /* Chart area: fills remaining section height, clips overflowing rows */
-        .ap-chart { position: relative; flex: 1; min-height: 200px; overflow: hidden; }
+        /* Chart area: exactly 10 rows tall — no empty space below bars */
+        .ap-chart { position: relative; height: 270px; flex-shrink: 0; overflow: hidden; }
 
         /* Divider between export and import */
         .ap-sep { height: 1px; background: #ebeae6; flex-shrink: 0; }
@@ -162,7 +189,7 @@
                 <img src="assets/unctad-icon.svg" alt="UNCTAD" class="header-logo">
                 <div class="header-text">
                     <h3>Global Second-Hand Clothes Trade Monitor</h3>
-                    <h4>UNCTAD &middot; SMEP project</h4>
+                    <h4>UNCTAD &middot; SMEP project &middot; Source: BACI based on UN Comtrade (HS 6309: Worn clothing and other worn articles)</h4>
                 </div>
             </div>
 
