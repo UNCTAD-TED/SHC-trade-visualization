@@ -38,7 +38,7 @@ let _active        = false;
 let _savedThreshold = 'auto';
 
 // Layer refs (created in TradeMap.g during animation, removed on stop)
-let _arcLayer = null, _nodeLayer = null, _labelLayer = null;
+let _arcLayer = null, _particleLayer = null, _haloLayer = null, _nodeLayer = null, _labelLayer = null;
 
 // ── Public API ────────────────────────────────────────────────
 
@@ -91,10 +91,12 @@ export async function startAnimation() {
     TradeMap.g.selectAll('.flow-layer, .node-layer, .label-layer')
       .style('display', 'none');
 
-    // Create dedicated animation layers (paint order: arcs → nodes → labels)
-    _arcLayer   = TradeMap.g.append('g').attr('class', 'anim-arc-layer');
-    _nodeLayer  = TradeMap.g.append('g').attr('class', 'anim-node-layer');
-    _labelLayer = TradeMap.g.append('g').attr('class', 'anim-label-layer');
+    // Create dedicated animation layers (paint order: arcs → particles → halos → nodes → labels)
+    _arcLayer      = TradeMap.g.append('g').attr('class', 'anim-arc-layer');
+    _particleLayer = TradeMap.g.append('g').attr('class', 'anim-particle-layer');
+    _haloLayer     = TradeMap.g.append('g').attr('class', 'anim-halo-layer');
+    _nodeLayer     = TradeMap.g.append('g').attr('class', 'anim-node-layer');
+    _labelLayer    = TradeMap.g.append('g').attr('class', 'anim-label-layer');
   }
 
   // Reset map zoom to global
@@ -119,10 +121,12 @@ export function stopAnimation() {
   document.body.classList.remove('anim-mode');
   document.getElementById('anim-panel')?.remove();
 
-  // Remove animation arc layers and restore the dashboard's own flow layers
-  _arcLayer?.remove();   _arcLayer = null;
-  _nodeLayer?.remove();  _nodeLayer = null;
-  _labelLayer?.remove(); _labelLayer = null;
+  // Remove animation layers and restore the dashboard's own flow layers
+  _arcLayer?.remove();      _arcLayer = null;
+  _particleLayer?.remove(); _particleLayer = null;
+  _haloLayer?.remove();     _haloLayer = null;
+  _nodeLayer?.remove();     _nodeLayer = null;
+  _labelLayer?.remove();    _labelLayer = null;
   if (TradeMap.g) {
     TradeMap.g.selectAll('.flow-layer, .node-layer, .label-layer')
       .style('display', null);
@@ -223,6 +227,12 @@ function _drawArcs(year) {
   // ── Country nodes (same encoding as the dashboard) ──
   _drawNodes(flows, k);
 
+  // ── Halo rings + particle arcs for top-3 countries ──
+  const top3expSet = new Set((_exportRanks[year] || []).slice(0, 3).map(d => d.iso));
+  const top3impSet = new Set((_importRanks[year] || []).slice(0, 3).map(d => d.iso));
+  _drawHalos(top3expSet, top3impSet, k);
+  _drawParticles(flows, k, new Set([...top3expSet, ...top3impSet]), widthScale);
+
   // ── Labels for the largest corridors ──
   const labelFlows = flows.slice(0, LABEL_N);
   const labels = _labelLayer.selectAll('.anim-arc-label').data(labelFlows, key);
@@ -306,6 +316,64 @@ function _drawNodes(flows, k) {
     .attr('fill', d => colorOf(stats[d].net))
     .attr('stroke-width', 1.5 / k)
     .style('opacity', 1);
+}
+
+// ── Pulsing halo rings for top-3 export (blue) and import (green) countries ──
+function _drawHalos(top3expSet, top3impSet, k) {
+  if (!_haloLayer) return;
+  const baseR = 10 / k;
+
+  const haloData = [
+    ...[...top3expSet].map(iso => ({ iso, color: '#009EDB' })),
+    ...[...top3impSet].map(iso => ({ iso, color: '#72BF44' })),
+  ].filter(d => STATE.countryCoords[d.iso]);
+
+  // Two rings per country with staggered animation-delay via CSS class
+  const ringData = haloData.flatMap(d => [
+    { iso: d.iso, color: d.color, ring: 1 },
+    { iso: d.iso, color: d.color, ring: 2 },
+  ]);
+
+  const proj = iso => TradeMap.projection(STATE.countryCoords[iso]) || [-999, -999];
+
+  const rings = _haloLayer.selectAll('.anim-halo-ring')
+    .data(ringData, d => `${d.iso}-${d.ring}`);
+
+  rings.exit().remove();
+
+  rings.enter().append('circle')
+    .attr('class', d => `anim-halo-ring anim-halo-ring-${d.ring}`)
+    .attr('stroke', d => d.color)
+    .attr('r', baseR)
+    .attr('cx', d => proj(d.iso)[0])
+    .attr('cy', d => proj(d.iso)[1])
+    .merge(rings)
+    .attr('r', baseR)
+    .attr('cx', d => proj(d.iso)[0])
+    .attr('cy', d => proj(d.iso)[1])
+    .attr('stroke', d => d.color);
+}
+
+// ── White flowing particle overlay on arcs connected to top-3 countries ──
+function _drawParticles(flows, k, topSet, widthScale) {
+  if (!_particleLayer) return;
+  const key = d => `${d.exporter}|${d.importer}`;
+
+  // flows is already sorted descending by netValue; take top 15 that touch top-3
+  const topFlows = flows
+    .filter(d => topSet.has(d.exporter) || topSet.has(d.importer))
+    .slice(0, 15);
+
+  const particles = _particleLayer.selectAll('.anim-particle-arc')
+    .data(topFlows, key);
+
+  particles.exit().remove();
+
+  particles.enter().append('path')
+    .attr('class', 'anim-particle-arc')
+    .merge(particles)
+    .attr('d', d => _arcPath(d.exporter, d.importer))
+    .attr('stroke-width', d => Math.max(widthScale(d.netValue) / k, 0.5));
 }
 
 // Midpoint of the arc (offset toward the bulge) for label placement

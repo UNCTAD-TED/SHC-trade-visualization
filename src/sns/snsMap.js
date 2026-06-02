@@ -15,6 +15,7 @@ const FLOW_COLORS = {
 };
 
 let svg, mapG, projection, path, meta;
+let _haloLayer = null, _particleLayer = null;
 
 // ── 1. Initialise map SVG (called once)
 export function initSNSMap(state) {
@@ -74,6 +75,10 @@ export function initSNSMap(state) {
 
   // Arc layer — populated by updateSNSMap()
   mapG.append('g').attr('class', 'arc-layer');
+
+  // Particle and halo layers above arcs (paint order: arcs → particles → halos)
+  _particleLayer = mapG.append('g').attr('class', 'particle-layer');
+  _haloLayer     = mapG.append('g').attr('class', 'halo-layer');
 
   // UI overlays (drawn above map)
   renderHeader();
@@ -192,7 +197,7 @@ function buildArcPath(d) {
 }
 
 // ── 2. Update arcs for a given year (called each animation tick)
-export function updateSNSMap(flows, metaData, duration) {
+export function updateSNSMap(flows, metaData, duration, top3exp = [], top3imp = []) {
   if (!svg) return;
   meta = metaData;
 
@@ -240,6 +245,69 @@ export function updateSNSMap(flows, metaData, duration) {
     .transition().duration(duration || 750).ease(d3.easeCubicOut)
     .attr('stroke-width', d => widthScale(d.netValue))
     .style('opacity', d => opacityScale(d.netValue));
+
+  // Halo rings and particle arcs for top-3 export/import countries
+  _snsDrawHalos(top3exp, top3imp);
+  _snsDrawParticles(flows, new Set([...top3exp, ...top3imp]), widthScale);
+}
+
+// ── Pulsing halo rings for top-3 export (blue) and import (green) countries ──
+function _snsDrawHalos(top3exp, top3imp) {
+  if (!_haloLayer) return;
+  const baseR = 10;
+
+  const haloData = [
+    ...top3exp.map(iso => ({ iso, color: '#009EDB' })),
+    ...top3imp.map(iso => ({ iso, color: '#72BF44' })),
+  ].filter(d => meta[d.iso]?.coords);
+
+  const ringData = haloData.flatMap(d => [
+    { iso: d.iso, color: d.color, ring: 1 },
+    { iso: d.iso, color: d.color, ring: 2 },
+  ]);
+
+  const proj = iso => {
+    const c = meta[iso]?.coords;
+    return c ? projection(c) : [-999, -999];
+  };
+
+  const rings = _haloLayer.selectAll('.anim-halo-ring')
+    .data(ringData, d => `${d.iso}-${d.ring}`);
+
+  rings.exit().remove();
+
+  rings.enter().append('circle')
+    .attr('class', d => `anim-halo-ring anim-halo-ring-${d.ring}`)
+    .attr('stroke', d => d.color)
+    .attr('r', baseR)
+    .attr('cx', d => proj(d.iso)[0])
+    .attr('cy', d => proj(d.iso)[1])
+    .merge(rings)
+    .attr('r', baseR)
+    .attr('cx', d => proj(d.iso)[0])
+    .attr('cy', d => proj(d.iso)[1])
+    .attr('stroke', d => d.color);
+}
+
+// ── White flowing particle overlay on arcs connected to top-3 countries ──
+function _snsDrawParticles(flows, topSet, widthScale) {
+  if (!_particleLayer) return;
+  const key = d => `${d.exporter}|${d.importer}`;
+
+  const topFlows = flows
+    .filter(d => topSet.has(d.exporter) || topSet.has(d.importer))
+    .slice(0, 15);
+
+  const particles = _particleLayer.selectAll('.anim-particle-arc')
+    .data(topFlows, key);
+
+  particles.exit().remove();
+
+  particles.enter().append('path')
+    .attr('class', 'anim-particle-arc')
+    .merge(particles)
+    .attr('d', d => buildArcPath(d))
+    .attr('stroke-width', d => Math.max(widthScale(d.netValue), 0.5));
 }
 
 // ── 3. Update timeline progress indicator

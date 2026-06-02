@@ -71,7 +71,13 @@ function updateYear(index, animate) {
   const year = YEARS[index];
   const dur  = animate ? TRANS_MS : 0;
 
-  updateSNSMap(state.allFlows[year], state.meta, dur);
+  updateSNSMap(
+    state.allFlows[year],
+    state.meta,
+    dur,
+    state.exportRanks[year].slice(0, 3).map(d => d.iso),
+    state.importRanks[year].slice(0, 3).map(d => d.iso),
+  );
   updateSNSChart(state.exportRanks[year], state.importRanks[year], dur);
   updateTimelineProgress(index, YEARS.length);
 

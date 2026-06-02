@@ -162,6 +162,37 @@ main {
 
 .trade-particle { pointer-events: none; filter: drop-shadow(0 0 1.5px rgba(255,255,255,0.9)); }
 
+// ── Animation-mode: pulsing halo rings for top-3 export / import countries ──
+@keyframes anim-halo-pulse {
+  0%   { transform: scale(0.5); opacity: 0.75; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+.anim-halo-ring {
+  pointer-events: none;
+  fill: none;
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.anim-halo-ring-1 { animation: anim-halo-pulse 2.4s ease-out infinite; }
+.anim-halo-ring-2 { animation: anim-halo-pulse 2.4s ease-out infinite 1.2s; }
+
+// ── Animation-mode: flowing particle arcs for corridors to top-3 countries ──
+@keyframes anim-particle-flow {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -100; }
+}
+.anim-particle-arc {
+  pointer-events: none;
+  fill: none;
+  stroke: #ffffff;
+  stroke-dasharray: 6 18;
+  stroke-linecap: round;
+  animation: anim-particle-flow 1.5s linear infinite;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,0.8));
+  opacity: 0.7;
+}
+
 .map-label {
   font-family: @font-family;
   font-weight: 600;
