@@ -58,9 +58,8 @@ function render() {
   // 09 — Policy
   buildPolicy();
 
-  // 10 — Outro (incl. consolidated sources & notes)
+  // 10 — Outro
   buildOutro();
-  buildSources();
 }
 
 // ── 02 Waffle (100 shirts) ───────────────────────────────────────────────────
@@ -303,7 +302,7 @@ function donutCard(c, iso2) {
     <div class="fs-cont-card">
       <div class="fs-cont-info">
         <div class="fs-cont-country"><span class="fi fi-${iso2}"></span>${c.country}</div>
-        <div class="fs-cont-cost"><span class="fs-cont-ico">${icon('container')}</span>$<span class="fs-count" data-to="${c.usd}">0</span></div>
+        <div class="fs-cont-cost">$<span class="fs-count" data-to="${c.usd}">0</span></div>
       </div>
       <div class="fs-donut">
         <svg viewBox="0 0 96 96" width="96" height="96">
@@ -361,20 +360,12 @@ function buildSector() {
 
 // ── 09 Policy ────────────────────────────────────────────────────────────────
 function buildPolicy() {
-  const tagIcon = (tag) => {
-    if (/HS|B3030/.test(tag)) return 'scale';
-    if (/EAS/.test(tag)) return 'check';
-    if (/sort/i.test(tag)) return 'funnel';
-    if (/recyc/i.test(tag)) return 'recycle';
-    return 'check';
-  };
   $('#fs-policy').innerHTML = POLICY.groups.map((grp) => `
     <div class="fs-policy-group">
       <div class="fs-policy-heading">${grp.heading}</div>
       ${grp.items.map((it) => `
-        <div class="fs-policy-card">
-          <span class="fs-policy-ico">${icon(tagIcon(it.tag))}</span>
-          <span class="fs-policy-tag">${it.tag}</span>
+        <div class="fs-policy-row">
+          <div class="fs-policy-tag">${it.tag}</div>
           <p class="fs-policy-text">${it.text}</p>
         </div>`).join('')}
     </div>`).join('');
@@ -389,36 +380,6 @@ function buildOutro() {
   const partners = $('#fs-outro-partners');
   partners.appendChild(el(`<div class="fs-partner is-smep"><img src="assets/smep-logo.png" alt="SMEP"></div>`));
   META.partners.forEach((p) => partners.appendChild(el(`<div class="fs-partner">${p}</div>`)));
-}
-
-// Consolidated per-fact sources, shown once at the end of the page.
-function buildSources() {
-  const host = $('#fs-outro-sources');
-  if (!host) return;
-  const rows = [
-    { n: '01', t: 'Key finding', s: KEY_FINDING.source },
-    { n: '02', t: 'Quality & composition', s: QUALITY.source },
-    { n: '03', t: 'Supply chain & trade flows', s: SUPPLY_CHAIN.source, note: 'Sorting geography is indicative.' },
-    { n: '04', t: 'The China shift', s: CHINA_SHIFT.source, note: CHINA_SHIFT.caveat },
-    { n: '05', t: 'Africa context', s: AFRICA_CONTEXT.source },
-    { n: '06', t: 'Socioeconomic impact', s: SOCIOECONOMIC.source },
-    { n: '07', t: 'Affordability & cost structure', s: AFFORDABILITY.source },
-    { n: '08', t: 'Sector context', s: `${SECTOR.global.source} · ${SECTOR.us.source}` },
-    { n: '09', t: 'Policy priorities', s: POLICY.source },
-  ];
-  host.innerHTML = `
-    <div class="fs-sources-title">Sources &amp; notes</div>
-    <div class="fs-sources-list">
-      ${rows.map((r) => `
-        <div class="fs-src-row">
-          <span class="fs-src-n">${r.n}</span>
-          <div class="fs-src-body">
-            <span class="fs-src-t">${r.t}</span>
-            <span class="fs-src-s">${r.s}</span>
-            ${r.note ? `<span class="fs-src-note">${r.note}</span>` : ''}
-          </div>
-        </div>`).join('')}
-    </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -595,8 +595,7 @@
 }
 .fs-cont-info { flex: 1; }
 .fs-cont-country { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: @fs-ink; margin-bottom: 8px; .fi { width: 24px; height: 16px; border-radius: 3px; } }
-.fs-cont-cost { display: flex; align-items: center; gap: 9px; font-size: clamp(26px, 3.6vw, 38px); font-weight: 800; color: @fs-ink; line-height: 1; font-feature-settings: "tnum"; }
-.fs-cont-ico { width: 24px; height: 24px; color: @fs-rust; flex-shrink: 0; }
+.fs-cont-cost { font-size: clamp(26px, 3.6vw, 38px); font-weight: 800; color: @fs-ink; line-height: 1; font-feature-settings: "tnum"; }
 .fs-donut { width: 96px; height: 96px; flex-shrink: 0; position: relative; }
 .fs-donut svg { transform: rotate(-90deg); }
 .fs-donut-ring { fill: none; stroke: @fs-paper-alt; }
@@ -663,28 +662,47 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // 09 · POLICY
 // ═══════════════════════════════════════════════════════════════════════════
-.fs-policy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(20px, 3vw, 32px); margin-top: 18px; }
+.fs-policy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 4vw, 64px); margin-top: 22px; }
 .fs-policy-group { }
 .fs-policy-heading {
   font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
-  color: @fs-gold; margin-bottom: 16px;
+  color: @fs-gold; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.18);
 }
-.fs-policy-card {
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: @radius-lg; padding: 22px 24px; margin-bottom: 16px;
-  backdrop-filter: blur(4px); transition: transform 0.3s, border-color 0.3s, background 0.3s;
-  &:hover { transform: translateY(-3px); border-color: fade(@fs-gold, 50%); background: rgba(255,255,255,0.08); }
+.fs-policy-row {
+  padding: 20px 0; border-top: 1px solid rgba(255,255,255,0.12);
 }
 .fs-policy-tag {
-  display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.04em;
-  color: @fs-ink; background: @fs-gold; padding: 4px 12px; border-radius: 100px; margin-bottom: 12px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: @fs-gold; margin-bottom: 8px;
 }
-.fs-policy-text { font-size: 14.5px; line-height: 1.55; color: rgba(255,255,255,0.85); margin: 0; }
+.fs-policy-text { font-size: 14.5px; line-height: 1.6; color: rgba(255,255,255,0.85); margin: 0; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 10 · OUTRO
 // ═══════════════════════════════════════════════════════════════════════════
 .fs-outro { background: @fs-paper-alt; padding: clamp(72px, 12vh, 130px) clamp(20px, 5vw, 48px) 60px; border-top: 1px solid @fs-line; }
+.fs-report {
+  display: grid; grid-template-columns: 168px 1fr; gap: clamp(28px, 4vw, 48px); align-items: center;
+  max-width: @fs-maxw; margin: 0 auto 64px; padding-bottom: 56px; border-bottom: 1px solid @fs-line;
+}
+.fs-report-cover img {
+  width: 100%; display: block; border-radius: @radius-md;
+  box-shadow: 0 18px 38px rgba(37,31,27,0.22);
+}
+.fs-report-kicker {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: @fs-rust; margin-bottom: 10px;
+}
+.fs-report-title { font-size: clamp(22px, 3vw, 30px); font-weight: 800; letter-spacing: -0.01em; color: @fs-ink; margin: 0 0 12px; }
+.fs-report-text { font-size: 15px; line-height: 1.6; color: @fs-ink-soft; margin: 0 0 20px; max-width: 52ch; }
+.fs-report-link {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: 14.5px; font-weight: 700; color: @fs-ink; text-decoration: none;
+  padding-bottom: 4px; border-bottom: 2px solid @fs-ink; transition: color 0.2s, border-color 0.2s;
+  svg { transition: transform 0.25s; }
+  &:hover { color: @fs-rust; border-color: @fs-rust; }
+  &:hover svg { transform: translateX(4px); }
+}
 .fs-outro-cta { text-align: center; max-width: 600px; margin: 0 auto 56px; }
 .fs-outro-title { font-size: clamp(26px, 4vw, 40px); font-weight: 800; letter-spacing: -0.02em; color: @fs-ink; margin: 0 0 14px; }
 .fs-outro-cta p { font-size: 16px; color: @fs-ink-soft; margin: 0 0 28px; }
@@ -704,20 +722,6 @@
 .fs-meta-block strong { display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: @fs-rust; margin-bottom: 7px; }
 .fs-meta-block p { font-size: 12.5px; line-height: 1.55; color: @fs-ink-soft; margin: 0; }
 
-// Consolidated "Sources & notes" at the end of the page
-.fs-outro-sources { max-width: @fs-maxw; margin: 0 auto; padding-top: 8px; }
-.fs-sources-title {
-  font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
-  color: @fs-rust; margin-bottom: 18px;
-}
-.fs-sources-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 40px; }
-.fs-src-row { display: flex; gap: 12px; padding: 9px 0; border-top: 1px solid @fs-line; }
-.fs-src-n { font-size: 11px; font-weight: 800; color: @fs-gold-deep; font-feature-settings: "tnum"; flex-shrink: 0; padding-top: 1px; }
-.fs-src-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.fs-src-t { font-size: 12px; font-weight: 700; color: @fs-ink; }
-.fs-src-s { font-size: 11.5px; color: @fs-muted; line-height: 1.45; }
-.fs-src-note { font-size: 11px; color: @fs-ink-soft; line-height: 1.45; margin-top: 3px;
-  padding-left: 9px; border-left: 2px solid @fs-gold; }
 .fs-outro-partners {
   max-width: @fs-maxw; margin: 28px auto 0; padding-top: 26px; border-top: 1px solid @fs-line;
   display: flex; flex-wrap: wrap; align-items: center; gap: 14px 28px;
@@ -762,20 +766,13 @@
   .fs-i { width: 27px; height: 27px; }
 }
 
-// 09 — policy card icon chips
-.fs-policy-ico {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 42px; height: 42px; border-radius: 11px; margin-bottom: 14px;
-  background: fade(@fs-gold, 16%); color: @fs-gold;
-  .fs-i { width: 23px; height: 23px; }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // RESPONSIVE
 // ═══════════════════════════════════════════════════════════════════════════
 @media (max-width: 860px) {
   .fs-key-grid, .fs-quality-grid, .fs-quality-foot, .fs-china-grid, .fs-afford-grid,
-  .fs-container-grid, .fs-sector-grid, .fs-policy-grid, .fs-africa, .fs-dests { grid-template-columns: 1fr; }
+  .fs-container-grid, .fs-sector-grid, .fs-policy-grid, .fs-africa, .fs-dests, .fs-report { grid-template-columns: 1fr; }
+  .fs-report-cover img { max-width: 168px; }
   .fs-social-top { grid-template-columns: 1fr; }
   .fs-waste-bars, .fs-mobility-stats { grid-template-columns: 1fr; gap: 16px; }
   .fs-africa-right { border-left: none; padding-left: 0; border-top: 1px solid rgba(255,255,255,0.14); padding-top: 26px; }
@@ -783,7 +780,6 @@
   .fs-mobility-chain { overflow-x: auto; padding-bottom: 8px; }
   .fs-sector-col { padding: 0; }
   .fs-sector-col:last-child { border-left: none; border-top: 1px solid @fs-line; padding-top: 8px; margin-top: 24px; }
-  .fs-sources-list { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .fs-ml-name { font-size: 11px; }
