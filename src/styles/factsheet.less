@@ -682,13 +682,16 @@
 // ═══════════════════════════════════════════════════════════════════════════
 .fs-outro { background: @fs-paper-alt; padding: clamp(72px, 12vh, 130px) clamp(20px, 5vw, 48px) 60px; border-top: 1px solid @fs-line; }
 .fs-report {
-  display: grid; grid-template-columns: 168px 1fr; gap: clamp(28px, 4vw, 48px); align-items: center;
+  display: grid; grid-template-columns: 240px 1fr; gap: clamp(32px, 4vw, 56px); align-items: center;
   max-width: @fs-maxw; margin: 0 auto 64px; padding-bottom: 56px; border-bottom: 1px solid @fs-line;
 }
-.fs-report-cover img {
-  width: 100%; display: block; border-radius: @radius-md;
+.fs-report-cover {
+  display: block; border-radius: @radius-md;
   box-shadow: 0 18px 38px rgba(37,31,27,0.22);
+  transition: transform 0.35s cubic-bezier(0.22,1,0.36,1), box-shadow 0.35s;
+  &:hover, &:focus-visible { transform: translateY(-6px) scale(1.035); box-shadow: 0 28px 52px rgba(37,31,27,0.3); }
 }
+.fs-report-cover img { width: 100%; display: block; border-radius: @radius-md; }
 .fs-report-kicker {
   font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: @fs-rust; margin-bottom: 10px;
@@ -772,7 +775,7 @@
 @media (max-width: 860px) {
   .fs-key-grid, .fs-quality-grid, .fs-quality-foot, .fs-china-grid, .fs-afford-grid,
   .fs-container-grid, .fs-sector-grid, .fs-policy-grid, .fs-africa, .fs-dests, .fs-report { grid-template-columns: 1fr; }
-  .fs-report-cover img { max-width: 168px; }
+  .fs-report-cover { max-width: 200px; }
   .fs-social-top { grid-template-columns: 1fr; }
   .fs-waste-bars, .fs-mobility-stats { grid-template-columns: 1fr; gap: 16px; }
   .fs-africa-right { border-left: none; padding-left: 0; border-top: 1px solid rgba(255,255,255,0.14); padding-top: 26px; }
