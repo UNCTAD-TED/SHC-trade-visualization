@@ -37,7 +37,7 @@ async function loadGeo() {
 export async function renderSupplyMap(container, dests) {
   const land = await loadGeo();
   let resizeRAF = null;
-  let played = false;
+  let stage = 0;
 
   const widthOf = (n) => scaleSqrt().domain([0, 90]).range([3, 10])(n);
 
@@ -87,8 +87,10 @@ export async function renderSupplyMap(container, dests) {
     const gArc = root.append('g').attr('class', 'fs-map-arc-layer');
     flows.forEach((f) => {
       const d = arcPath(f.a, f.b);
+      const st = f.cls === 'trunk' ? 1 : 2; // scrolly stage at which this arc appears
       gArc.append('path')
         .attr('class', `fs-map-arc is-${f.cls}`)
+        .attr('data-stage', st)
         .attr('d', d).attr('stroke-width', f.w)
         .attr('marker-end', f.cls === 'branch' ? 'url(#fs-arrow-rust)' : null);
       gArc.append('path')
@@ -100,7 +102,7 @@ export async function renderSupplyMap(container, dests) {
     const gNode = root.append('g').attr('class', 'fs-map-node-layer');
     Object.entries(NODES).forEach(([key, n]) => {
       const [x, y] = proj(key);
-      const g = gNode.append('g').attr('class', `fs-map-node is-${n.kind}`).attr('transform', `translate(${x},${y})`);
+      const g = gNode.append('g').attr('class', `fs-map-node is-${n.kind}`).attr('data-key', key).attr('transform', `translate(${x},${y})`);
       if (n.kind === 'hub') {
         g.append('circle').attr('r', 17).attr('class', 'fs-map-hub-halo');
         g.append('circle').attr('r', 12).attr('class', 'fs-map-hub-dot');
@@ -138,23 +140,33 @@ export async function renderSupplyMap(container, dests) {
     label('tz', `<span class="fs-ml-name">Tanzania</span><span class="fs-ml-fig">${(tz.totalKg ?? 86.3).toFixed(1)}M kg</span>`, { dx: 16, dy: 14, align: 'left' });
     container.appendChild(overlay);
 
-    // Prime draw-on state
-    const arcs = container.querySelectorAll('.fs-map-arc');
-    arcs.forEach((p) => { const len = p.getTotalLength(); p.style.strokeDasharray = len; p.style.strokeDashoffset = played ? 0 : len; });
-    if (played) container.classList.add('is-played');
+    applyStage(false); // set initial arc/node state for the current stage without animation
   }
 
-  function play() {
-    if (played) return;
-    played = true;
-    const arcs = container.querySelectorAll('.fs-map-arc');
-    arcs.forEach((p, i) => {
+  // Reveal arcs up to the current stage, toggle particle/halo classes, highlight nodes.
+  const ACTIVE_BY_STAGE = { 0: ['us'], 1: ['sorting'], 2: ['ug', 'tz'], 3: ['ug', 'tz'] };
+  function applyStage(animate) {
+    container.querySelectorAll('.fs-map-arc').forEach((p) => {
+      const st = +p.dataset.stage;
       const len = p.getTotalLength();
-      p.style.transition = `stroke-dashoffset 1.25s cubic-bezier(0.65,0,0.35,1) ${i * 0.32}s`;
-      requestAnimationFrame(() => { p.style.strokeDashoffset = 0; });
-      void len;
+      p.style.strokeDasharray = len;
+      p.style.transition = animate ? 'stroke-dashoffset 1.15s cubic-bezier(0.65,0,0.35,1)' : 'none';
+      p.style.strokeDashoffset = stage >= st ? 0 : len;
     });
-    setTimeout(() => container.classList.add('is-played'), 700);
+    container.classList.toggle('stage-1', stage >= 1);
+    container.classList.toggle('stage-2', stage >= 2);
+    container.classList.toggle('stage-3', stage >= 3);
+    const active = ACTIVE_BY_STAGE[stage] || [];
+    container.querySelectorAll('.fs-map-node').forEach((g) => {
+      g.classList.toggle('is-active', active.includes(g.dataset.key));
+    });
+  }
+
+  function setStage(n) {
+    n = Math.max(0, Math.min(3, Math.round(n)));
+    if (n === stage) return;
+    stage = n;
+    applyStage(true);
   }
 
   build();
@@ -163,5 +175,5 @@ export async function renderSupplyMap(container, dests) {
     resizeRAF = requestAnimationFrame(build);
   });
 
-  return { play };
+  return { setStage };
 }

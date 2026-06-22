@@ -128,25 +128,9 @@ function buildWastePerBale() {
     ${rows}`;
 }
 
-// ── 03 Supply chain ──────────────────────────────────────────────────────────
+// ── 03 Supply chain (pinned scrollytelling) ──────────────────────────────────
 function buildSupplyChain() {
-  const host = $('#fs-supply');
   const s = SUPPLY_CHAIN;
-  const dests = s.destinations.map((d) => `
-    <div class="fs-dest-card">
-      <span class="fi fi-${d.iso2} fs-dest-flag"></span>
-      <div>
-        <div class="fs-dest-name">${d.name}</div>
-        <div class="fs-dest-fig">
-          <span class="fs-dest-total"><span class="fs-count" data-to="${d.totalKg}" data-decimals="1">0</span></span>
-          <span class="fs-dest-unit">${s.unit}</span>
-        </div>
-        <div class="fs-dest-us">of which from the US: <b>${d.usKg.toFixed(1)} ${s.unit}</b></div>
-      </div>
-    </div>`).join('');
-  host.innerHTML = `
-    <div class="fs-map" id="fs-supply-map" role="img" aria-label="Geographic flow of secondhand clothing from the United States through sorting hubs in Pakistan and India to Uganda and the United Republic of Tanzania"></div>
-    <div class="fs-dests">${dests}</div>`;
   supplyMapPromise = renderSupplyMap($('#fs-supply-map'),
     s.destinations.map((d) => ({ iso2: d.iso2, totalKg: d.totalKg, usKg: d.usKg })));
 }
@@ -232,16 +216,22 @@ function buildSocial() {
       <span class="female">Female <b>${s.ownership.female}%</b></span>
     </div>`;
 
-  const chain = $('#fs-mobility-chain');
+  // Ascending staircase: each role sits one step higher up the value chain,
+  // with rising height and deepening colour encoding increasing value.
   const stageIcons = ['bale', 'person', 'store', 'container'];
-  s.mobility.stages.forEach((stage, i) => {
-    if (i > 0) chain.appendChild(el(`<div class="fs-chain-link">${icon('arrow-up', 'fs-chain-arrow')}</div>`));
-    chain.appendChild(el(`
-      <div class="fs-chain-node">
-        <div class="fs-chain-circle"><span class="fs-chain-step">${i + 1}</span>${icon(stageIcons[i] || 'person')}</div>
-        <div class="fs-chain-label">${stage}</div>
-      </div>`));
-  });
+  const stepColors = ['#9bb578', '#c2a05c', '#9a7c40', '#b4501f'];
+  $('#fs-mobility-chain').innerHTML = `
+    <div class="fs-stair-axis"><span>Value</span>${icon('arrow-up', 'fs-stair-axis-ico')}</div>
+    <div class="fs-stair">
+      ${s.mobility.stages.map((stage, i) => `
+        <div class="fs-step" style="--lvl:${i + 1};--c:${stepColors[i] || '#b4501f'}">
+          <div class="fs-step-head">
+            <div class="fs-step-node">${icon(stageIcons[i] || 'person', 'fs-step-ico')}<span class="fs-step-num">${i + 1}</span></div>
+            <div class="fs-step-label">${stage}</div>
+          </div>
+          <div class="fs-step-riser"></div>
+        </div>`).join('')}
+    </div>`;
   $('#fs-mobility-stats').innerHTML = s.mobility.stats.map((st) => `
     <div class="fs-mstat">
       <div class="fs-mstat-num">${icon('arrow-up', 'fs-mstat-arrow')}<span class="fs-count" data-to="${st.pct}">0</span>%</div>
@@ -431,17 +421,21 @@ function setupObservers() {
     wObs.observe(waffleBlock);
   }
 
-  // Fact 03 map — play the flow animation when it scrolls into view
-  const mapBlock = document.querySelector('#fs-supply-map');
-  if (mapBlock) {
-    const mapObs = new IntersectionObserver((entries, obs) => {
-      entries.forEach((e) => {
-        if (!e.isIntersecting) return;
-        supplyMapPromise?.then((m) => m.play());
-        obs.unobserve(e.target);
-      });
-    }, { threshold: 0.3 });
-    mapObs.observe(mapBlock);
+  // Fact 03 scrollytelling — the centred step card drives the map's stage
+  const steps = [...document.querySelectorAll('#fs-supply-steps .fs-step-card')];
+  if (steps.length) {
+    const dots = [...document.querySelectorAll('#fs-scrolly-progress span')];
+    const setActive = (stepEl) => {
+      const stage = +stepEl.dataset.stage;
+      steps.forEach((st) => st.classList.toggle('is-active', st === stepEl));
+      dots.forEach((d, i) => d.classList.toggle('is-on', i <= stage));
+      supplyMapPromise?.then((m) => m.setStage(stage));
+    };
+    const stepObs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) setActive(e.target); });
+    }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+    steps.forEach((st) => stepObs.observe(st));
+    setActive(steps[0]); // prime stage 0
   }
 
   // Count-ups (one-shot)
@@ -479,15 +473,20 @@ function setupRail() {
 function setupScrollChrome() {
   const fill = $('#fs-progress-fill');
   const topbar = $('#fs-topbar');
+  const heroPattern = $('#fs-hero-pattern');
   let ticking = false;
   const onScroll = () => {
     if (ticking) return;
     ticking = true;
     requestAnimationFrame(() => {
+      const y = window.scrollY;
       const max = document.documentElement.scrollHeight - window.innerHeight;
-      const p = max > 0 ? (window.scrollY / max) * 100 : 0;
+      const p = max > 0 ? (y / max) * 100 : 0;
       fill.style.width = `${p}%`;
-      topbar.classList.toggle('is-stuck', window.scrollY > 16);
+      topbar.classList.toggle('is-stuck', y > 16);
+      if (heroPattern && !reduceMotion && y < window.innerHeight * 1.2) {
+        heroPattern.style.transform = `translateY(${y * 0.3}px)`;
+      }
       ticking = false;
     });
   };

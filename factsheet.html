@@ -32,20 +32,21 @@
 
     <!-- ═══════════ 00 · HERO ═══════════ -->
     <section class="fs-hero" id="sec-hero" data-nav="Overview">
-      <div class="fs-hero-bg" aria-hidden="true"></div>
+      <div class="fs-hero-bg" aria-hidden="true"><div class="fs-hero-pattern" id="fs-hero-pattern"></div></div>
       <div class="fs-hero-inner">
         <div class="fs-eyebrow fs-reveal">SMEP · UN Trade and Development · Fact Sheet</div>
-        <h1 class="fs-hero-title fs-reveal">Trade in<br><em>Secondhand Clothing</em></h1>
-        <p class="fs-hero-sub fs-reveal">
+        <h1 class="fs-hero-title fs-reveal" data-reveal-delay="1">Trade in<br><em>Secondhand Clothing</em></h1>
+        <p class="fs-hero-sub fs-reveal" data-reveal-delay="2">
           Inside the markets of <strong>Uganda</strong>, <strong>the United Republic of Tanzania</strong>
           &amp; <strong>the United States of America</strong>
         </p>
-        <div class="fs-hero-flags fs-reveal">
+        <div class="fs-hero-flags fs-reveal" data-reveal-delay="2">
           <span class="fi fi-ug"></span>
           <span class="fi fi-tz"></span>
           <span class="fi fi-us"></span>
         </div>
-        <div class="fs-scrollcue fs-reveal" aria-hidden="true">
+        <p class="fs-hero-hook fs-reveal" data-reveal-delay="3"><b>96%</b> of it is rewearable. So why do we still call it waste?</p>
+        <div class="fs-scrollcue fs-reveal" data-reveal-delay="3" aria-hidden="true">
           <span>Scroll to explore</span>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
         </div>
@@ -69,7 +70,7 @@
             <div class="fs-reweare">
               <svg class="fs-shirt-icon" viewBox="0 0 64 64" aria-hidden="true"><use href="#fs-shirt"/></svg>
               <div>
-                <div class="fs-reweare-num"><span class="fs-count" data-to="96" data-format="int">0</span><span class="fs-pct">%</span></div>
+                <div class="fs-reweare-num"><span class="fs-circled"><span class="fs-count" data-to="96" data-format="int">0</span><span class="fs-pct">%</span><svg class="fs-annot-circle" viewBox="0 0 200 96" preserveAspectRatio="none" aria-hidden="true"><path d="M36,13 C98,2 176,9 190,45 C198,73 146,89 95,90 C41,91 8,79 9,47 C10,27 22,17 42,12"/></svg></span></div>
                 <div class="fs-reweare-label">comprised of <strong>rewearable</strong> items</div>
               </div>
             </div>
@@ -98,6 +99,10 @@
           <div class="fs-grades fs-reveal" data-reveal-delay="1">
             <div class="fs-grades-head">Bale quality grades</div>
             <div id="fs-grade-bars"></div>
+            <div class="fs-grade-callout">
+              <div class="fs-gc-fig"><b class="fs-count" data-to="96" data-format="int">0</b><span>of 100</span></div>
+              <p>items can be <b>worn again</b>. Just four in every hundred are not rewearable.</p>
+            </div>
           </div>
         </div>
 
@@ -109,13 +114,45 @@
       </div>
     </section>
 
-    <!-- ═══════════ 03 · SUPPLY CHAIN ═══════════ -->
-    <section class="fs-section" id="sec-supply" data-nav="Supply chain">
+    <!-- ═══════════ 03 · SUPPLY CHAIN (pinned scrollytelling) ═══════════ -->
+    <section class="fs-section fs-scrolly-section" id="sec-supply" data-nav="Supply chain">
       <div class="fs-wrap">
         <div class="fs-secnum" aria-hidden="true">03</div>
         <div class="fs-kicker fs-reveal">Supply chain &amp; trade flows</div>
-        <h2 class="fs-h2 fs-reveal">From the United States, through two-stage sorting, to East Africa</h2>
-        <div class="fs-supply fs-reveal" id="fs-supply"></div>
+        <h2 class="fs-h2 fs-reveal">Follow a bale, from the United States to East Africa</h2>
+      </div>
+
+      <div class="fs-scrolly">
+        <div class="fs-scrolly-graphic">
+          <div class="fs-scrolly-sticky">
+            <div class="fs-map" id="fs-supply-map" role="img" aria-label="Geographic flow of secondhand clothing from the United States through sorting hubs in Pakistan and India to Uganda and the United Republic of Tanzania"></div>
+            <div class="fs-scrolly-progress" id="fs-scrolly-progress" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+        <div class="fs-scrolly-steps" id="fs-supply-steps">
+          <div class="fs-step-card" data-stage="0">
+            <div class="fs-step-eyebrow">Origin</div>
+            <h3>It starts in the United States</h3>
+            <p>Every year, households and charities across the United States set aside used clothing. It is collected, compressed into bales and prepared for export.</p>
+          </div>
+          <div class="fs-step-card" data-stage="1">
+            <div class="fs-step-eyebrow">Two-stage sorting</div>
+            <h3>Re-graded in Pakistan &amp; India</h3>
+            <p>Most bales travel first to South Asia. In Pakistan and India they are opened and sorted in two stages, by quality grade and by garment type, before moving on.</p>
+          </div>
+          <div class="fs-step-card" data-stage="2">
+            <div class="fs-step-eyebrow">Destination</div>
+            <h3>On to East African markets</h3>
+            <p>Graded clothing then flows to traders in Uganda and the United Republic of Tanzania, where it is sold across busy second-hand markets.</p>
+          </div>
+          <div class="fs-step-card" data-stage="3">
+            <div class="fs-step-eyebrow">Scale</div>
+            <h3>Measured in millions of kilos</h3>
+            <p>In a single year Uganda took in <b>80.0M kg</b> and the United Republic of Tanzania <b>86.3M kg</b> of secondhand clothing. Of that, only <b>2.0M kg</b> and <b>7.8M kg</b> arrived directly from the United States.</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -127,6 +164,13 @@
         <h2 class="fs-h2 fs-reveal">The China shift, <span class="fs-yr">2018</span> → <span class="fs-yr">2023</span></h2>
         <p class="fs-intro fs-reveal" id="fs-china-intro"></p>
         <div class="fs-china-grid" id="fs-china-grid"></div>
+        <div class="fs-china-callout fs-reveal">
+          <svg class="fs-callout-arrow" viewBox="0 0 90 70" aria-hidden="true">
+            <path class="fs-ca-line" d="M12,62 C8,34 26,14 70,12" />
+            <path class="fs-ca-head" d="M58,8 L72,11 L67,24" />
+          </svg>
+          <p>In just five years, <b>China overtook the United States</b> as the leading origin of secondhand clothing for both markets, supplying close to half of Uganda’s and more than half of Tanzania’s imports by 2023.</p>
+        </div>
       </div>
     </section>
 
