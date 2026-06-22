@@ -88,6 +88,33 @@ export const DataLoader = {
         // 1. Use pre-computed net flows for the current year
         let netFlows = STATE.yearCache[STATE.year] || [];
 
+        // 1b. Interactive line filter takes precedence.
+        // While the draw mode is active (or any connection has been drawn) the map
+        // shows ONLY the drawn country pairs — so turning the mode on starts from a
+        // blank map and each connection appears as it is drawn. Pairs are matched
+        // undirected (the dataset holds a single net flow per pair) and bypass the
+        // region / selector / threshold filters entirely so the chosen relationships
+        // are always visible regardless of how small they are ("optimized" exact
+        // display). Flow-category visibility is still honoured for the legend toggles.
+        if (TradeMap.lineFilterMode || (STATE.bilateralPairs && STATE.bilateralPairs.length > 0)) {
+            const pairKeys = new Set(
+                STATE.bilateralPairs.map(p => [p.exporter, p.importer].sort().join('|'))
+            );
+            const pairFlows = netFlows.filter(d =>
+                pairKeys.has([d.exporter, d.importer].sort().join('|'))
+            );
+
+            STATE.effectiveThreshold  = 0;
+            STATE.totalBilateral      = d3.sum(pairFlows, d => d.netValue);
+            STATE.totalBilateralCount = pairFlows.length;
+            STATE.rawNodeStats        = this.computeStatsFromNetFlows(pairFlows);
+
+            const finalFlows   = pairFlows.filter(d => STATE.flowFilters.has(d.flowCategory));
+            STATE.nodeStats    = this.computeStatsFromNetFlows(finalFlows);
+            STATE.filteredData = finalFlows;
+            return finalFlows;
+        }
+
         // 2. Region filter – both exporter and importer must be in the same region
         if (STATE.region && STATE.region !== 'Global') {
             netFlows = netFlows.filter(d => {

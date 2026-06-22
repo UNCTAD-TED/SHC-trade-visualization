@@ -125,6 +125,19 @@ const App = {
             if (btn) btn.classList.toggle('active', e.detail.active);
         });
 
+        // ── Interactive line filter (draw bilateral connections on the map) ──
+        document.getElementById('linefilter-btn')?.addEventListener('click', () => {
+            if (!TradeMap || !TradeMap.toggleLineFilter) return;
+            TradeMap.toggleLineFilter();
+            // Re-render: entering the mode blanks the map, leaving it restores the view.
+            this.updateDashboard(false);
+            if (TradeMap.lineFilterMode || STATE.bilateralPairs.length > 0) this.openConnectionsPanel();
+            else this.closeConnectionsPanel();
+        });
+        document.getElementById('linefilter-clear')?.addEventListener('click', () => this.clearBilateralFilter());
+        document.addEventListener('shc:linefilter-toggled', (e) => this._updateLineFilterUI(e.detail));
+        document.addEventListener('shc:bilateral-pair-added', (e) => this.addBilateralPair(e.detail.exporter, e.detail.importer));
+
         // Mobile legend toggle
         const mobileLegendBtn = document.getElementById('mobile-legend-btn');
         if (mobileLegendBtn) mobileLegendBtn.addEventListener('click', () => this.toggleMobileLegend());
@@ -146,9 +159,10 @@ const App = {
         document.getElementById('methodology-modal-close')?.addEventListener('click', () => this.closeMethodologyModal());
         document.getElementById('methodology-modal-backdrop')?.addEventListener('click', () => this.closeMethodologyModal());
 
-        // Escape key closes any open modal
+        // Escape key cancels an in-progress connection, then closes any open modal
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
+            if (TradeMap.lineFilterMode && TradeMap._pendingExporter) { TradeMap.cancelLineDraw(); return; }
             if (!document.getElementById('arc-modal').classList.contains('hidden')) this.closeArcModal();
             if (!document.getElementById('compare-modal').classList.contains('hidden')) this.closeCompareModal();
             if (!document.getElementById('methodology-modal').classList.contains('hidden')) this.closeMethodologyModal();
@@ -417,6 +431,7 @@ const App = {
         }
 
         this._currentPanelIso = iso;
+        this._connectionsPanelOpen = false; // single-country insight now owns the panel
         this.hideTooltip();
 
         // Reset Sea Route button to OFF for each new country
@@ -446,6 +461,7 @@ const App = {
         }
 
         this._currentPanelIso = null;
+        this._connectionsPanelOpen = false;
         if (TradeMap && TradeMap.clearFocus) TradeMap.clearFocus();
     },
 
@@ -1275,10 +1291,203 @@ const App = {
         TradeMap.renderFlows();
         this.updateKPIBar();
 
+        // Keep the open connections panel (mini history cards) in sync with year etc.
+        if (this._connectionsPanelOpen) this.openConnectionsPanel();
+
         if (this._lastRenderedRegion !== STATE.region) {
             this._lastRenderedRegion = STATE.region;
             setTimeout(() => TradeMap.zoomToRegion(STATE.region), 50);
         }
+    },
+
+    // ── Interactive line filter orchestration ───────────────────────────────
+
+    // Commit a drawn connection. Pairs accumulate (earlier lines persist) and are
+    // de-duplicated undirected, matching how DataLoader.filterData resolves them.
+    addBilateralPair(exporter, importer) {
+        if (!exporter || !importer || exporter === importer) return;
+        const key = [exporter, importer].sort().join('|');
+        const exists = STATE.bilateralPairs.some(p => [p.exporter, p.importer].sort().join('|') === key);
+        if (!exists) STATE.bilateralPairs.push({ exporter, importer });
+        this._syncBilateralSelectors();
+        this.updateDashboard(false);
+        this.openConnectionsPanel();
+    },
+
+    // Remove a single drawn connection (× button on its card).
+    removeBilateralPair(exporter, importer) {
+        const key = [exporter, importer].sort().join('|');
+        STATE.bilateralPairs = STATE.bilateralPairs.filter(p => [p.exporter, p.importer].sort().join('|') !== key);
+        this._syncBilateralSelectors();
+        this.updateDashboard(false);
+        this._updateLineFilterUI({ active: TradeMap.lineFilterMode, stage: TradeMap._pendingExporter ? 'import' : 'export' });
+        if (STATE.bilateralPairs.length > 0 || TradeMap.lineFilterMode) this.openConnectionsPanel();
+        else this.closeConnectionsPanel();
+    },
+
+    // Remove every drawn connection and reset the synced pickers.
+    clearBilateralFilter() {
+        STATE.bilateralPairs = [];
+        if (TradeMap.cancelLineDraw) TradeMap.cancelLineDraw();
+        // setCountries syncs the checkbox UI without dispatching (avoids a double render)
+        this.exporterSelector.setCountries([]);
+        this.importerSelector.setCountries([]);
+        this.updateDashboard(false);
+        this._updateLineFilterUI({ active: TradeMap.lineFilterMode, stage: 'export' });
+        if (TradeMap.lineFilterMode) this.openConnectionsPanel();
+        else this.closeConnectionsPanel();
+    },
+
+    // Reflect the drawn pairs in the existing checkbox pickers (visual sync only —
+    // the actual filtering is driven by STATE.bilateralPairs in DataLoader.filterData).
+    _syncBilateralSelectors() {
+        const froms = new Set(), tos = new Set();
+        STATE.bilateralPairs.forEach(p => { froms.add(p.exporter); tos.add(p.importer); });
+        this.exporterSelector.setCountries([...froms]);
+        this.importerSelector.setCountries([...tos]);
+    },
+
+    _updateLineFilterUI(detail = {}) {
+        const btn      = document.getElementById('linefilter-btn');
+        const clearBtn = document.getElementById('linefilter-clear');
+        const status   = document.getElementById('linefilter-status');
+        const count    = STATE.bilateralPairs.length;
+        const active   = !!detail.active;
+
+        if (btn)      btn.classList.toggle('active', active);
+        if (clearBtn) clearBtn.classList.toggle('hidden', count === 0);
+        if (!status) return;
+
+        // The on-map status only guides the live drawing; the connection list/count
+        // lives in the side panel, so nothing is shown once the mode is off.
+        let text = '';
+        if (active && detail.stage === 'import') {
+            const expName = STATE.countryNames[detail.exporter] || detail.exporter || '';
+            text = `${expName} → ?  ·  Click an importer`;
+        } else if (active) {
+            text = count > 0 ? `${count} connection${count > 1 ? 's' : ''} · Click an exporter` : 'Click an exporter to start';
+        }
+        status.textContent = text;
+        status.classList.toggle('hidden', text === '');
+    },
+
+    // ── Connections panel (reuses the Data Insight side-panel container) ──────
+    // Mirrors the single-country Data Insight box, but stacks one simplified
+    // bilateral-history card per drawn connection.
+    async openConnectionsPanel() {
+        // Mini history charts need the precomputed bilateral history (lazy-loaded)
+        if (!STATE.bilateralHistory && STATE._bilateralPromise) {
+            try { await STATE._bilateralPromise; } catch (e) { /* fall back to net-only */ }
+        }
+        const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
+        const n = STATE.bilateralPairs.length;
+
+        document.getElementById('panel-country-name').textContent = 'Drawn Connections';
+        document.getElementById('panel-country-meta').textContent =
+            n > 0 ? `${n} connection${n > 1 ? 's' : ''} · ${STATE.year}` : `Draw mode · ${STATE.year}`;
+        document.getElementById('panel-body').innerHTML = this._buildConnectionsContent(mf);
+
+        // The Sea Route button belongs to single-country focus — disable it here.
+        const searouteBtn = document.getElementById('searoute-btn');
+        if (searouteBtn) { searouteBtn.disabled = true; searouteBtn.classList.remove('active'); }
+
+        document.getElementById('insight-panel').classList.add('open');
+        document.body.classList.add('insight-open');
+        this._currentPanelIso = null;
+        this._connectionsPanelOpen = true;
+        this.hideTooltip();
+        if (window.innerWidth <= 767) setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
+    },
+
+    closeConnectionsPanel() {
+        if (!this._connectionsPanelOpen) return;
+        this._connectionsPanelOpen = false;
+        document.getElementById('insight-panel').classList.remove('open');
+        document.body.classList.remove('insight-open');
+        if (window.innerWidth <= 767) setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
+    },
+
+    _buildConnectionsContent(mf) {
+        if (STATE.bilateralPairs.length === 0) {
+            return `<div class="conn-empty">
+                <div class="conn-empty-icon">🔗</div>
+                <p>Click a country to set the <b>exporter</b>, then click another to set the <b>importer</b>.</p>
+                <p class="conn-empty-sub">Every connection you draw is listed here with its trade history.</p>
+            </div>`;
+        }
+        // Newest connection on top
+        return STATE.bilateralPairs.slice().reverse()
+            .map(p => this._buildConnectionCard(p.exporter, p.importer, mf)).join('');
+    },
+
+    // Simplified version of the arc-click history modal: current-year split, net,
+    // and a compact per-year bilateral bar chart.
+    _buildConnectionCard(expIso, impIso, mf) {
+        const expName = STATE.countryNames[expIso] || expIso;
+        const impName = STATE.countryNames[impIso] || impIso;
+
+        const yearData = {};
+        for (let y = 2015; y <= 2024; y++) yearData[y] = { aToB: 0, bToA: 0 };
+        const [a, b] = [expIso, impIso].sort();
+        const expIsA = expIso === a;
+        const hist = STATE.bilateralHistory ? STATE.bilateralHistory[`${a}|${b}`] : null;
+        if (hist) {
+            Object.entries(hist).forEach(([yStr, entry]) => {
+                const y = +yStr;
+                if (yearData[y]) {
+                    yearData[y].aToB = expIsA ? entry.aToB : entry.bToA;
+                    yearData[y].bToA = expIsA ? entry.bToA : entry.aToB;
+                }
+            });
+        }
+
+        const years  = Object.keys(yearData).map(Number).sort();
+        const atoBs  = years.map(y => yearData[y].aToB);
+        const bToAs  = years.map(y => yearData[y].bToA);
+        const maxAbs = Math.max(...atoBs, ...bToAs, 1);
+        const cy     = STATE.year;
+        const curAtoB = yearData[cy] ? yearData[cy].aToB : 0;
+        const curBtoA = yearData[cy] ? yearData[cy].bToA : 0;
+        const curNet  = curAtoB - curBtoA;
+        const netCol  = curNet >= 0 ? '#009EDB' : '#ED1847';
+        const netSign = curNet >= 0 ? '+' : '';
+        const hasData = atoBs.some(v => v > 0) || bToAs.some(v => v > 0);
+
+        const W = 248, H = 30, barH = 12, gap = 2;
+        const bw = (W - gap * (years.length - 1)) / years.length;
+        const bars = years.map((y, i) => {
+            const aH = Math.max(0, (atoBs[i] / maxAbs) * barH);
+            const bH = Math.max(0, (bToAs[i] / maxAbs) * barH);
+            const x  = i * (bw + gap);
+            const isCur = y === cy;
+            const yr = String(y).slice(2);
+            return `<rect x="${x}" y="${H/2 - aH}" width="${bw}" height="${aH}" rx="1" fill="#009EDB" opacity="${isCur ? 1 : 0.4}"/>
+                    <rect x="${x}" y="${H/2}" width="${bw}" height="${bH}" rx="1" fill="#ED1847" opacity="${isCur ? 1 : 0.4}"/>
+                    <text x="${x + bw/2}" y="${H + 8}" text-anchor="middle" font-size="6" fill="${isCur ? '#0077B8' : '#AEA29A'}" font-family="Inter,monospace">${yr}</text>`;
+        }).join('');
+
+        const chart = hasData
+            ? `<svg width="${W}" height="${H + 10}" style="width:100%;overflow:visible">
+                   <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#DED9D5" stroke-width="0.5"/>${bars}
+               </svg>`
+            : `<div class="conn-nodata">No recorded bilateral trade</div>`;
+
+        return `<div class="si-section conn-card">
+            <div class="conn-card-hdr">
+                <span class="conn-flow"><b>${expName}</b> <span class="conn-arrow">→</span> <b>${impName}</b></span>
+                <button class="conn-remove" title="Remove this connection" onclick="App.removeBilateralPair('${expIso}','${impIso}')">×</button>
+            </div>
+            <div class="conn-card-stats">
+                <span class="conn-stat"><span class="conn-stat-lbl">${expName} →</span><b style="color:#0077B8">${mf.fmt(curAtoB)}</b></span>
+                <span class="conn-stat"><span class="conn-stat-lbl">← ${impName}</span><b style="color:#ED1847">${mf.fmt(curBtoA)}</b></span>
+                <span class="conn-stat"><span class="conn-stat-lbl">Net ${cy}</span><b style="color:${netCol}">${netSign}${mf.fmt(Math.abs(curNet))}</b></span>
+            </div>
+            ${chart}
+            <div class="conn-card-foot">
+                <span class="conn-chart-legend"><i class="cc-sw" style="background:#009EDB"></i>${expName} exports<i class="cc-sw" style="background:#ED1847;margin-left:8px"></i>${impName} exports</span>
+                <button class="conn-detail-btn" onclick="App.openArcModal('${expIso}','${impIso}')">Full history ↗</button>
+            </div>
+        </div>`;
     },
 
     showTooltip(event, iso) {

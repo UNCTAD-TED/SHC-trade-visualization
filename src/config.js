@@ -75,6 +75,12 @@ export const STATE = {
     selectedExporters: new Set(),
     selectedImporters: new Set(),
 
+    // Interactive line filter: explicit bilateral pairs drawn on the map.
+    // Each entry is { exporter, importer } (ISO3). When non-empty this takes
+    // precedence over the cartesian exporter×importer selector filter so the
+    // map shows exactly the connections the user drew (see DataLoader.filterData).
+    bilateralPairs: [],
+
     // Flow category visibility filters
     flowFilters: new Set(['north-south', 'south-north', 'south-south', 'north-north']),
 

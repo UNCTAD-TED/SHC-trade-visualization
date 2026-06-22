@@ -162,6 +162,147 @@ main {
 
 .trade-particle { pointer-events: none; filter: drop-shadow(0 0 1.5px rgba(255,255,255,0.9)); }
 
+// ── Interactive line filter ───────────────────────────────────
+// Cursor + pickable affordance while the draw mode is active.
+.map-2d-layer.line-filter-mode { cursor: crosshair; }
+.map-2d-layer.line-filter-mode .land { cursor: crosshair; &:active { cursor: crosshair; } }
+.map-2d-layer.line-filter-mode .country-node,
+.map-2d-layer.line-filter-mode .economy-point { cursor: crosshair; }
+
+.line-filter-layer { pointer-events: none; }
+.line-filter-temp {
+  fill: none;
+  stroke: @unblue-dark;
+  stroke-linecap: round;
+  opacity: 0.9;
+  animation: line-filter-dash 0.6s linear infinite;
+}
+.line-filter-tip { fill: @unblue-dark; stroke: #fff; stroke-width: 0.6; }
+@keyframes line-filter-dash { to { stroke-dashoffset: -11; } }
+
+.line-filter-start .lf-start-core  { fill: @unblue-dark; stroke: #fff; stroke-width: 1; }
+.line-filter-start .lf-start-pulse {
+  fill: none;
+  stroke: @unblue-dark;
+  stroke-width: 2;
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: halo-pulse 2s ease-out infinite;
+}
+
+// Header pill buttons (Connect / Clear). They use the shared .btn-toggle base;
+// only the Clear accent + hidden state need overriding here.
+#linefilter-clear {
+  color: @unred-dark;
+  &:hover { color: @unred-dark; background: lighten(@unred, 38%); }
+  &.hidden { display: none; }
+}
+
+// Live drawing status (floating, top-center of the map)
+#linefilter-status {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  background: rgba(0, 73, 144, 0.94);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: @radius-xl;
+  padding: 6px 14px;
+  box-shadow: @shadow-md;
+  white-space: nowrap;
+  pointer-events: none;
+  &.hidden { display: none; }
+}
+
+// ── Connections panel cards (simplified bilateral history, stacked) ──
+.conn-empty {
+  text-align: center;
+  color: @ungrey-text;
+  font-size: 12px;
+  padding: 28px 10px;
+  .conn-empty-icon { font-size: 30px; margin-bottom: 10px; opacity: 0.7; }
+  p { margin: 6px 0; line-height: 1.5; }
+  .conn-empty-sub { font-size: 11px; color: @ungrey; }
+  b { color: @unblue-dark; }
+}
+.conn-card {
+  .conn-card-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .conn-flow {
+    font-size: 12.5px;
+    color: @ungrey-dark;
+    b { color: @unblue-dark; }
+    .conn-arrow { color: @ungrey; margin: 0 2px; font-weight: 700; }
+  }
+  .conn-remove {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+    border: none;
+    border-radius: 50%;
+    background: @ungrey-bg;
+    color: @ungrey-text;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    &:hover { background: lighten(@unred, 34%); color: @unred-dark; }
+  }
+  .conn-card-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-bottom: 6px;
+    .conn-stat {
+      font-size: 11px;
+      color: @ungrey-text;
+      font-family: @font-mono;
+      .conn-stat-lbl { color: @ungrey; margin-right: 4px; }
+    }
+  }
+  .conn-nodata {
+    font-size: 11px;
+    font-style: italic;
+    color: @ungrey;
+    padding: 8px 0;
+  }
+  .conn-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+    .conn-chart-legend {
+      font-size: 8.5px;
+      color: @ungrey-text;
+      display: inline-flex;
+      align-items: center;
+      .cc-sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 3px; }
+    }
+    .conn-detail-btn {
+      flex-shrink: 0;
+      border: 1px solid @ungrey-border;
+      background: #fff;
+      color: @unblue-text;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: @radius-sm;
+      padding: 3px 8px;
+      cursor: pointer;
+      transition: background 0.12s;
+      &:hover { background: @unblue-bg; }
+    }
+  }
+}
+
 // ── Animation-mode: pulsing halo rings for top-3 export / import countries ──
 @keyframes anim-halo-pulse {
   0%   { transform: scale(0.5); opacity: 0.75; }

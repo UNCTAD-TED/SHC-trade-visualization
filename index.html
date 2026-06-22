@@ -349,6 +349,18 @@
                 </div>
 
                 <div class="ctrl-divider"></div>
+
+                <!-- Interactive line filter: draw connections between countries on the map -->
+                <div class="ctrl-pill" title="Draw connections between two countries on the map">
+                    <button id="linefilter-btn" class="btn-toggle" type="button">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px">
+                            <circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M6.7 7.6 17.3 16.4"/>
+                        </svg>Connect
+                    </button>
+                    <button id="linefilter-clear" class="btn-toggle hidden" type="button">Clear</button>
+                </div>
+
+                <div class="ctrl-divider"></div>
                 <button id="anim-btn" title="Auto-play 2015–2024 with bar chart race">&#9654; Animate</button>
                 <a id="factsheet-link" href="factsheet.html" title="Open the SMEP fact sheet">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
@@ -441,6 +453,9 @@
         <!-- ── Map + Overlays ── -->
         <div class="map-area">
             <div id="map-container"></div>
+
+            <!-- Interactive line filter: live drawing status -->
+            <div id="linefilter-status" class="hidden"></div>
 
 <div id="tooltip"></div>
 

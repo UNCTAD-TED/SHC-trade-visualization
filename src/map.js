@@ -47,6 +47,10 @@ export const TradeMap = {
     focusedIso: null,
     searouteMode: false,
 
+    // ── Interactive line filter (draw bilateral connections on the map)
+    lineFilterMode: false,
+    _pendingExporter: null,
+
     // When a country is focused/hovered, also highlight these additional territory codes (numeric).
     // UNCTAD treats HKG (344), MAC (446), TWN (158) as part of China (156).
     _territoryAliases: { 'CHN': ['158', '344', '446'] },
@@ -161,6 +165,13 @@ export const TradeMap = {
                     this.g.selectAll(".map-label")
                         .attr("font-size", (8.5 / Math.sqrt(k)) + "px")
                         .attr("stroke-width", 2.5 / k);
+                    // Keep the in-progress line-filter visuals crisp while zooming
+                    this.g.selectAll(".line-filter-temp")
+                        .attr("stroke-width", 2 / k)
+                        .attr("stroke-dasharray", `${6/k},${5/k}`);
+                    this.g.selectAll(".line-filter-tip").attr("r", 3 / k);
+                    this.g.selectAll(".lf-start-pulse").attr("r", 10 / k);
+                    this.g.selectAll(".lf-start-core").attr("r", 4 / k);
                 });
             });
         this.svg.call(this.zoomBehavior);
@@ -283,6 +294,12 @@ export const TradeMap = {
                 this.g.selectAll("path.land")
                     .filter(ld => ld && ld.properties && group.has(String(ld.properties.code)))
                     .attr("fill", ld => this._specialFill(ld, focusGroup.has(String(ld.properties.code)) ? "#EAF4FB" : "#FAFAFA"));
+            })
+            .on("click", (event, d) => {
+                // Only active in line-filter mode — otherwise land is just the backdrop.
+                if (!this.lineFilterMode || !d || !d.properties) return;
+                event.stopPropagation();
+                this._handleCountryPick(this._codeToIso(d.properties.code));
             });
 
         landsEnter.merge(lands)
@@ -347,7 +364,14 @@ export const TradeMap = {
                 .attr("fill", "#FAFAFA")
                 .attr("stroke", "#DED9D5")
                 .attr("stroke-width", 0.5)
-                .style("pointer-events", "none")
+                // Pointer-events are toggled on only while line-filter mode is active
+                // (see enable/disableLineFilter) so island nations stay pickable too.
+                .style("pointer-events", this.lineFilterMode ? "all" : "none")
+                .on("click", (event, d) => {
+                    if (!this.lineFilterMode || !d || !d.properties) return;
+                    event.stopPropagation();
+                    this._handleCountryPick(this._codeToIso(d.properties.code));
+                })
                 .merge(dots)
                 .attr("cx", d => (this.projection(d.geometry.coordinates) || [])[0])
                 .attr("cy", d => (this.projection(d.geometry.coordinates) || [])[1]);
@@ -601,7 +625,11 @@ export const TradeMap = {
             .style("opacity", 0)
             .on("mouseover", (event, d) => document.dispatchEvent(new CustomEvent('shc:country-hover', { detail: { event, country: d } })))
             .on("mouseout",  () => document.dispatchEvent(new CustomEvent('shc:country-hoverend')))
-            .on("click",     (event, d) => { event.stopPropagation(); document.dispatchEvent(new CustomEvent('shc:country-click', { detail: d })); });
+            .on("click",     (event, d) => {
+                event.stopPropagation();
+                if (this.lineFilterMode) { this._handleCountryPick(d); return; }
+                document.dispatchEvent(new CustomEvent('shc:country-click', { detail: d }));
+            });
 
         const nodeOpacity = (d) => {
             if (!focusedIso) return 1;
@@ -911,6 +939,139 @@ export const TradeMap = {
 
     _clearParticles() {
         if (this.g) this.g.selectAll(".particle-layer").remove();
+    },
+
+    // ── Interactive line filter ───────────────────────────────────────────
+    // State machine: OFF → (click A) pending(A) → (mousemove) live cursor line →
+    // (click B) commit pair A→B. On commit the temp line is removed and the real
+    // trade arc(s) for the pair render through the normal data filter, so earlier
+    // connections stay on screen. Esc / a repeat toggle cancel only the in-progress
+    // line; committed pairs persist until the Clear button is pressed.
+
+    toggleLineFilter() {
+        if (this.lineFilterMode) this.disableLineFilter();
+        else this.enableLineFilter();
+        return this.lineFilterMode;
+    },
+
+    enableLineFilter() {
+        if (!this.svg) return;
+        this.lineFilterMode = true;
+        this._pendingExporter = null;
+        this.svg.classed("line-filter-mode", true);
+        // Island-nation dots become pickable too (inline pointer-events beats CSS).
+        if (this.g) this.g.selectAll(".economy-point").style("pointer-events", "all");
+        // Live cursor-following line. Namespaced so it never clobbers the d3.zoom handler.
+        this.svg.on("mousemove.linefilter", (event) => this._onLineFilterMove(event));
+        this._emitLineFilterStage("export");
+    },
+
+    disableLineFilter() {
+        this.lineFilterMode = false;
+        this._pendingExporter = null;
+        this._clearPendingVisuals();
+        if (this.svg) {
+            this.svg.classed("line-filter-mode", false);
+            this.svg.on("mousemove.linefilter", null);
+        }
+        if (this.g) this.g.selectAll(".economy-point").style("pointer-events", "none");
+        document.dispatchEvent(new CustomEvent("shc:linefilter-toggled", { detail: { active: false } }));
+    },
+
+    // Cancel the in-progress (half-drawn) line but keep the mode on and committed pairs.
+    cancelLineDraw() {
+        if (!this._pendingExporter) return;
+        this._pendingExporter = null;
+        this._clearPendingVisuals();
+        if (this.lineFilterMode) this._emitLineFilterStage("export");
+    },
+
+    _emitLineFilterStage(stage) {
+        document.dispatchEvent(new CustomEvent("shc:linefilter-toggled", {
+            detail: { active: this.lineFilterMode, stage, exporter: this._pendingExporter }
+        }));
+    },
+
+    _codeToIso(code) {
+        return this.isoMap[parseInt(code, 10)] || null;
+    },
+
+    // Click handler shared by land polygons, country nodes and island-nation dots.
+    _handleCountryPick(iso) {
+        if (!iso || !STATE.countryCoords[iso]) return; // need a centroid to anchor the line
+        if (!this._pendingExporter) {
+            this._pendingExporter = iso;          // 1st click → exporter (start)
+            this._setStartHighlight(iso);
+            this._emitLineFilterStage("import");
+            return;
+        }
+        if (iso === this._pendingExporter) return; // ignore re-clicking the start country
+
+        const exporter = this._pendingExporter;    // 2nd click → importer (end): commit
+        this._pendingExporter = null;
+        this._clearPendingVisuals();
+        document.dispatchEvent(new CustomEvent("shc:bilateral-pair-added", {
+            detail: { exporter, importer: iso }
+        }));
+        this._emitLineFilterStage("export");
+    },
+
+    _onLineFilterMove(event) {
+        if (!this.lineFilterMode || !this._pendingExporter) return;
+        const s = STATE.countryCoords[this._pendingExporter];
+        if (!s) return;
+        const p1 = this.projection(s);
+        if (!p1) return;
+        const p2 = d3.pointer(event, this.g.node()); // g-space matches projection output
+        this._drawTempLine(p1, p2);
+    },
+
+    _lineFilterLayer() {
+        let layer = this.g.select(".line-filter-layer");
+        if (layer.empty()) {
+            layer = this.g.append("g")
+                .attr("class", "line-filter-layer")
+                .style("pointer-events", "none");
+        }
+        layer.raise();
+        return layer;
+    },
+
+    _drawTempLine(p1, p2) {
+        const layer = this._lineFilterLayer();
+        const k = this._pendingZoomK || 1;
+        const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+        const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
+        const d = `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,1 ${p2[0]},${p2[1]}`;
+
+        let line = layer.select(".line-filter-temp");
+        if (line.empty()) line = layer.append("path").attr("class", "line-filter-temp");
+        line.attr("d", d)
+            .attr("stroke-width", 2 / k)
+            .attr("stroke-dasharray", `${6/k},${5/k}`);
+
+        let tip = layer.select(".line-filter-tip");
+        if (tip.empty()) tip = layer.append("circle").attr("class", "line-filter-tip");
+        tip.attr("cx", p2[0]).attr("cy", p2[1]).attr("r", 3 / k);
+    },
+
+    _setStartHighlight(iso) {
+        const coords = STATE.countryCoords[iso];
+        if (!coords || !this.g) return;
+        const p = this.projection(coords);
+        if (!p) return;
+        const k = this._pendingZoomK || 1;
+        const layer = this._lineFilterLayer();
+        layer.selectAll(".line-filter-start").remove();
+        const g = layer.append("g").attr("class", "line-filter-start");
+        g.append("circle").attr("class", "lf-start-pulse")
+            .attr("cx", p[0]).attr("cy", p[1]).attr("r", 10 / k);
+        g.append("circle").attr("class", "lf-start-core")
+            .attr("cx", p[0]).attr("cy", p[1]).attr("r", 4 / k);
+    },
+
+    _clearPendingVisuals() {
+        if (this.g) this.g.selectAll(".line-filter-temp, .line-filter-tip, .line-filter-start").remove();
     },
 
     renderLegend() {
