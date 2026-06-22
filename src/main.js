@@ -96,6 +96,29 @@ const App = {
             });
         });
 
+        // Metric toggle (trade value ⇄ trade weight). Loads the metric's pre-computed
+        // JSON on demand, relabels the unit-bearing controls and re-renders.
+        document.querySelectorAll('.metric-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const metric = e.currentTarget.dataset.metric;
+                if (!metric || metric === STATE.metric) return;
+                const loader = document.getElementById('loader');
+                loader?.classList.remove('hidden');
+                try {
+                    await DataLoader.switchMetric(metric);
+                    this._setActiveMetricButtons(metric);
+                    this.updateThresholdLabels(metric);
+                    this._globalRankCache = {};          // ranks are metric-specific
+                    TradeMap._lastLegendKey = null;      // force legend refresh
+                    this.updateDashboard(false);
+                } catch (err) {
+                    console.error('Failed to switch metric:', err);
+                } finally {
+                    loader?.classList.add('hidden');
+                }
+            });
+        });
+
         // Flow category checkboxes
         document.querySelectorAll('.flow-checkbox').forEach(cb => {
             cb.addEventListener('change', (e) => {
@@ -330,6 +353,28 @@ const App = {
     updateUIClasses(selector, activeEl) {
         document.querySelectorAll(selector).forEach(b => b.classList.remove('active'));
         activeEl.classList.add('active');
+    },
+
+    // Metric buttons span the desktop bar and the mobile sheet, so toggle every
+    // matching button rather than a single clicked element.
+    _setActiveMetricButtons(metric) {
+        document.querySelectorAll('.metric-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.metric === metric));
+    },
+
+    // Threshold buttons keep the same numeric data-threshold across metrics; only
+    // their unit-bearing labels change ($ for value, t for weight).
+    THRESHOLD_LABELS: {
+        value:  { auto: 'Auto', '10000000': '$10M', '1000000': '$1M', '500000': '$500k', '100000': '$100k', '10000': '$10k' },
+        weight: { auto: 'Auto', '10000000': '10kt', '1000000': '1kt',  '500000': '500t',  '100000': '100t',  '10000': '10t'  },
+    },
+
+    updateThresholdLabels(metric = STATE.metric) {
+        const map = this.THRESHOLD_LABELS[metric] || this.THRESHOLD_LABELS.value;
+        document.querySelectorAll('.threshold-btn').forEach(b => {
+            const lbl = map[b.dataset.threshold];
+            if (lbl !== undefined) b.textContent = lbl;
+        });
     },
 
     updateKPIBar() {
@@ -1749,6 +1794,9 @@ const App = {
         const threshVal = (STATE.thresholdMode === 'auto' || STATE.thresholdMode === undefined) ? 'auto' : String(STATE.thresholdMode);
         const activeThreshold = document.querySelector(`.threshold-btn[data-threshold="${threshVal}"]`);
         if (activeThreshold) this.updateUIClasses('.threshold-btn', activeThreshold);
+        // Metric toggle + unit-aware threshold labels (desktop and mobile share classes)
+        this._setActiveMetricButtons(STATE.metric || 'value');
+        this.updateThresholdLabels(STATE.metric || 'value');
     }
 };
 

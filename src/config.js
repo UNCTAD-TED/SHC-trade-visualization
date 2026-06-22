@@ -8,7 +8,8 @@ export const CONFIG = {
     },
 
     colors: {
-        value: { label: "Export Value ($)", discrete: { large: "#0ea5e9", medium: "#6366f1", small: "#334155" } },
+        value:  { label: "Export Value ($)",   discrete: { large: "#0ea5e9", medium: "#6366f1", small: "#334155" } },
+        weight: { label: "Export Weight (t)",   discrete: { large: "#0ea5e9", medium: "#6366f1", small: "#334155" } },
     },
 
     // Flow category base colors (North = Developed, South = Developing/LDC)
@@ -50,9 +51,33 @@ export const METRIC_FORMAT = {
             return s + '$' + d3.format(',.0f')(a);
         }
     },
+    // Weight figures arrive in kilograms (BACI harmonized export weight) and are
+    // displayed in metric tonnes (t / kt / Mt) for readability.
+    weight: {
+        grossLabel: 'Gross Volume:', netLabel: 'Net Balance:',
+        fmt: (v) => {
+            const a = Math.abs(v);
+            const s = v < 0 ? '-' : '';
+            const t = a / 1000;                        // kilograms → tonnes
+            if (t >= 1e6) return s + d3.format('.2f')(t / 1e6) + ' Mt';
+            if (t >= 1e3) return s + d3.format('.2f')(t / 1e3) + ' kt';
+            if (t >= 1)   return s + d3.format('.2f')(t) + ' t';
+            return s + d3.format(',.0f')(a) + ' kg';
+        }
+    },
 };
 
 export const STATE = {
+    // Per-metric data stores. The active-metric views (yearCache, trendSummary,
+    // bilateralHistory) below are repointed into these by DataLoader.switchMetric.
+    //   value  -> data/        (USD)
+    //   weight -> data/weight/ (kilograms)
+    metricStore: {
+        value:  { years: {}, trendSummary: null, bilateralHistory: null, _bilateralPromise: null },
+        weight: { years: {}, trendSummary: null, bilateralHistory: null, _bilateralPromise: null },
+    },
+
+    // Active-metric views (point into metricStore[metric]) ----------------------
     // Per-year pre-computed net flows, keyed by year number
     yearCache: {},
 

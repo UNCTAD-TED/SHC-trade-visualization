@@ -5,17 +5,25 @@ import { RegionConfig } from './regions.js';
 import { TradeMap } from './map.js';
 
 export const DataLoader = {
-    // Cache key for pre-threshold stats (year|region|exporters|importers).
+    // Cache key for pre-threshold stats (metric|year|region|exporters|importers).
     // Threshold and flow-category changes must not trigger a recompute.
     _preThresholdKey: null,
 
+    // Directory prefix for a metric's pre-computed JSON files.
+    //   value  -> data/        weight -> data/weight/
+    _prefix(metric = STATE.metric) {
+        return metric === 'weight' ? 'data/weight/' : 'data/';
+    },
+
     async loadAll() {
         try {
+            const metric = STATE.metric;
+            const prefix = this._prefix(metric);
             const [world, meta, trendSummary, yearFlows] = await Promise.all([
                 d3.json(CONFIG.geoJsonUrl),
                 fetch('data/meta.json').then(r => r.json()),
-                fetch('data/trend_summary.json').then(r => r.json()),
-                fetch(`data/${STATE.year}.json`).then(r => r.json()),
+                fetch(`${prefix}trend_summary.json`).then(r => r.json()),
+                fetch(`${prefix}${STATE.year}.json`).then(r => r.json()),
             ]);
 
             // Correct the ~11.314° westward longitude shift in the UNCTAD TopoJSON transform
@@ -44,26 +52,72 @@ export const DataLoader = {
                 if (!STATE.countryNames[iso]) STATE.countryNames[iso] = entry.name;
             });
 
-            STATE.trendSummary = trendSummary;
-            STATE.yearCache[STATE.year] = yearFlows;
+            // Seed the active-metric store and repoint the active views into it
+            const store = STATE.metricStore[metric];
+            store.years[STATE.year] = yearFlows;
+            store.trendSummary      = trendSummary;
+            STATE.yearCache    = store.years;
+            STATE.trendSummary = store.trendSummary;
 
-            // Load routes.json in the background — not needed until a country is clicked
+            // Load routes.json in the background — not needed until a country is clicked.
+            // Routes are geographic (metric-independent), so they are shared across metrics.
             STATE._routesPromise = fetch('data/routes.json')
                 .then(r => r.json())
                 .then(data => { STATE.routes = data; })
                 .catch(err => console.warn('routes.json load failed:', err));
 
-            // Start loading bilateral history in the background
-            STATE._bilateralPromise = fetch('data/bilateral_history.json')
-                .then(r => r.json())
-                .then(data => { STATE.bilateralHistory = data; })
-                .catch(err => console.warn('bilateral_history.json load failed:', err));
+            // Start loading bilateral history for the active metric in the background
+            this._loadBilateral(metric);
 
             return true;
         } catch (error) {
             console.error('DataLoader.loadAll error:', error);
             return false;
         }
+    },
+
+    // Lazily fetch a metric's bilateral history into its store (once), and point
+    // the active view at it if that metric is still selected when the fetch lands.
+    _loadBilateral(metric = STATE.metric) {
+        const store = STATE.metricStore[metric];
+        if (store.bilateralHistory) {
+            if (STATE.metric === metric) STATE.bilateralHistory = store.bilateralHistory;
+            return store._bilateralPromise || Promise.resolve(store.bilateralHistory);
+        }
+        if (!store._bilateralPromise) {
+            store._bilateralPromise = fetch(`${this._prefix(metric)}bilateral_history.json`)
+                .then(r => r.json())
+                .then(data => {
+                    store.bilateralHistory = data;
+                    if (STATE.metric === metric) STATE.bilateralHistory = data;
+                    return data;
+                })
+                .catch(err => console.warn('bilateral_history.json load failed:', err));
+        }
+        return store._bilateralPromise;
+    },
+
+    // Switch the active metric ('value' | 'weight'), loading its files on demand.
+    // Repoints the active views (yearCache / trendSummary / bilateralHistory) and
+    // invalidates the pre-threshold stats cache so figures recompute.
+    async switchMetric(metric) {
+        if (metric === STATE.metric || !STATE.metricStore[metric]) return;
+        STATE.metric = metric;
+
+        const store  = STATE.metricStore[metric];
+        const prefix = this._prefix(metric);
+
+        if (!store.trendSummary) {
+            store.trendSummary = await fetch(`${prefix}trend_summary.json`).then(r => r.json());
+        }
+        await this.loadYear(STATE.year, metric);
+
+        STATE.yearCache        = store.years;
+        STATE.trendSummary     = store.trendSummary;
+        STATE.bilateralHistory = store.bilateralHistory; // may be null until loaded
+        this._loadBilateral(metric);
+
+        this._preThresholdKey = null;
     },
 
     processGeoData(geoData) {
@@ -77,10 +131,11 @@ export const DataLoader = {
         });
     },
 
-    async loadYear(year) {
-        if (STATE.yearCache[year]) return STATE.yearCache[year];
-        const data = await fetch(`data/${year}.json`).then(r => r.json());
-        STATE.yearCache[year] = data;
+    async loadYear(year, metric = STATE.metric) {
+        const store = STATE.metricStore[metric];
+        if (store.years[year]) return store.years[year];
+        const data = await fetch(`${this._prefix(metric)}${year}.json`).then(r => r.json());
+        store.years[year] = data;
         return data;
     },
 
@@ -143,7 +198,7 @@ export const DataLoader = {
         // Save pre-threshold totals for legend coverage display.
         // These only depend on year/region/selection, not on threshold or flow-category filters,
         // so skip the recompute when only those UI controls changed.
-        const preKey = `${STATE.year}|${STATE.region}|${[...STATE.selectedExporters].sort()}|${[...STATE.selectedImporters].sort()}`;
+        const preKey = `${STATE.metric}|${STATE.year}|${STATE.region}|${[...STATE.selectedExporters].sort()}|${[...STATE.selectedImporters].sort()}`;
         if (this._preThresholdKey !== preKey) {
             this._preThresholdKey     = preKey;
             STATE.totalBilateral      = d3.sum(netFlows, d => d.netValue);

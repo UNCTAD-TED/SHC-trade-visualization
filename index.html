@@ -271,6 +271,14 @@
                     </select>
                 </div>
 
+                <div class="ctrl-divider"></div>
+
+                <!-- Metric toggle: trade value (USD) vs trade weight (tonnes) -->
+                <div class="ctrl-pill" title="Switch between trade value (USD) and trade weight (tonnes)">
+                    <button class="metric-btn btn-toggle active" data-metric="value">Value</button>
+                    <button class="metric-btn btn-toggle" data-metric="weight">Weight</button>
+                </div>
+
                 <!-- Flow direction filter -->
                 <div class="ctrl-pill" title="Filter by economic flow direction">
                     <span class="ctrl-flows-label">Flows</span>
@@ -295,7 +303,7 @@
                 <div id="threshold-divider" class="ctrl-divider"></div>
 
                 <!-- Threshold filter -->
-                <div id="threshold-group" class="ctrl-pill" title="Visibility threshold — minimum trade value to display">
+                <div id="threshold-group" class="ctrl-pill" title="Visibility threshold — minimum trade flow (value or weight) to display">
                     <button class="threshold-btn btn-toggle active" data-threshold="auto">Auto</button>
                     <button class="threshold-btn btn-toggle" data-threshold="10000000">$10M</button>
                     <button class="threshold-btn btn-toggle" data-threshold="1000000">$1M</button>
@@ -574,6 +582,10 @@
                         <dd>2015–2024 (provisional for the most recent year)</dd>
                         <dt>Value unit</dt>
                         <dd>Current USD (thousands, then converted to display units)</dd>
+                        <dt>Weight unit</dt>
+                        <dd>Kilograms (BACI harmonized export weight), displayed in metric tonnes (t&thinsp;/&thinsp;kt&thinsp;/&thinsp;Mt).</dd>
+                        <dt>Metric toggle</dt>
+                        <dd>The <strong>Value / Weight</strong> switch in the toolbar recomputes every figure on the map, legend, KPIs and country panels from the selected measure. Net flow direction, thresholds and rankings are all derived from whichever metric is active.</dd>
                     </dl>
                 </section>
 
@@ -706,6 +718,14 @@
             </div>
 
             <div class="sheet-section">
+                <div class="section-label">Metric</div>
+                <div style="display:flex;gap:8px">
+                    <button class="metric-btn btn-toggle-lg active" data-metric="value">Value ($)</button>
+                    <button class="metric-btn btn-toggle-lg" data-metric="weight">Weight (t)</button>
+                </div>
+            </div>
+
+            <div class="sheet-section">
                 <div class="section-label">Flow Direction</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                     <label class="flow-label-lg">
@@ -728,7 +748,7 @@
             </div>
 
             <div class="sheet-section">
-                <div class="section-label">Min. Trade Value</div>
+                <div class="section-label">Min. Trade Flow</div>
                 <div style="display:flex;flex-wrap:wrap;gap:8px">
                     <button class="threshold-btn btn-toggle-lg" data-threshold="auto">Auto</button>
                     <button class="threshold-btn btn-toggle-lg" data-threshold="10000000">$10M</button>

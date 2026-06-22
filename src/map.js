@@ -466,12 +466,6 @@ export const TradeMap = {
     render2DFlows() {
         if (!this.g) return;
 
-        if (STATE.metric !== 'value') {
-            this.g.selectAll(".trade-arc, .country-node, .map-label-unified")
-                .transition().duration(500).style("opacity", 0).remove();
-            return;
-        }
-
         const netFlows  = STATE.filteredData;
         const nodeStats = STATE.nodeStats;
 
@@ -1080,11 +1074,11 @@ export const TradeMap = {
 
         const netFlows = STATE.filteredData || [];
 
-        const _legendKey = `${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}`;
+        const _legendKey = `${STATE.metric}_${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}`;
         if (this._lastLegendKey === _legendKey) return;
         this._lastLegendKey = _legendKey;
 
-        const fmtShort = this._fmtShort.bind(this);
+        const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
 
         // Flow categories
         const categories = [
@@ -1106,7 +1100,7 @@ export const TradeMap = {
         const flowItems = categories.map(c => {
             const active   = STATE.flowFilters.has(c.key);
             const stat     = catStats[c.key];
-            const valStr   = stat.count > 0 ? `$${fmtShort(stat.total)}` : '—';
+            const valStr   = stat.count > 0 ? mf.fmt(stat.total) : '—';
             const cntStr   = stat.count > 0 ? `${stat.count}` : '0';
             return `<div class="legend-flow-item" style="opacity:${active ? 1 : 0.3}">
                 <span class="legend-flow-dot" style="background:${CONFIG.flowColors[c.key]}"></span>
@@ -1144,7 +1138,7 @@ export const TradeMap = {
             <div class="legend-section">
                 <span class="legend-section-label">Threshold</span>
                 <span class="legend-threshold-badge${isManual ? ' manual' : ''}">${isManual ? 'MANUAL' : 'AUTO'}</span>
-                <span class="legend-threshold-val">$${fmtShort(currentThreshold)}</span>
+                <span class="legend-threshold-val">${mf.fmt(currentThreshold)}</span>
                 <span class="legend-arc-count">${arcCount} arcs</span>
             </div>
         `;
@@ -1157,8 +1151,8 @@ export const TradeMap = {
         const statEl    = document.getElementById('stat-value');
         const bilatEl   = document.getElementById('stat-bilateral');
         const coverageEl = document.getElementById('stat-coverage');
-        if (statEl)    statEl.innerText    = '$' + fmtShort(shownTotal);
-        if (bilatEl)   bilatEl.innerText   = '$' + fmtShort(bilateralTotal);
+        if (statEl)    statEl.innerText    = mf.fmt(shownTotal);
+        if (bilatEl)   bilatEl.innerText   = mf.fmt(bilateralTotal);
         if (coverageEl) coverageEl.innerText = `${coverage.toFixed(1)}% shown`;
     }
 };
