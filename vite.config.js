@@ -13,8 +13,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: 'index.html',
-        sns:  'sns.html',
+        main:      'index.html',
+        sns:       'sns.html',
+        factsheet: 'factsheet.html',
       },
     },
   },

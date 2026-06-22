@@ -84,6 +84,7 @@ export function initSNSMap(state) {
   renderHeader();
   renderYearDisplay();
   renderTimeline();
+  renderLegend();
 }
 
 // ── Header bar
@@ -180,6 +181,74 @@ function renderTimeline() {
         .text(yr);
     }
   });
+}
+
+// ── Legend: arc colours, country nodes, and animation highlights ──
+function renderLegend() {
+  const lx  = 60;               // left edge of content
+  const col = lx + 72;          // content column (after section labels)
+  const y1  = H - TIMELINE_H - 66;   // row 1 — Arc colours
+  const y2  = H - TIMELINE_H - 46;   // row 2 — Country nodes
+  const y3  = H - TIMELINE_H - 26;   // row 3 — Highlights
+  const bgY = y1 - 14;
+  const bgH = (y3 - y1) + 26;
+  const bgW = 600;
+
+  const g    = svg.append('g').attr('class', 'sns-legend');
+  const font = 'Inter, Arial, sans-serif';
+
+  // Background
+  g.append('rect')
+    .attr('x', lx - 10).attr('y', bgY)
+    .attr('width', bgW).attr('height', bgH)
+    .attr('fill', 'rgba(2,10,26,0.75)')
+    .attr('stroke', 'rgba(0,158,219,0.18)')
+    .attr('stroke-width', 0.8)
+    .attr('rx', 5);
+
+  const secLabel = (y, text) =>
+    g.append('text')
+      .attr('x', col - 6).attr('y', y + 4)
+      .attr('text-anchor', 'end')
+      .attr('fill', '#2c4a68')
+      .attr('font-size', '9px').attr('font-weight', '700')
+      .attr('font-family', font).attr('letter-spacing', '0.8')
+      .text(text);
+
+  const lbl = (x, y, text, color = '#8ab0cc', size = '11px') =>
+    g.append('text')
+      .attr('x', x).attr('y', y + 4)
+      .attr('fill', color).attr('font-size', size).attr('font-family', font)
+      .text(text);
+
+  // ── Row 1: Arc colours ──────────────────────────────────────────
+  secLabel(y1, 'ARCS');
+  [['#009EDB','N→S'], ['#72BF44','S→N'], ['#FBAF17','S→S'], ['#AEA29A','N→N']]
+    .forEach(([color, text], i) => {
+      const x = col + i * 56;
+      g.append('rect').attr('x', x).attr('y', y1 - 4).attr('width', 14).attr('height', 4).attr('fill', color).attr('rx', 1);
+      lbl(x + 18, y1, text);
+    });
+
+  // ── Row 2: Country nodes ────────────────────────────────────────
+  secLabel(y2, 'NODES');
+  g.append('circle').attr('cx', col + 4).attr('cy', y2).attr('r', 4).attr('fill', '#009EDB');
+  lbl(col + 13, y2, 'Net exporter');
+  g.append('circle').attr('cx', col + 110).attr('cy', y2).attr('r', 4).attr('fill', '#ED1847');
+  lbl(col + 119, y2, 'Net importer');
+  lbl(col + 215, y2, '· size = trade volume', '#2c4a68', '10px');
+
+  // ── Row 3: Animation highlights ─────────────────────────────────
+  secLabel(y3, 'HIGHLIGHTS');
+  g.append('circle').attr('cx', col + 4).attr('cy', y3).attr('r', 4).attr('fill', '#009EDB');
+  lbl(col + 13, y3, 'Top 3 exporters');
+  g.append('circle').attr('cx', col + 120).attr('cy', y3).attr('r', 4).attr('fill', '#72BF44');
+  lbl(col + 129, y3, 'Top 3 importers');
+  g.append('line')
+    .attr('x1', col + 234).attr('y1', y3).attr('x2', col + 254).attr('y2', y3)
+    .attr('stroke', '#ffffff').attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '4 5').attr('opacity', 0.7);
+  lbl(col + 259, y3, 'Major corridors (≥10% of max)');
 }
 
 // ── Arc path: circular arc matching the original dashboard formula exactly
@@ -294,9 +363,11 @@ function _snsDrawParticles(flows, topSet, widthScale) {
   if (!_particleLayer) return;
   const key = d => `${d.exporter}|${d.importer}`;
 
+  const maxVal = flows[0]?.netValue || 1;
   const topFlows = flows
-    .filter(d => topSet.has(d.exporter) || topSet.has(d.importer))
-    .slice(0, 15);
+    .filter(d => (topSet.has(d.exporter) || topSet.has(d.importer))
+                 && d.netValue >= maxVal * 0.10)
+    .slice(0, 25);
 
   const particles = _particleLayer.selectAll('.anim-particle-arc')
     .data(topFlows, key);

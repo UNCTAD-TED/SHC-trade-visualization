@@ -149,6 +149,9 @@ export const TradeMap = {
                     this._zoomRaf = null;
                     const k = this._pendingZoomK;
                     this.g.selectAll(".land, .graticule, .border").attr("stroke-width", 0.5 / k);
+                    this.g.selectAll(".border-dashed").attr("stroke-dasharray", `${4/k},${3/k}`);
+                    this.g.selectAll(".border-dotted").attr("stroke-dasharray", `${1.5/k},${2.5/k}`);
+                    this.g.selectAll(".border-dash-dotted").attr("stroke-dasharray", `${5/k},${2/k},${1.5/k},${2/k}`);
                     this.g.selectAll(".trade-arc").attr("stroke-width", function() {
                         return (+this.getAttribute("data-original-width") || 1) / k;
                     });
@@ -215,6 +218,21 @@ export const TradeMap = {
         this.svg.transition()
             .duration(1200)
             .call(this.zoomBehavior.transform, transform);
+    },
+
+    // Zoom to a single country's centroid. `scale` plays the same role as RegionConfig.scale.
+    zoomToCountry(iso, scale = 3.5, duration = 1200) {
+        if (!this.zoomBehavior) return;
+        const coords = STATE.countryCoords[iso];
+        if (!coords) return;
+        const p = this.projection(coords);
+        if (!p) return;
+        const k = Math.max(0.2, scale);
+        const tx = (this.width / 2) - (p[0] * k);
+        const ty = (this.height / 2) - (p[1] * k);
+        this.svg.transition()
+            .duration(duration)
+            .call(this.zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
     },
 
     // ── Static map (land polygons) with D3 Data Join
@@ -593,9 +611,12 @@ export const TradeMap = {
 
         nodesEnter.merge(nodes)
             .attr("data-original-radius", d => radiusScale(nodeStats[d].grossVolume))
-            .transition().duration(750).ease(d3.easeElasticOut)
+            // Commit positions immediately. If a later setFocus/clearFocus starts its own
+            // (unnamed) transition on .country-node it cancels this one — so cx/cy must be
+            // set outside the transition or nodes freeze at their previous projection.
             .attr("cx", d => projOf(d)[0])
             .attr("cy", d => projOf(d)[1])
+            .transition().duration(750).ease(d3.easeElasticOut)
             .attr("r", d => radiusScale(nodeStats[d].grossVolume) / currentK)
             .attr("fill", d => colorScale(nodeStats[d].netBalance))
             .attr("stroke-width", 1.5 / currentK)
@@ -643,11 +664,13 @@ export const TradeMap = {
             .attr("fill", "#6E6259")
             .attr("stroke", "#FAFAFA") // 背景や陸地と同じ色で白フチ（Halo）をつける
             .attr("stroke-linejoin", "round")
-            .transition().duration(750)
+            // Position set immediately (same reason as nodes — a following focus transition
+            // would otherwise cancel an in-flight position tween and freeze labels).
             .attr("x", d => projOf(d)[0] + (radiusScale(nodeStats[d].grossVolume) / currentK) + 4)
             .attr("y", d => projOf(d)[1] + 4)
             .attr("font-size", (8.5 / Math.sqrt(currentK)) + "px") // 10pxから8.5pxへ少し縮小
             .attr("stroke-width", 2.5 / currentK)
+            .transition().duration(750)
             .style("opacity", labelOpacity);
 
         if (this.renderLegend) this.renderLegend();

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py --version)",
+      "Bash(python scripts/process_data.py)",
+      "Bash(python scripts/verify_data.py)"
+    ]
+  }
+}

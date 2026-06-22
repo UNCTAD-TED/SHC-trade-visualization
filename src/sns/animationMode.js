@@ -43,6 +43,7 @@ let _arcLayer = null, _particleLayer = null, _haloLayer = null, _nodeLayer = nul
 // ── Public API ────────────────────────────────────────────────
 
 export async function startAnimation() {
+  if (document.body.classList.contains('story-mode')) return;
   if (_active) return;
   _active = true;
   _savedThreshold = STATE.thresholdMode;
@@ -120,6 +121,7 @@ export function stopAnimation() {
 
   document.body.classList.remove('anim-mode');
   document.getElementById('anim-panel')?.remove();
+  document.getElementById('anim-legend')?.remove();
 
   // Remove animation layers and restore the dashboard's own flow layers
   _arcLayer?.remove();      _arcLayer = null;
@@ -359,10 +361,14 @@ function _drawParticles(flows, k, topSet, widthScale) {
   if (!_particleLayer) return;
   const key = d => `${d.exporter}|${d.importer}`;
 
-  // flows is already sorted descending by netValue; take top 15 that touch top-3
+  // flows is already sorted descending by netValue.
+  // Use a value-based threshold (≥10% of the top flow) rather than a fixed count,
+  // so the selection reflects genuinely major corridors regardless of the year.
+  const maxVal = flows[0]?.netValue || 1;
   const topFlows = flows
-    .filter(d => topSet.has(d.exporter) || topSet.has(d.importer))
-    .slice(0, 15);
+    .filter(d => (topSet.has(d.exporter) || topSet.has(d.importer))
+                 && d.netValue >= maxVal * 0.10)
+    .slice(0, 25);
 
   const particles = _particleLayer.selectAll('.anim-particle-arc')
     .data(topFlows, key);
@@ -412,6 +418,42 @@ function _injectOverlays() {
       <div class="ap-tl-track"><div id="ap-tl-fill"></div></div>
     </div>`;
   area.appendChild(panel);
+
+  // Map annotation legend — appended to #map-container (position: relative in anim-mode)
+  const mapContainer = document.getElementById('map-container');
+  if (mapContainer) {
+    const legend = document.createElement('div');
+    legend.id = 'anim-legend';
+    legend.innerHTML = `
+      <div class="al-section">
+        <div class="al-section-title">Arc colours</div>
+        <div class="al-row">
+          <span class="al-item"><span class="al-swatch" style="background:#009EDB"></span>N→S</span>
+          <span class="al-item"><span class="al-swatch" style="background:#72BF44"></span>S→N</span>
+          <span class="al-item"><span class="al-swatch" style="background:#FBAF17"></span>S→S</span>
+          <span class="al-item"><span class="al-swatch" style="background:#AEA29A"></span>N→N</span>
+        </div>
+      </div>
+      <div class="al-divider"></div>
+      <div class="al-section">
+        <div class="al-section-title">Country nodes</div>
+        <div class="al-row">
+          <span class="al-item"><span class="al-dot" style="background:#009EDB"></span>Net exporter</span>
+          <span class="al-item"><span class="al-dot" style="background:#ED1847"></span>Net importer</span>
+          <span class="al-muted">· size = trade volume</span>
+        </div>
+      </div>
+      <div class="al-divider"></div>
+      <div class="al-section">
+        <div class="al-section-title">Highlights</div>
+        <div class="al-row">
+          <span class="al-item"><span class="al-dot" style="background:#009EDB;box-shadow:0 0 4px #009EDB"></span>Top 3 exporters</span>
+          <span class="al-item"><span class="al-dot" style="background:#72BF44;box-shadow:0 0 4px #72BF44"></span>Top 3 importers</span>
+          <span class="al-item"><span class="al-dash"></span>Major corridors (≥10% of max)</span>
+        </div>
+      </div>`;
+    mapContainer.appendChild(legend);
+  }
 }
 
 function _updateOverlays(year, index) {

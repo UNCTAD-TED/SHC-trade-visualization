@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(npx vite *)",
+      "Bash(echo \"started, pid $!\")",
+      "Bash(node /c/tmp/fs-shot.mjs)"
+    ]
+  }
+}

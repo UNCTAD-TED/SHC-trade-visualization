@@ -10,12 +10,12 @@
         /* 1. KPIバーの上の線を非表示にする */
         #main-header { border-bottom: none !important; }
         #kpi-bar { border-top: none !important; box-shadow: none !important; }
-        
+
         /* 2. 画面の一番下に水色の線を配置する */
         body {
             border-bottom: 4px solid #009edb !important;
         }
-        
+
         /* 3. KPIバーとLegendの背景色を変更する */
         #kpi-bar, #legend-panel {
             background-color: #f2f8fc !important;
@@ -30,6 +30,18 @@
             transition: background 0.15s, color 0.15s;
         }
         #anim-btn:hover { background: #009edb; color: #fff; }
+
+        /* ── Fact Sheet page link ── */
+        #factsheet-link {
+            display: flex; align-items: center; gap: 5px;
+            padding: 3px 11px; font-size: 12px; font-weight: 600;
+            font-family: Inter, Arial, sans-serif; text-decoration: none;
+            border: 1px solid #b4501f; border-radius: 5px;
+            background: #b4501f; color: #fff; cursor: pointer; white-space: nowrap;
+            transition: background 0.15s, box-shadow 0.15s;
+        }
+        #factsheet-link:hover { background: #8c3c15; box-shadow: 0 2px 8px rgba(180,80,31,0.3); }
+        #factsheet-link svg { flex-shrink: 0; }
 
         /* ── Right-side anim controls (hidden normally) ── */
         #anim-header-right {
@@ -177,6 +189,40 @@
             font-size: 10px; font-family: Inter, monospace;
             color: #6e6259; white-space: nowrap; flex-shrink: 0;
         }
+
+        /* ── Map annotation legend (shown during animation mode) ── */
+        #anim-legend {
+            position: absolute;
+            bottom: 18px;
+            left: 12px;
+            background: rgba(255,255,255,0.93);
+            border: 1px solid #ded9d5;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+            color: #3a3530;
+            pointer-events: none;
+            z-index: 15;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.09);
+        }
+        .al-section { margin-bottom: 4px; }
+        .al-section:last-child { margin-bottom: 0; }
+        .al-section-title {
+            font-size: 8.5px; font-weight: 700; color: #aea29a;
+            text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px;
+        }
+        .al-divider { height: 1px; background: #ebeae6; margin: 5px 0; }
+        .al-row { display: flex; gap: 10px; align-items: center; }
+        .al-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .al-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .al-swatch { width: 14px; height: 4px; border-radius: 1px; flex-shrink: 0; }
+        .al-muted { color: #aea29a; font-size: 10px; white-space: nowrap; }
+        .al-dash {
+            width: 18px; height: 0;
+            border-top: 2px dashed rgba(80,80,80,0.45);
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -304,6 +350,10 @@
 
                 <div class="ctrl-divider"></div>
                 <button id="anim-btn" title="Auto-play 2015–2024 with bar chart race">&#9654; Animate</button>
+                <a id="factsheet-link" href="factsheet.html" title="Open the SMEP fact sheet">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+                    Fact Sheet
+                </a>
 
             </div><!-- /.header-controls -->
 
