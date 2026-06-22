@@ -382,20 +382,34 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
 }
 .fs-scrolly-steps { grid-column: 1; grid-row: 1; padding: 30vh 0 8vh; }
+// Text-only editorial steps (no card chrome); dimmed until centred
 .fs-step-card {
-  background: @fs-card; border: 1px solid @fs-line; border-radius: @radius-xl;
-  padding: 26px 28px; margin-bottom: 72vh; box-shadow: @shadow-sm;
-  opacity: 0.4; transform: translateY(6px);
-  transition: opacity 0.45s ease, transform 0.45s ease, box-shadow 0.45s ease, border-color 0.45s ease;
+  max-width: 30ch; margin-bottom: 78vh;
+  opacity: 0.28; transform: translateY(12px); filter: saturate(0.7);
+  transition: opacity 0.55s ease, transform 0.55s ease, filter 0.55s ease;
 }
 .fs-step-card:last-child { margin-bottom: 8vh; }
-.fs-step-card.is-active { opacity: 1; transform: none; box-shadow: @shadow-lg; border-color: fade(@fs-rust, 42%); }
-.fs-step-eyebrow {
-  display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
-  color: @fs-rust; margin-bottom: 10px;
+.fs-step-card.is-active { opacity: 1; transform: none; filter: none; }
+.fs-step-index {
+  display: block; font-size: clamp(38px, 4.4vw, 58px); font-weight: 800; line-height: 0.85;
+  letter-spacing: -0.04em; color: @fs-line; font-feature-settings: "tnum";
+  margin-bottom: 14px; transition: color 0.55s ease;
 }
-.fs-step-card h3 { font-size: clamp(20px, 2.3vw, 26px); font-weight: 800; color: @fs-ink; margin: 0 0 10px; line-height: 1.2; }
-.fs-step-card p { font-size: 15px; line-height: 1.6; color: @fs-ink-soft; margin: 0; b { color: @fs-rust; font-weight: 800; font-feature-settings: "tnum"; } }
+.fs-step-card.is-active .fs-step-index { color: fade(@fs-rust, 38%); }
+.fs-step-eyebrow {
+  display: flex; align-items: center; gap: 11px;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
+  color: @fs-rust; margin-bottom: 14px;
+  &::before { content: ""; width: 26px; height: 2px; background: @fs-rust; flex-shrink: 0; }
+}
+.fs-step-card h3 {
+  font-size: clamp(25px, 2.9vw, 35px); font-weight: 800; color: @fs-ink;
+  margin: 0 0 16px; line-height: 1.12; letter-spacing: -0.02em;
+}
+.fs-step-card p {
+  font-size: clamp(15px, 1.15vw, 17px); line-height: 1.66; color: @fs-ink-soft; margin: 0;
+  b { color: @fs-rust; font-weight: 800; font-feature-settings: "tnum"; }
+}
 .fs-scrolly-progress { display: flex; gap: 7px; }
 .fs-scrolly-progress span { width: 28px; height: 4px; border-radius: 2px; background: @fs-line; transition: background 0.35s ease; }
 .fs-scrolly-progress span.is-on { background: @fs-rust; }
@@ -899,8 +913,14 @@
   .fs-scrolly-graphic { grid-column: 1; grid-row: 1; }
   .fs-scrolly-steps { grid-column: 1; grid-row: 1; padding: 50vh 0 14vh; z-index: 3; }
   .fs-scrolly-sticky { position: sticky; top: 56px; height: 44vh; gap: 10px; }
-  .fs-step-card { margin-bottom: 38vh; background: fade(@fs-card, 93%); backdrop-filter: blur(4px); }
+  // Steps scroll over the map: a faint frosted panel keeps text legible
+  .fs-step-card {
+    margin-bottom: 38vh; max-width: none; padding: 22px 22px 24px; border-radius: @radius-lg;
+    background: fade(@fs-paper, 86%); backdrop-filter: blur(6px);
+  }
   .fs-step-card:last-child { margin-bottom: 6vh; }
+  .fs-step-index { font-size: 34px; margin-bottom: 8px; }
+  .fs-step-card h3 { font-size: clamp(22px, 6vw, 27px); }
 }
 @media (max-width: 560px) {
   .fs-ml-name { font-size: 11px; }
