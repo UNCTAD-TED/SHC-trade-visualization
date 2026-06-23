@@ -6,6 +6,7 @@ import { RegionConfig } from './regions.js';
 import { CountrySelector } from './countrySelector.js';
 import { DataLoader } from './dataLoader.js';
 import { TradeMap } from './map.js';
+import { Tour } from './tour/tour.js';
 
 const App = {
     exporterSelector: null,
@@ -45,6 +46,10 @@ const App = {
         this.exporterSelector.updateSelection();
         this.updateDashboard();
         document.getElementById('loader').classList.add('hidden');
+
+        // Guided Story tour: wires the header button + first-visit auto-launch
+        this.tour = Tour;
+        Tour.init(this);
     },
 
     setupEventListeners() {

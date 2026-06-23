@@ -118,7 +118,7 @@ export const SOCIOECONOMIC = {
   familyBenefitLabel: 'report family financial benefits',
   ownership: { male: 66, female: 34 },
   mobility: {
-    stages: ['Bale carrier', 'Vendor', 'Retailer', 'Importer'],
+    stages: ['Bale carrier', 'Vendors', 'Retailers', 'Importer'],
     stats: [
       { pct: 89, label: 'of retailers reported advancing up the value chain' },
       { pct: 61, label: 'of tertiary-educated traders advanced up the value chain' },

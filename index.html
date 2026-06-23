@@ -244,7 +244,7 @@
                 <div class="ctrl-divider"></div>
 
                 <!-- Region filter -->
-                <div class="ctrl-pill">
+                <div class="ctrl-pill" id="region-group">
                     <button class="region-btn btn-toggle active" data-region="Global" title="Global">All</button>
                     <button class="region-btn btn-toggle" data-region="Africa"   title="Africa">Africa</button>
                     <button class="region-btn btn-toggle" data-region="Americas" title="Americas">Americas</button>
@@ -274,13 +274,13 @@
                 <div class="ctrl-divider"></div>
 
                 <!-- Metric toggle: trade value (USD) vs trade weight (tonnes) -->
-                <div class="ctrl-pill" title="Switch between trade value (USD) and trade weight (tonnes)">
+                <div class="ctrl-pill" id="metric-group" title="Switch between trade value (USD) and trade weight (tonnes)">
                     <button class="metric-btn btn-toggle active" data-metric="value">Value</button>
                     <button class="metric-btn btn-toggle" data-metric="weight">Weight</button>
                 </div>
 
                 <!-- Flow direction filter -->
-                <div class="ctrl-pill" title="Filter by economic flow direction">
+                <div class="ctrl-pill" id="flow-filter-group" title="Filter by economic flow direction">
                     <span class="ctrl-flows-label">Flows</span>
                     <label class="flow-label" title="North to South">
                         <input type="checkbox" class="flow-checkbox" value="north-south" checked>
@@ -369,6 +369,7 @@
                 </div>
 
                 <div class="ctrl-divider"></div>
+                <button id="tour-btn" title="Take a guided tour of the visualization">Tour</button>
                 <button id="anim-btn" title="Auto-play 2015–2024 with bar chart race">&#9654; Animate</button>
                 <a id="factsheet-link" href="factsheet.html" title="Open the SMEP fact sheet">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
