@@ -3,8 +3,8 @@
 //
 // A lightweight, dependency-free walkthrough that *drives the real app* (it calls
 // the same App / DataLoader / TradeMap APIs the UI uses) while a moving spotlight
-// and a frosted narration card explain each feature. Hybrid: every chapter performs
-// its action automatically, but the user can pause autoplay and try it themselves.
+// and a UNCTAD-styled narration card explain each feature. Every chapter performs
+// its action live; the user advances manually (Next / Back / dots / arrow keys).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { STATE } from '../config.js';
@@ -21,9 +21,8 @@ export const Tour = {
     steps: [],
     index: 0,
     active: false,
-    autoplay: true,
-    _autoTimer: null,
     _reposTimer: null,
+    _settleTimers: [],
     _els: null,            // { spot, card, bar }
     _ctx: null,
     _busy: false,
@@ -36,10 +35,10 @@ export const Tour = {
 
         document.getElementById('tour-btn')?.addEventListener('click', () => this.start());
 
-        // First visit → auto-launch once (after the map has settled)
+        // First visit → auto-open once (the user then advances manually)
         let seen = false;
         try { seen = !!localStorage.getItem(SEEN_KEY); } catch { /* private mode */ }
-        if (!seen) setTimeout(() => { if (!this.active) this.start({ autoplay: true }); }, 900);
+        if (!seen) setTimeout(() => { if (!this.active) this.start(); }, 900);
     },
 
     _buildContext() {
@@ -88,10 +87,9 @@ export const Tour = {
     },
 
     // ── Lifecycle ───────────────────────────────────────────────────────────
-    async start(opts = {}) {
+    async start() {
         if (this.active) return;
         this.active = true;
-        this.autoplay = opts.autoplay !== false;
         this.index = 0;
         try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* ignore */ }
 
@@ -104,7 +102,7 @@ export const Tour = {
     async end() {
         if (!this.active) return;
         this.active = false;
-        clearTimeout(this._autoTimer);
+        this._clearSettle();
         clearTimeout(this._reposTimer);
         window.removeEventListener('resize', this._onResize);
         document.removeEventListener('keydown', this._onKey, true);
@@ -128,7 +126,7 @@ export const Tour = {
     async goTo(i) {
         if (this._busy) return;
         this._busy = true;
-        clearTimeout(this._autoTimer);
+        this._clearSettle();
 
         const prev = this.steps[this.index];
         const step = this.steps[i];
@@ -147,21 +145,21 @@ export const Tour = {
         this._updateProgress();
 
         this._busy = false;
-        this._scheduleAuto(step);
+        // Re-measure shortly after, so spotlights on elements that slide/zoom in
+        // (e.g. the insight side-panel) settle onto their final position.
+        this._scheduleSettle();
     },
 
-    _scheduleAuto(step) {
-        clearTimeout(this._autoTimer);
-        if (!this.autoplay || step.advance === 'manual') return;
-        const dwell = step.dwell ?? 6500;
-        this._autoTimer = setTimeout(() => { if (this.active && this.autoplay) this.next(); }, dwell);
+    // Re-anchor a few times after a step renders to catch CSS transitions
+    // (panel slide ~300ms, map zoom) without any auto-advance.
+    _scheduleSettle() {
+        this._clearSettle();
+        [140, 360, 680].forEach(d =>
+            this._settleTimers.push(setTimeout(() => { if (this.active) this._reanchor(); }, d)));
     },
-
-    toggleAuto() {
-        this.autoplay = !this.autoplay;
-        this._els?.card.querySelector('.tour-card__auto')?.classList.toggle('is-playing', this.autoplay);
-        if (this.autoplay) this._scheduleAuto(this.steps[this.index]);
-        else clearTimeout(this._autoTimer);
+    _clearSettle() {
+        this._settleTimers.forEach(clearTimeout);
+        this._settleTimers = [];
     },
 
     // ── DOM ─────────────────────────────────────────────────────────────────
@@ -169,9 +167,6 @@ export const Tour = {
         const spot = document.createElement('div'); spot.className = 'tour-spot';
         const bar  = document.createElement('div'); bar.className = 'tour-progressbar';
         const card = document.createElement('div'); card.className = 'tour-card';
-        // Pause autoplay while the pointer is on the card (reading)
-        card.addEventListener('mouseenter', () => clearTimeout(this._autoTimer));
-        card.addEventListener('mouseleave', () => this._scheduleAuto(this.steps[this.index]));
         document.body.append(spot, bar, card);
         this._els = { spot, card, bar };
     },
@@ -197,9 +192,6 @@ export const Tour = {
             </div>
             <div class="tour-card__body">${body}</div>
             <div class="tour-card__foot">
-                <button class="tour-card__auto ${this.autoplay ? 'is-playing' : ''}" data-act="auto" title="Toggle autoplay">
-                    ${this.autoplay ? 'Pause' : 'Play'}
-                </button>
                 <div class="tour-card__dots">${dots}</div>
                 <button class="tour-card__btn tour-card__btn--ghost" data-act="prev" ${this.index === 0 ? 'disabled' : ''}>Back</button>
                 <button class="tour-card__btn tour-card__btn--primary" data-act="next">${isLast ? 'Done' : 'Next →'}</button>
@@ -211,7 +203,6 @@ export const Tour = {
                 if (act === 'end') this.end();
                 else if (act === 'next') this.next();
                 else if (act === 'prev') this.prev();
-                else if (act === 'auto') this.toggleAuto();
             });
         });
         card.querySelectorAll('.tour-card__dot').forEach(d =>

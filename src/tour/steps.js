@@ -38,11 +38,10 @@ export const TOUR_STEPS = [
         title: 'The global second-hand clothing trade',
         body: `This map visualises the worldwide flow of <b>second-hand clothing&nbsp;(SHC)</b>.
                <br><br>We'll walk through its filters and analytics in <b>10 short chapters</b>,
-               driving the map live as we go. Press <b>Play</b> to advance hands-free, or use the
-               <b>&larr;&nbsp;&rarr;</b> keys to move at your own pace.`,
+               driving the map live as we go. Click <b>Next</b> (or press the <b>&rarr;</b> key)
+               to advance at your own pace.`,
         placement: 'center',
         async onEnter(ctx) { await ctx.resetView(); },
-        dwell: 7000,
     },
 
     // 02 ─ Reading the map ────────────────────────────────────────────────────
@@ -72,7 +71,7 @@ export const TOUR_STEPS = [
                It refreshes instantly whenever you change the year or any filter.`,
         target: '#kpi-bar',
         placement: 'top',
-        dock: 'tr',
+        dock: 'br',
         dwell: 8000,
     },
 
@@ -81,7 +80,7 @@ export const TOUR_STEPS = [
         id: 'flows',
         title: 'The North–South story',
         body: `Most used clothing flows from <b>developed (North) to developing (South)</b> economies.
-               We've isolated <span class="tour-chip">N→S</span> flows only. Toggle these boxes to extract
+               For example, we've isolated <span class="tour-chip">N→S</span> flows only. Toggle these boxes to extract
                any single direction of trade.`,
         target: '#flow-filter-group',
         placement: 'bottom',
@@ -99,7 +98,7 @@ export const TOUR_STEPS = [
     {
         id: 'metric',
         title: 'Value or weight?',
-        body: `Switch between <b>Value (USD)</b> and <b>Weight (tonnes)</b>. We've switched to weight —
+        body: `Switch between <b>Value (USD)</b> and <b>Weight (tonnes)</b>. We've switched to weight,
                units become <span class="tour-chip">Mt / kt</span>, revealing the heavy textile streams that
                are cheap by value but huge by mass. The threshold buttons relabel to match automatically.`,
         target: '#metric-group',
@@ -172,7 +171,7 @@ export const TOUR_STEPS = [
     {
         id: 'region',
         title: 'Focus by region',
-        body: `The region buttons reframe the whole view. We've zoomed into <b>Africa</b> — only
+        body: `The region buttons reframe the whole view. We've zoomed into <b>Africa</b>, only
                intra-regional SHC trade is shown. Combine this with the <b>Exporter / Importer</b>
                pickers to analyse any custom set of countries.`,
         target: '#region-group',
@@ -201,7 +200,7 @@ export const TOUR_STEPS = [
         title: 'Travel through time',
         body: `<b>Animate</b> auto-plays 2015→2024 as a <b>bar-chart race</b>. Watch the rankings shuffle
                and volumes grow as motion rather than numbers.
-               <br><br>It's playing now — moving to the next chapter will stop it automatically.`,
+               <br><br>It's playing now, moving to the next chapter will stop it automatically.`,
         placement: 'center',
         dim: false,            // keep the bar-chart race fully visible
         cardAnchor: 'bottom',
