@@ -67,10 +67,10 @@ export const QUALITY = {
 // 03 — Supply chain & trade flows (2-stage sorting via Pakistan & India)
 export const SUPPLY_CHAIN = {
   origin: { name: 'United States of America', iso2: 'us' },
-  sorting: { label: '2-stage sorting', note: 'Concentrated in Pakistan & India' },
+  sorting: { label: '2-stage sorting', note: 'Concentrated in Pakistan, Malaysia & UAE' },
   destinations: [
     { name: 'Uganda', iso2: 'ug', totalKg: 80.0, usKg: 2.0 },
-    { name: 'United Republic of Tanzania', iso2: 'tz', totalKg: 86.3, usKg: 7.8 },
+    { name: 'United Republic of Tanzania', iso2: 'tz', totalKg: 86.3, usKg: 8.0 },
   ],
   unit: 'million kg',
   source: 'UN Comtrade; Full Cycle Resource (report §2)',
@@ -114,7 +114,7 @@ export const AFRICA_CONTEXT = {
 // 06 — Socioeconomic impact
 export const SOCIOECONOMIC = {
   tradersSurveyed: 2147,
-  familyBenefitPct: 99,
+  familyBenefitPct: 98,
   familyBenefitLabel: 'report family financial benefits',
   ownership: { male: 66, female: 34 },
   mobility: {
@@ -130,7 +130,7 @@ export const SOCIOECONOMIC = {
 
 // 07 — Affordability & cost structure (Uganda) + container costs
 export const AFFORDABILITY = {
-  dailyIncomeUSD: 2.60,
+  dailyIncomeUSD: 2.68,
   dailyIncomeNote: 'Estimated daily income for approximately 50% of Ugandans (World Bank Poverty and Equity Index).',
   items: [
     { key: 'new', label: 'New clothing item', usd: 6.36 },
@@ -139,9 +139,9 @@ export const AFFORDABILITY = {
   affordabilityNote: 'Cost expressed in days of income for an average Ugandan household.',
   containerCosts: [
     { country: 'Uganda', usd: 57080, dutyPct: 77 },
-    { country: 'United Republic of Tanzania', usd: 47954, dutyPct: 61.4 },
+    { country: 'United Republic of Tanzania', usd: 47954, dutyPct: 38 },
   ],
-  containerNote: 'CIF cost of a 40-ft container, inclusive of taxes, duties and levies; the ring shows the duty/levy share of landed cost.',
+  containerNote: 'Total cost of a 40-ft container, inclusive of taxes, duties and levies; the ring shows the duty/levy share of total cost.',
   source: 'TRA / URA, analysed by Full Cycle Resource; World Bank (report §4)',
 };
 

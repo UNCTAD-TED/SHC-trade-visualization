@@ -7,6 +7,7 @@ import { CountrySelector } from './countrySelector.js';
 import { DataLoader } from './dataLoader.js';
 import { TradeMap } from './map.js';
 import { Tour } from './tour/tour.js';
+import { CsvExport } from './csvExport.js';
 
 const App = {
     exporterSelector: null,
@@ -246,6 +247,9 @@ const App = {
 
         // Sync initial active state to mobile panel buttons
         this.syncMobileFilterState();
+
+        // ── CSV export (flows + country summary) ──────────────
+        CsvExport.init();
 
         // ── Animation mode ────────────────────────────────────
         document.getElementById('anim-btn')?.addEventListener('click', startAnimation);
@@ -491,6 +495,10 @@ const App = {
             searouteBtn.classList.remove('active');
         }
 
+        // Country-level CSV export belongs to single-country focus
+        const exportBtn = document.getElementById('panel-export-btn');
+        if (exportBtn) exportBtn.style.display = '';
+
         if (TradeMap && TradeMap.setFocus) {
             // Ensure routes.json is loaded before switching to sea-route rendering
             const doFocus = () => TradeMap.setFocus(iso);
@@ -525,6 +533,7 @@ const App = {
         const impName = STATE.countryNames[impIso] || impIso;
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
 
+        this._arcPair = { expIso, impIso };   // consumed by the corridor CSV export button
         document.getElementById('arc-modal-title').textContent = `${expName}  →  ${impName}`;
         document.getElementById('arc-modal-meta').textContent = `Net exporter: ${expName} · ${STATE.year}`;
         document.getElementById('arc-modal-body').innerHTML = this._buildArcDetailContent(expIso, impIso, mf);
@@ -1437,9 +1446,11 @@ const App = {
             n > 0 ? `${n} connection${n > 1 ? 's' : ''} · ${STATE.year}` : `Draw mode · ${STATE.year}`;
         document.getElementById('panel-body').innerHTML = this._buildConnectionsContent(mf);
 
-        // The Sea Route button belongs to single-country focus — disable it here.
+        // The Sea Route button and country CSV export belong to single-country focus.
         const searouteBtn = document.getElementById('searoute-btn');
         if (searouteBtn) { searouteBtn.disabled = true; searouteBtn.classList.remove('active'); }
+        const exportBtn = document.getElementById('panel-export-btn');
+        if (exportBtn) exportBtn.style.display = 'none';
 
         document.getElementById('insight-panel').classList.add('open');
         document.body.classList.add('insight-open');

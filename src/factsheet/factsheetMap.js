@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Fact 03 — geographic flow infographic
 // Renders the secondhand-clothing supply chain on the project's own world
-// TopoJSON: United States → 2-stage sorting (Pakistan & India) → East Africa.
+// TopoJSON: United States → 2-stage sorting (Pakistan, Malaysia & UAE) → East Africa.
 // Great-circle arcs are projected through geoNaturalEarth1, sized by trade
 // volume, and animated (draw-on + flowing particles) when the section reveals.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 // Geographic anchors (lon, lat). Sorting hub sits between Karachi and Mumbai.
 const NODES = {
   us:      { lon: -97, lat: 39.5, name: 'United States', iso2: 'us', kind: 'origin' },
-  sorting: { lon: 70,  lat: 25.5, name: '2-stage sorting', sub: 'Pakistan & India', kind: 'hub' },
+  sorting: { lon: 70,  lat: 25.5, name: '2-stage sorting', sub: 'Pakistan, Malaysia & UAE', kind: 'hub' },
   ug:      { lon: 32.3, lat: 1.4,  name: 'Uganda', iso2: 'ug', kind: 'dest' },
   tz:      { lon: 34.9, lat: -6.2, name: 'United Rep. of Tanzania', iso2: 'tz', kind: 'dest' },
 };
@@ -133,7 +133,7 @@ export async function renderSupplyMap(container, dests) {
       overlay.appendChild(el);
     };
     label('us', `<span class="fs-ml-name">United States</span><span class="fs-ml-sub">Export origin</span>`, { dx: -16, dy: -8, align: 'right' });
-    label('sorting', `<span class="fs-ml-name">2-stage sorting</span><span class="fs-ml-sub">Pakistan &amp; India</span>`, { dx: 22, dy: -8, align: 'left' });
+    label('sorting', `<span class="fs-ml-name">2-stage sorting</span><span class="fs-ml-sub">Pakistan, Malaysia &amp; UAE</span>`, { dx: 22, dy: -8, align: 'left' });
     const ug = dests.find((d) => d.iso2 === 'ug') || {};
     const tz = dests.find((d) => d.iso2 === 'tz') || {};
     label('ug', `<span class="fs-ml-name">Uganda</span><span class="fs-ml-fig">${(ug.totalKg ?? 80).toFixed(1)}M kg</span>`, { dx: -18, dy: -26, align: 'right' });

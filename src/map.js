@@ -645,6 +645,9 @@ export const TradeMap = {
             .style("opacity", nodeOpacity);
 
         // --- 3. Labels ---
+        // Countries placed above their node to avoid overlapping adjacent labels.
+        const LABEL_ABOVE = new Set(['GTM', 'KOR']);
+
         const sortedNodes = activeNodes.slice().sort((a, b) => nodeStats[b].grossVolume - nodeStats[a].grossVolume);
         const volumeThreshold = sortedNodes.length > 15 ? nodeStats[sortedNodes[14]].grossVolume : 0;
 
@@ -688,8 +691,13 @@ export const TradeMap = {
             .attr("stroke-linejoin", "round")
             // Position set immediately (same reason as nodes — a following focus transition
             // would otherwise cancel an in-flight position tween and freeze labels).
-            .attr("x", d => projOf(d)[0] + (radiusScale(nodeStats[d].grossVolume) / currentK) + 4)
-            .attr("y", d => projOf(d)[1] + 4)
+            .attr("text-anchor", d => LABEL_ABOVE.has(d) ? "middle" : "start")
+            .attr("x", d => LABEL_ABOVE.has(d)
+                ? projOf(d)[0]
+                : projOf(d)[0] + (radiusScale(nodeStats[d].grossVolume) / currentK) + 4)
+            .attr("y", d => LABEL_ABOVE.has(d)
+                ? projOf(d)[1] - (radiusScale(nodeStats[d].grossVolume) / currentK) - 3
+                : projOf(d)[1] + 4)
             .attr("font-size", (8.5 / Math.sqrt(currentK)) + "px") // 10pxから8.5pxへ少し縮小
             .attr("stroke-width", 2.5 / currentK)
             .transition().duration(750)
