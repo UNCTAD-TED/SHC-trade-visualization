@@ -34,7 +34,17 @@ async function loadGeo() {
   return geoCache;
 }
 
-export async function renderSupplyMap(container, dests) {
+// Text overlay labels are the only locale-specific piece of this module — every
+// other caller (any language) shares the same geometry/animation logic below.
+const DEFAULT_LABELS = {
+  us: 'United States', usSub: 'Export origin',
+  sorting: '2-stage sorting', sortingSub: 'Pakistan, Malaysia & UAE',
+  ug: 'Uganda', tz: 'Tanzania',
+  formatKg: (millionKg) => `${millionKg.toFixed(1)}M kg`,
+};
+
+export async function renderSupplyMap(container, dests, labels = {}) {
+  const L = { ...DEFAULT_LABELS, ...labels };
   const land = await loadGeo();
   let resizeRAF = null;
   let stage = 0;
@@ -132,12 +142,12 @@ export async function renderSupplyMap(container, dests) {
       el.innerHTML = html;
       overlay.appendChild(el);
     };
-    label('us', `<span class="fs-ml-name">United States</span><span class="fs-ml-sub">Export origin</span>`, { dx: -16, dy: -8, align: 'right' });
-    label('sorting', `<span class="fs-ml-name">2-stage sorting</span><span class="fs-ml-sub">Pakistan, Malaysia &amp; UAE</span>`, { dx: 22, dy: -8, align: 'left' });
+    label('us', `<span class="fs-ml-name">${L.us}</span><span class="fs-ml-sub">${L.usSub}</span>`, { dx: -16, dy: -8, align: 'right' });
+    label('sorting', `<span class="fs-ml-name">${L.sorting}</span><span class="fs-ml-sub">${L.sortingSub}</span>`, { dx: 22, dy: -8, align: 'left' });
     const ug = dests.find((d) => d.iso2 === 'ug') || {};
     const tz = dests.find((d) => d.iso2 === 'tz') || {};
-    label('ug', `<span class="fs-ml-name">Uganda</span><span class="fs-ml-fig">${(ug.totalKg ?? 80).toFixed(1)}M kg</span>`, { dx: -18, dy: -26, align: 'right' });
-    label('tz', `<span class="fs-ml-name">Tanzania</span><span class="fs-ml-fig">${(tz.totalKg ?? 86.3).toFixed(1)}M kg</span>`, { dx: 16, dy: 14, align: 'left' });
+    label('ug', `<span class="fs-ml-name">${L.ug}</span><span class="fs-ml-fig">${L.formatKg(ug.totalKg ?? 80)}</span>`, { dx: -18, dy: -26, align: 'right' });
+    label('tz', `<span class="fs-ml-name">${L.tz}</span><span class="fs-ml-fig">${L.formatKg(tz.totalKg ?? 86.3)}</span>`, { dx: 16, dy: 14, align: 'left' });
     container.appendChild(overlay);
 
     applyStage(false); // set initial arc/node state for the current stage without animation

@@ -1,0 +1,209 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// SMEP Fact Sheet — Japanese typographic layer
+// Loaded on top of factsheet.less, for factsheet.ja.js only.
+//
+// The base sheet is tuned for Latin: tight display leading, negative tracking on
+// headings, wide small-caps tracking on labels, and measures set in `ch`. None of
+// those settings transfer to Japanese, because the two scripts are built
+// differently:
+//
+//   · Width      — a kana/kanji glyph fills a full em; Latin "0" (the `ch` unit)
+//                  is only ~0.55em wide, so every `ch` measure here runs ~45%
+//                  short of its intended character count in Japanese.
+//   · Density    — Japanese has no ascenders, descenders or word spaces to open
+//                  the page up, so it needs noticeably more leading than Latin
+//                  at the same size, and no negative tracking.
+//   · Alignment  — uniform-width glyphs justify cleanly into a grid, without the
+//                  rivers that make justified Latin ugly.
+//   · Wrapping   — a line may break between almost any two characters, so the
+//                  measure, not the word, decides where lines fall.
+//
+// Measures below are expressed in `em`, where 1em = one Japanese character, so
+// the numbers read as the character counts they actually are.
+//
+// Note on tracking: the Japanese tracking that pairs with `palt` is applied to
+// text rules individually rather than to `.fs-body`. The figures are this
+// design's loudest element and several carry their own display tracking from the
+// base sheet; a blanket inherited value would flatten those, and fighting it back
+// runs into `.fs-count` sitting on the very elements it would need to spare.
+// ═══════════════════════════════════════════════════════════════════════════
+@import 'variables.less';
+
+// Comfortable Japanese leading. Body copy sits near 1.85; large display type is
+// set tighter (a full 1.85 would scatter a 46px heading down the page).
+@ja-leading-body:    1.85;
+@ja-leading-compact: 1.75;  // dense label/caption blocks
+@ja-leading-display: 1.45;  // section headings and titles
+
+// Positive tracking restores the air that `palt` takes back out of the line.
+@ja-tracking: 0.02em;
+
+// ── Base ────────────────────────────────────────────────────────────────────
+.fs-body {
+  font-family: Inter, 'Noto Sans JP', "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  // `palt` swaps Japanese glyphs onto proportional widths. Without it every
+  // 、。「」（） carries a full em of built-in white space, which punches holes
+  // through a line and is the clearest giveaway of untuned Japanese type.
+  font-feature-settings: "palt" 1;
+
+  // Full kinsoku: keeps small kana (っゃゅょ) and the長音符 off the start of a
+  // line, and punctuation off the end.
+  line-break: strict;
+}
+
+// ── Tracking on label styles ────────────────────────────────────────────────
+// These are set in wide uppercase tracking (0.08–0.26em) for Latin small-caps.
+// Japanese carries its own spacing, so wide tracking just breaks words apart.
+.fs-kicker,
+.fs-eyebrow,
+.fs-scrollcue,
+.fs-grades-head,
+.fs-mobility-head,
+.fs-container-head,
+.fs-step-eyebrow,
+.fs-origin-name,
+.fs-income-cap,
+.fs-donut-cap,
+.fs-sector-title,
+.fs-report-kicker,
+.fs-meta-block strong,
+.fs-cta-btn { letter-spacing: 0.04em; }
+
+// ── Display type ────────────────────────────────────────────────────────────
+// Negative tracking is a Latin trick for closing loose sidebearings; on
+// full-width Japanese glyphs it makes them collide. `text-wrap: balance` evens
+// out the lines of any heading that does wrap rather than leaving a stub line.
+.fs-hero-title {
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+}
+.fs-h2 {
+  line-height: @ja-leading-display;
+  letter-spacing: 0.01em;
+  max-width: 20em;
+  text-wrap: balance;
+}
+.fs-h2-light { max-width: 22em; }
+.fs-step-card h3,
+.fs-report-title,
+.fs-outro-title {
+  line-height: @ja-leading-display;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+
+// ── Body copy ───────────────────────────────────────────────────────────────
+// Measures re-cut in em (= characters). Japanese reads comfortably at roughly
+// 35–45 characters a line; the base sheet's 60ch works out to only ~33.
+.fs-lead,
+.fs-intro {
+  line-height: 1.9;
+  letter-spacing: @ja-tracking;
+  max-width: 38em;
+}
+.fs-hero-sub  { line-height: 1.8; letter-spacing: @ja-tracking; max-width: 26em; }
+.fs-hero-hook { line-height: 1.8; letter-spacing: @ja-tracking; max-width: 24em; }
+.fs-step-card { max-width: 25em; }
+.fs-step-card p { line-height: 1.95; letter-spacing: @ja-tracking; }
+.fs-china-callout { max-width: 40em; }
+.fs-china-callout p { line-height: 1.9; letter-spacing: @ja-tracking; }
+.fs-policy-text { line-height: 1.9; letter-spacing: @ja-tracking; }
+.fs-report-text { line-height: @ja-leading-body; letter-spacing: @ja-tracking; max-width: 34em; }
+.fs-outro-cta p { line-height: @ja-leading-body; letter-spacing: @ja-tracking; }
+.fs-africa-label { line-height: @ja-leading-body; letter-spacing: @ja-tracking; max-width: 24em; }
+.fs-source { line-height: @ja-leading-body; letter-spacing: @ja-tracking; max-width: 44em; }
+.fs-note { letter-spacing: @ja-tracking; max-width: 40em; }
+
+// ── Captions, labels and small print ────────────────────────────────────────
+.fs-bigstat-label { line-height: @ja-leading-compact; letter-spacing: @ja-tracking; max-width: 22em; }
+.fs-grade-callout p,
+.fs-nonrewear-note,
+.fs-wastebale-note { line-height: 1.8; letter-spacing: @ja-tracking; }
+.fs-wastebale-head { line-height: @ja-leading-compact; letter-spacing: @ja-tracking; }
+.fs-stat-label,
+.fs-mstat-label { line-height: 1.8; letter-spacing: @ja-tracking; }
+.fs-metric-label { line-height: @ja-leading-compact; letter-spacing: @ja-tracking; }
+.fs-meta-block p { line-height: @ja-leading-body; letter-spacing: @ja-tracking; }
+.fs-income-note { line-height: @ja-leading-body; letter-spacing: @ja-tracking; max-width: 19em; }
+.fs-step-label { line-height: 1.5; max-width: 7em; }
+.fs-grade-name,
+.fs-reweare-label,
+.fs-nonrewear-title,
+.fs-waste-title { letter-spacing: @ja-tracking; }
+
+// Map annotations are small and sit over the map, so they stay tighter than
+// running text — but still need more air than the Latin originals.
+.fs-ml-name { line-height: 1.35; }
+.fs-ml-sub  { line-height: 1.5; }
+
+// ── Value axis on the mobility staircase (section 05) ───────────────────────
+// The base rule pairs `writing-mode: vertical-rl` with `rotate(180deg)` so the
+// Latin word "VALUE" climbs bottom-to-top like a y-axis label. Japanese already
+// sets correctly top-to-bottom under vertical-rl, so that extra half-turn renders
+// 価値 upside down — drop it and let the vertical writing mode stand on its own.
+.fs-stair-axis span { transform: none; letter-spacing: 0.04em; }
+
+// ── Part-coins in the affordability pictogram (section 06) ──────────────────
+// One coin stands for one day's household income, so a 2.4-day price is two
+// coins and four tenths of a third. That remainder is cut out of the coin rather
+// than faded down: a clean vertical edge states "0.4 of one", where a translucent
+// whole coin only suggests it. --cut carries the share removed (60% here), so
+// the visible slice always matches the figure printed beside it.
+.fs-coin.is-cut { clip-path: inset(0 var(--cut) 0 0); }
+
+// ── Justification ───────────────────────────────────────────────────────────
+// Uniform character widths let Japanese justify into a clean rectangle, the
+// finish expected of set Japanese text. Applied only to the wider left-aligned
+// prose blocks: narrow columns and centred copy read better ragged.
+.fs-lead,
+.fs-intro,
+.fs-policy-text,
+.fs-report-text,
+.fs-china-callout p {
+  text-align: justify;
+  text-justify: inter-ideograph;
+}
+
+// Pull a word back off the previous line rather than let a paragraph end on one
+// or two stranded characters — the 泣き別れ that a trailing 「す。」or 「だ。」
+// leaves. Japanese hits this more often than Latin: with no word spaces to
+// absorb slack, the last line takes whatever is left over.
+.fs-lead,
+.fs-intro,
+.fs-hero-hook,
+.fs-step-card p,
+.fs-china-callout p,
+.fs-policy-text,
+.fs-report-text,
+.fs-outro-cta p,
+.fs-africa-label,
+.fs-bigstat-label,
+.fs-grade-callout p,
+.fs-nonrewear-note,
+.fs-stat-label,
+.fs-mstat-label,
+.fs-metric-label,
+.fs-income-note,
+.fs-meta-block p { text-wrap: pretty; }
+
+// ── Line breaking ───────────────────────────────────────────────────────────
+// Japanese permits a wrap between almost any two characters, so a country name
+// or katakana term can split mid-word at the line edge ("アメリ" / "カ合衆国").
+.fs-hero-sub strong { white-space: nowrap; }
+.fs-nowrap { white-space: nowrap; }
+
+// The supply-chain map's hub label is anchored to the right of its node, which
+// leaves it barely a third of the viewport at phone widths. The English original
+// just fits there; the same text in full-width Japanese glyphs runs past the
+// right edge and drags the whole page into horizontal scroll. Let this one label
+// wrap instead — the map labels are absolutely positioned, so extra lines cost
+// no layout elsewhere.
+@media (max-width: 560px) {
+  .fs-map-label.align-left {
+    white-space: normal; max-width: 31vw;
+    // keep-all stops Japanese breaking anywhere it likes; the label's own <wbr>
+    // marks supply the legal break points, at the ・ separators.
+    word-break: keep-all;
+  }
+}

@@ -82,6 +82,7 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   border-left: 1px solid @fs-line; padding-left: 12px;
 }
+.fs-topbar-links { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .fs-topbar-link {
   display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
   font-size: 12.5px; font-weight: 600; color: @fs-ink; text-decoration: none;
@@ -923,6 +924,10 @@
   .fs-step-card h3 { font-size: clamp(22px, 6vw, 27px); }
 }
 @media (max-width: 560px) {
+  // Only at phone widths does the topbar actually run out of room for both link
+  // labels — collapse the language switch to its globe icon here, not earlier.
+  .fs-lang-link { padding: 7px 10px; }
+  .fs-lang-link span { display: none; }
   .fs-ml-name { font-size: 11px; }
   .fs-ml-sub { font-size: 9.5px; }
   .fs-ml-fig { font-size: 13px; }

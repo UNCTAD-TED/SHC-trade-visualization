@@ -1,0 +1,125 @@
+import * as d3 from 'd3';
+
+export const CONFIG = {
+    geoJsonUrl: 'assets/worldmap-economies-4326.topo.json',
+
+    thresholds: {
+        value: { large: 5000000, medium: 500000 },
+    },
+
+    colors: {
+        value:  { label: "Export Value ($)",   discrete: { large: "#0ea5e9", medium: "#6366f1", small: "#334155" } },
+        weight: { label: "Export Weight (t)",   discrete: { large: "#0ea5e9", medium: "#6366f1", small: "#334155" } },
+    },
+
+    // Flow category base colors (North = Developed, South = Developing/LDC)
+    flowColors: {
+        'north-south': '#009EDB',  // UNCTAD Blue
+        'south-north': '#72BF44',  // UNCTAD Green
+        'south-south': '#FBAF17',  // UNCTAD Yellow
+        'north-north': '#AEA29A',  // UNCTAD Warm Grey
+    },
+
+    // Development status: 'north' = Developed economies
+    // All unlisted countries default to 'south' (Developing/LDC)
+    development: {
+        'USA': 'north', 'CAN': 'north', 'GRL': 'north',
+        'GBR': 'north', 'FRA': 'north', 'DEU': 'north', 'ITA': 'north', 'ESP': 'north',
+        'NLD': 'north', 'BEL': 'north', 'AUT': 'north', 'SWE': 'north', 'NOR': 'north',
+        'DNK': 'north', 'FIN': 'north', 'CHE': 'north', 'PRT': 'north', 'GRC': 'north',
+        'IRL': 'north', 'POL': 'north', 'CZE': 'north', 'HUN': 'north', 'ROU': 'north',
+        'BGR': 'north', 'SVK': 'north', 'SVN': 'north', 'HRV': 'north', 'EST': 'north',
+        'LVA': 'north', 'LTU': 'north', 'LUX': 'north', 'MLT': 'north', 'CYP': 'north',
+        'ISL': 'north', 'AND': 'north', 'SMR': 'north', 'MCO': 'north', 'LIE': 'north',
+        'MNE': 'north', 'SRB': 'north', 'BIH': 'north', 'MKD': 'north', 'ALB': 'north',
+        'RUS': 'north', 'UKR': 'north', 'BLR': 'north', 'MDA': 'north',
+        'ISR': 'north',
+        'AUS': 'north', 'NZL': 'north', 'JPN': 'north', 'KOR': 'north'
+    }
+};
+
+// Metric display formatting (used by tooltips and legends)
+export const METRIC_FORMAT = {
+    value: {
+        grossLabel: 'Gross Volume:', netLabel: 'Net Balance:',
+        fmt: (v) => {
+            const a = Math.abs(v);
+            const s = v < 0 ? '-' : '';
+            if (a >= 1e9) return s + '$' + d3.format('.2f')(a / 1e9) + 'B';
+            if (a >= 1e6) return s + '$' + d3.format('.2f')(a / 1e6) + 'M';
+            if (a >= 1e3) return s + '$' + d3.format('.2f')(a / 1e3) + 'K';
+            return s + '$' + d3.format(',.0f')(a);
+        }
+    },
+    // Weight figures arrive in kilograms (BACI harmonized export weight) and are
+    // displayed in metric tonnes (t / kt / Mt) for readability.
+    weight: {
+        grossLabel: 'Gross Volume:', netLabel: 'Net Balance:',
+        fmt: (v) => {
+            const a = Math.abs(v);
+            const s = v < 0 ? '-' : '';
+            const t = a / 1000;                        // kilograms → tonnes
+            if (t >= 1e6) return s + d3.format('.2f')(t / 1e6) + ' Mt';
+            if (t >= 1e3) return s + d3.format('.2f')(t / 1e3) + ' kt';
+            if (t >= 1)   return s + d3.format('.2f')(t) + ' t';
+            return s + d3.format(',.0f')(a) + ' kg';
+        }
+    },
+};
+
+export const STATE = {
+    // Per-metric data stores. The active-metric views (yearCache, trendSummary,
+    // bilateralHistory) below are repointed into these by DataLoader.switchMetric.
+    //   value  -> data/        (USD)
+    //   weight -> data/weight/ (kilograms)
+    metricStore: {
+        value:  { years: {}, trendSummary: null, bilateralHistory: null, _bilateralPromise: null },
+        weight: { years: {}, trendSummary: null, bilateralHistory: null, _bilateralPromise: null },
+    },
+
+    // Active-metric views (point into metricStore[metric]) ----------------------
+    // Per-year pre-computed net flows, keyed by year number
+    yearCache: {},
+
+    // Gross trade volume per country per year: { iso: { "YYYY": value } }
+    trendSummary: {},
+
+    // Raw bilateral flows per country pair across all years (lazy-loaded)
+    bilateralHistory: null,
+    _bilateralPromise: null,
+
+    geoData: null,
+    filteredData: [],
+    nodeStats: {},
+    totalBilateral: 0,
+    totalBilateralCount: 0,
+
+    year: 2024,
+    metric: "value",
+
+    selectedExporters: new Set(),
+    selectedImporters: new Set(),
+
+    // Interactive line filter: explicit bilateral pairs drawn on the map.
+    // Each entry is { exporter, importer } (ISO3). When non-empty this takes
+    // precedence over the cartesian exporter×importer selector filter so the
+    // map shows exactly the connections the user drew (see DataLoader.filterData).
+    bilateralPairs: [],
+
+    // Flow category visibility filters
+    flowFilters: new Set(['north-south', 'south-north', 'south-south', 'north-north']),
+
+    countryCoords: {},
+    countryNames: {},
+    routes: {},
+
+    // Border line layers from TopoJSON (dashed/dotted/dash-dotted for disputed borders)
+    borderLayers: null,
+
+    // Label visibility toggles
+    showExporterLabels: true,
+    showImporterLabels: true,
+
+    // Threshold mode: 'auto' | 500000 | 100000 | 10000
+    thresholdMode: 'auto',
+};
