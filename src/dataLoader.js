@@ -148,9 +148,10 @@ export const DataLoader = {
         // shows ONLY the drawn country pairs — so turning the mode on starts from a
         // blank map and each connection appears as it is drawn. Pairs are matched
         // undirected (the dataset holds a single net flow per pair) and bypass the
-        // region / selector / threshold filters entirely so the chosen relationships
-        // are always visible regardless of how small they are ("optimized" exact
-        // display). Flow-category visibility is still honoured for the legend toggles.
+        // region / selector / threshold / Top-N filters entirely so the chosen
+        // relationships are always visible regardless of how small they are
+        // ("optimized" exact display). Flow-category visibility is still honoured
+        // for the legend toggles.
         if (TradeMap.lineFilterMode || (STATE.bilateralPairs && STATE.bilateralPairs.length > 0)) {
             const pairKeys = new Set(
                 STATE.bilateralPairs.map(p => [p.exporter, p.importer].sort().join('|'))
@@ -187,9 +188,20 @@ export const DataLoader = {
         }
 
         // 4. Semantic Zoom Thresholding
+        //
+        // How the magnitude threshold and the Top-N line limit (step 4b) combine:
+        //   • explicit threshold + Top-N  → AND. A flow must clear the threshold
+        //     AND rank inside the top N. The user picked both, so both apply.
+        //   • 'auto' threshold + Top-N    → Top-N only (effective threshold 0).
+        //     computeAutoThreshold caps the map at ~40 arcs, which would silently
+        //     override a larger Top-N (choosing 500 would still show 40), so the
+        //     adaptive threshold stands down and the count alone controls the view.
+        //   • either one alone            → behaves exactly as before.
         let dynamicThreshold;
         if (STATE.thresholdMode !== 'auto') {
             dynamicThreshold = STATE.thresholdMode;
+        } else if (STATE.topNMode) {
+            dynamicThreshold = 0;
         } else {
             dynamicThreshold = this.computeAutoThreshold(netFlows);
         }
@@ -208,8 +220,16 @@ export const DataLoader = {
 
         const thresholded = netFlows.filter(d => d.netValue >= dynamicThreshold);
 
+        // 4b. Top-N line limit — the N largest corridors by netValue.
+        // Applied before the flow-category filter (step 5), so hiding a category
+        // subtracts from the N rather than back-filling it with smaller flows:
+        // the N is a slice of the same ranking regardless of which categories are on.
+        const limited = STATE.topNMode
+            ? thresholded.slice().sort((a, b) => b.netValue - a.netValue).slice(0, STATE.topNMode)
+            : thresholded;
+
         // 5. Flow category filter
-        const finalFlows = thresholded.filter(d => STATE.flowFilters.has(d.flowCategory));
+        const finalFlows = limited.filter(d => STATE.flowFilters.has(d.flowCategory));
 
         // 6. Compute node statistics from visible flows
         STATE.nodeStats    = this.computeStatsFromNetFlows(finalFlows);

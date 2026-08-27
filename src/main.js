@@ -1,13 +1,14 @@
 import './styles/styles.less';
 import * as d3 from 'd3';
 import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
-import { startAnimation, stopAnimation } from './sns/animationMode.js';
+import { startAnimation, stopAnimation, stopAnimationForMetricChange } from './sns/animationMode.js';
 import { RegionConfig } from './regions.js';
 import { CountrySelector } from './countrySelector.js';
 import { DataLoader } from './dataLoader.js';
 import { TradeMap } from './map.js';
 import { Tour } from './tour/tour.js';
 import { CsvExport } from './csvExport.js';
+import { DeepLink } from './deepLink.js';
 
 const App = {
     exporterSelector: null,
@@ -24,6 +25,11 @@ const App = {
 
         STATE.region = "Global";
 
+        // Deep link: restore a shared/reloaded view before any data is fetched,
+        // so DataLoader.loadAll() reads the right metric and year straight away.
+        this._deepLink = DeepLink.read();
+        DeepLink.applyPreLoad(this._deepLink);
+
         const success = await DataLoader.loadAll();
         if (!success) return;
 
@@ -35,6 +41,9 @@ const App = {
             await this.exporterSelector.init();
             await this.importerSelector.init();
             console.log('Country selectors initialized successfully');
+            // Country selection has to be restored into the selectors, not into
+            // STATE — updateDashboard() rebuilds STATE.selected* from them.
+            DeepLink.applyPostLoad(this._deepLink, this);
         } catch (error) {
             console.error('Failed to initialize country selectors:', error);
             alert('国選択機能の初期化に失敗しました。詳細はコンソールを確認してください。');
@@ -50,7 +59,9 @@ const App = {
 
         // Guided Story tour: wires the header button + first-visit auto-launch
         this.tour = Tour;
-        Tour.init(this);
+        // A shared deep link must survive first contact: the tour's opening reset
+        // would wipe the linked-to view before the recipient ever sees it.
+        Tour.init(this, { autoLaunch: !DeepLink.isLink(this._deepLink) });
     },
 
     setupEventListeners() {
@@ -102,12 +113,30 @@ const App = {
             });
         });
 
+        // Top-N line limit. Buttons live in both the desktop bar and the mobile
+        // sheet, so activate by value across all of them rather than by clicked node.
+        document.querySelectorAll('.topn-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const val = e.currentTarget.dataset.topn;
+                STATE.topNMode = val === 'all' ? null : +val;
+                this._setActiveTopNButtons(val);
+                // 50ms debounce: prevents overlapping D3 transitions when buttons are clicked rapidly
+                clearTimeout(this._filterDebounce);
+                this._filterDebounce = setTimeout(() => this.updateDashboard(false), 50);
+            });
+        });
+
         // Metric toggle (trade value ⇄ trade weight). Loads the metric's pre-computed
         // JSON on demand, relabels the unit-bearing controls and re-renders.
         document.querySelectorAll('.metric-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const metric = e.currentTarget.dataset.metric;
                 if (!metric || metric === STATE.metric) return;
+                // A metric change ends the bar-chart-race run and returns to the
+                // normal dashboard — a race whose units change halfway is easy to
+                // misread. (The header controls are hidden in anim-mode, so this
+                // only fires for a programmatic switch.)
+                stopAnimationForMetricChange();
                 const loader = document.getElementById('loader');
                 loader?.classList.remove('hidden');
                 try {
@@ -256,10 +285,11 @@ const App = {
         document.getElementById('anim-stop-btn')?.addEventListener('click', stopAnimation);
 
         document.addEventListener('shc:animation-stopped', () => {
-            // Restore threshold UI and re-render dashboard
+            // Restore threshold + Top-N UI and re-render dashboard
             const threshVal = STATE.thresholdMode === 'auto' ? 'auto' : String(STATE.thresholdMode);
             const threshBtn = document.querySelector(`.threshold-btn[data-threshold="${threshVal}"]`);
             if (threshBtn) this.updateUIClasses('.threshold-btn', threshBtn);
+            this._setActiveTopNButtons(STATE.topNMode == null ? 'all' : String(STATE.topNMode));
             this.updateDashboard();
         });
     },
@@ -371,6 +401,14 @@ const App = {
             b.classList.toggle('active', b.dataset.metric === metric));
     },
 
+    // Top-N buttons span the desktop bar and the mobile sheet, so toggle every
+    // matching button rather than a single clicked element (updateUIClasses would
+    // leave the other surface stale).
+    _setActiveTopNButtons(val) {
+        document.querySelectorAll('.topn-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.topn === val));
+    },
+
     // Threshold buttons keep the same numeric data-threshold across metrics; only
     // their unit-bearing labels change ($ for value, t for weight).
     THRESHOLD_LABELS: {
@@ -387,6 +425,15 @@ const App = {
     },
 
     updateKPIBar() {
+        // Scope of each figure — deliberately mixed, matching the KPI tooltips:
+        //   filteredData / nodeStats → what is actually drawn, i.e. AFTER the
+        //     magnitude threshold, the Top-N line limit and the flow-category
+        //     filter. Volume, Corridors, Countries and the N→S / S→S shares
+        //     therefore always agree with the map and the CSV export.
+        //   rawNodeStats            → pre-threshold, pre-Top-N. Used only for
+        //     #1 Exporter / #1 Importer so the headline ranking does not flip
+        //     when the user declutters the map (same convention as the HHI and
+        //     partner-rank figures elsewhere).
         const flows = STATE.filteredData || [];
         const stats = STATE.nodeStats || {};
         const rawStats = STATE.rawNodeStats || stats;
@@ -1350,6 +1397,10 @@ const App = {
         TradeMap.renderFlows();
         this.updateKPIBar();
 
+        // Single choke point for the URL: every filter change routes through
+        // updateDashboard(), so the hash always describes what is on screen.
+        DeepLink.write();
+
         // Keep the open connections panel (mini history cards) in sync with year etc.
         if (this._connectionsPanelOpen) this.openConnectionsPanel();
 
@@ -1810,6 +1861,8 @@ const App = {
         const threshVal = (STATE.thresholdMode === 'auto' || STATE.thresholdMode === undefined) ? 'auto' : String(STATE.thresholdMode);
         const activeThreshold = document.querySelector(`.threshold-btn[data-threshold="${threshVal}"]`);
         if (activeThreshold) this.updateUIClasses('.threshold-btn', activeThreshold);
+        // Top-N label is unit-free, so only the active state needs syncing
+        this._setActiveTopNButtons(STATE.topNMode == null ? 'all' : String(STATE.topNMode));
         // Metric toggle + unit-aware threshold labels (desktop and mobile share classes)
         this._setActiveMetricButtons(STATE.metric || 'value');
         this.updateThresholdLabels(STATE.metric || 'value');

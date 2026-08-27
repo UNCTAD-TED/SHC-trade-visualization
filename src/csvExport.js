@@ -11,9 +11,13 @@
 //   • View     — from the header menu: the current map scope (year · region · selection ·
 //                drawn connections · flow-direction), as flows or a country summary.
 //
-// All tables ignore the on-screen display threshold and 40-arc cap — those declutter
-// the map, whereas a CSV has no visual-overload limit, so analysts get the full data
-// for the chosen scope. Value is USD, weight is kilograms, unit value is USD/kg.
+// All tables ignore the on-screen magnitude threshold and the 40-arc auto cap —
+// those declutter the map, whereas a CSV has no visual-overload limit, so analysts
+// get the full data for the chosen scope. The one display control that IS carried
+// through is the explicit "Lines" Top-N limit (STATE.topNMode): it is a deliberate
+// "give me the top N corridors" request rather than a decluttering side effect, so
+// the export matches what is on screen. Value is USD, weight is kilograms, unit
+// value is USD/kg.
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONFIG, STATE } from './config.js';
 import { RegionConfig } from './regions.js';
@@ -105,6 +109,11 @@ function scopedFlows(metric) {
         }
         if (STATE.selectedExporters.size) flows = flows.filter(d => STATE.selectedExporters.has(d.exporter));
         if (STATE.selectedImporters.size) flows = flows.filter(d => STATE.selectedImporters.has(d.importer));
+    }
+    // Top-N limit, applied before the flow-category filter — same order as
+    // DataLoader.filterData, so the export and the map agree row-for-arc.
+    if (STATE.topNMode) {
+        flows = flows.slice().sort((a, b) => b.netValue - a.netValue).slice(0, STATE.topNMode);
     }
     return flows.filter(d => STATE.flowFilters.has(d.flowCategory));
 }

@@ -122,4 +122,10 @@ export const STATE = {
 
     // Threshold mode: 'auto' | 500000 | 100000 | 10000
     thresholdMode: 'auto',
+
+    // Top-N line limit: null (no limit) | 50 | 100 | 200 | 500
+    // Keeps only the N largest corridors by netValue. Unlike thresholdMode this
+    // is metric-independent, so it stays meaningful across a value ⇄ weight
+    // switch. See DataLoader.filterData for how the two combine.
+    topNMode: null,
 };

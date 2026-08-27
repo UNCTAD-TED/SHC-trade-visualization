@@ -371,6 +371,19 @@
                     <button class="threshold-btn btn-toggle" data-threshold="10000">$10k</button>
                 </div>
 
+                <div id="topn-divider" class="ctrl-divider"></div>
+
+                <!-- Top-N line limit — how many trade lines to draw, largest first.
+                     Metric-independent, so it survives a value ⇄ weight switch. -->
+                <div id="topn-group" class="ctrl-pill" title="Show only the N largest trade lines (independent of the value/weight threshold)">
+                    <span class="ctrl-flows-label">Lines</span>
+                    <button class="topn-btn btn-toggle active" data-topn="all">All</button>
+                    <button class="topn-btn btn-toggle" data-topn="50">50</button>
+                    <button class="topn-btn btn-toggle" data-topn="100">100</button>
+                    <button class="topn-btn btn-toggle" data-topn="200">200</button>
+                    <button class="topn-btn btn-toggle" data-topn="500">500</button>
+                </div>
+
                 <div class="ctrl-divider"></div>
 
                 <!-- Exporter picker -->
@@ -502,12 +515,12 @@
                 <span class="kpi-value" id="kpi-scope">Global</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="Total trade value of visible flows (USD)">
+            <div class="kpi-item" title="Total trade value of visible flows — after threshold and Top-N line limit">
                 <span class="kpi-label">Volume</span>
                 <span class="kpi-value" id="kpi-total">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="Number of bilateral trade corridors shown on map">
+            <div class="kpi-item" title="Number of bilateral trade corridors shown on map — after threshold and Top-N line limit">
                 <span class="kpi-label">Corridors</span>
                 <span class="kpi-value" id="kpi-flows">—</span>
             </div>
@@ -517,12 +530,12 @@
                 <span class="kpi-value" id="kpi-countries">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item kpi-item-col" title="Largest net exporter by trade balance (includes all flows, before threshold)">
+            <div class="kpi-item kpi-item-col" title="Largest net exporter by trade balance (includes all flows, before threshold and Top-N limit)">
                 <span class="kpi-label">#1 Exporter</span>
                 <span class="kpi-value" id="kpi-top-exp" style="color:#0077B6">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item kpi-item-col" title="Largest net importer by trade balance (includes all flows, before threshold)">
+            <div class="kpi-item kpi-item-col" title="Largest net importer by trade balance (includes all flows, before threshold and Top-N limit)">
                 <span class="kpi-label">#1 Importer</span>
                 <span class="kpi-value" id="kpi-top-imp" style="color:#C0392B">—</span>
             </div>
@@ -847,6 +860,17 @@
                     <button class="threshold-btn btn-toggle-lg" data-threshold="500000">$500k</button>
                     <button class="threshold-btn btn-toggle-lg" data-threshold="100000">$100k</button>
                     <button class="threshold-btn btn-toggle-lg" data-threshold="10000">$10k</button>
+                </div>
+            </div>
+
+            <div class="sheet-section">
+                <div class="section-label">Top Trade Lines</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                    <button class="topn-btn btn-toggle-lg active" data-topn="all">All</button>
+                    <button class="topn-btn btn-toggle-lg" data-topn="50">50</button>
+                    <button class="topn-btn btn-toggle-lg" data-topn="100">100</button>
+                    <button class="topn-btn btn-toggle-lg" data-topn="200">200</button>
+                    <button class="topn-btn btn-toggle-lg" data-topn="500">500</button>
                 </div>
             </div>
 

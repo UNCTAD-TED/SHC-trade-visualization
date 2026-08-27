@@ -2,6 +2,10 @@ import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
 import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
 import { RegionConfig } from './regions.js';
+// md() = motionDuration: every D3 transition below runs through it so that
+// under prefers-reduced-motion the end state is applied instantly (0 ms) while
+// still firing the transition's end callbacks (.remove(), text tweens).
+import { motionDuration as md, prefersReducedMotion } from './motion.js';
 
 export const TradeMap = {
     isoMap: {
@@ -227,7 +231,7 @@ export const TradeMap = {
         const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
 
         this.svg.transition()
-            .duration(1200)
+            .duration(md(1200))
             .call(this.zoomBehavior.transform, transform);
     },
 
@@ -242,7 +246,7 @@ export const TradeMap = {
         const tx = (this.width / 2) - (p[0] * k);
         const ty = (this.height / 2) - (p[1] * k);
         this.svg.transition()
-            .duration(duration)
+            .duration(md(duration))
             .call(this.zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
     },
 
@@ -471,7 +475,7 @@ export const TradeMap = {
 
         if (!netFlows || netFlows.length === 0) {
             this.g.selectAll(".trade-arc, .country-node, .map-label-unified")
-                .transition().duration(500).style("opacity", 0).remove();
+                .transition().duration(md(500)).style("opacity", 0).remove();
             if (this.renderLegend) this.renderLegend();
             return;
         }
@@ -542,7 +546,7 @@ export const TradeMap = {
             .data(visibleFlows, d => `${d.exporter}|${d.importer}`);
 
         arcs.exit()
-            .transition().duration(500)
+            .transition().duration(md(500))
             .style("opacity", 0)
             .remove();
 
@@ -595,7 +599,7 @@ export const TradeMap = {
             .attr("data-original-width", d => edgeWidthScale(d.netValue))
             .attr("data-base-opacity", d => opacityScale(d.netValue))
             .attr("d", buildArcD)  // set shape immediately — no interpolation glitch
-            .transition().duration(750).ease(d3.easeCubicOut)
+            .transition().duration(md(750)).ease(d3.easeCubicOut)
             .attr("stroke", d => CONFIG.flowColors[d.flowCategory])
             .attr("stroke-width", d => edgeWidthScale(d.netValue) / currentK)
             .style("opacity", arcOpacity);
@@ -607,7 +611,7 @@ export const TradeMap = {
             .data(activeNodes, d => d);
 
         nodes.exit()
-            .transition().duration(500)
+            .transition().duration(md(500))
             .attr("r", 0)
             .style("opacity", 0)
             .remove();
@@ -638,7 +642,7 @@ export const TradeMap = {
             // set outside the transition or nodes freeze at their previous projection.
             .attr("cx", d => projOf(d)[0])
             .attr("cy", d => projOf(d)[1])
-            .transition().duration(750).ease(d3.easeElasticOut)
+            .transition().duration(md(750)).ease(d3.easeElasticOut)
             .attr("r", d => radiusScale(nodeStats[d].grossVolume) / currentK)
             .attr("fill", d => colorScale(nodeStats[d].netBalance))
             .attr("stroke-width", 1.5 / currentK)
@@ -665,7 +669,7 @@ export const TradeMap = {
             .data(visibleLabels, d => d);
 
         labels.exit()
-            .transition().duration(300)
+            .transition().duration(md(300))
             .style("opacity", 0)
             .remove();
 
@@ -700,7 +704,7 @@ export const TradeMap = {
                 : projOf(d)[1] + 4)
             .attr("font-size", (8.5 / Math.sqrt(currentK)) + "px") // 10pxから8.5pxへ少し縮小
             .attr("stroke-width", 2.5 / currentK)
-            .transition().duration(750)
+            .transition().duration(md(750))
             .style("opacity", labelOpacity);
 
         if (this.renderLegend) this.renderLegend();
@@ -760,7 +764,7 @@ export const TradeMap = {
             });
 
         // Then animate only opacity (same selection object, no second DOM traversal)
-        focusArcs.transition().duration(450)
+        focusArcs.transition().duration(md(450))
             .style("opacity", function(d) {
                 const base = +this.getAttribute("data-base-opacity") || 0.5;
                 if (d.exporter === focusedIso || d.importer === focusedIso) return base;
@@ -768,14 +772,14 @@ export const TradeMap = {
             });
 
         this.g.selectAll(".country-node")
-            .transition().duration(450)
+            .transition().duration(md(450))
             .style("opacity", function(d) {
                 if (d === focusedIso) return 1;
                 return partners.has(d) ? 0.95 : 0.18;
             });
 
         this.g.selectAll(".map-label-unified")
-            .transition().duration(450)
+            .transition().duration(md(450))
             .style("opacity", function(d) {
                 if (d === focusedIso) return 1;
                 return partners.has(d) ? 0.85 : 0.2;
@@ -791,7 +795,7 @@ export const TradeMap = {
         const highlightCodes = new Set([focusedCode, ...aliasCodes].filter(Boolean));
 
         this.g.selectAll(".land")
-            .transition().duration(450)
+            .transition().duration(md(450))
             .style("opacity", function(d) {
                 return (d && highlightCodes.has(String(d.properties.code))) ? 1 : 0.35;
             })
@@ -852,19 +856,19 @@ export const TradeMap = {
             });
 
         // Then fade opacity back in (same selection, no second DOM traversal)
-        clearArcs.transition().duration(400)
+        clearArcs.transition().duration(md(400))
             .style("opacity", function() {
                 return +this.getAttribute("data-base-opacity") || 0.5;
             });
 
         this.g.selectAll(".country-node")
-            .transition().duration(400).style("opacity", 1);
+            .transition().duration(md(400)).style("opacity", 1);
 
         this.g.selectAll(".map-label-unified")
-            .transition().duration(400).style("opacity", 1);
+            .transition().duration(md(400)).style("opacity", 1);
 
         this.g.selectAll(".land")
-            .transition().duration(400)
+            .transition().duration(md(400))
             .style("opacity", 1)
             .attr("fill", d => this._specialFill(d, "#FAFAFA"));
 
@@ -902,6 +906,9 @@ export const TradeMap = {
     _renderParticles(iso, visibleFlows) {
         this._clearParticles();
         if (!this.g) return;
+        // Particles are pure decoration — the corridors themselves are already
+        // drawn as arcs — so they are skipped entirely under reduced motion.
+        if (prefersReducedMotion()) return;
 
         const focusedFlows = (visibleFlows || [])
             .filter(d => d.exporter === iso || d.importer === iso)
@@ -1082,7 +1089,7 @@ export const TradeMap = {
 
         const netFlows = STATE.filteredData || [];
 
-        const _legendKey = `${STATE.metric}_${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}`;
+        const _legendKey = `${STATE.metric}_${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.topNMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}`;
         if (this._lastLegendKey === _legendKey) return;
         this._lastLegendKey = _legendKey;
 

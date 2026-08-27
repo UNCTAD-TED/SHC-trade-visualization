@@ -1,0 +1,37 @@
+// ── Animation mode: active-metric badge ───────────────────────
+// Two small labels added so the bar-chart-race panel and the map legend state
+// which metric is on screen (Value (USD) / Weight (tonnes)).
+//
+// The rest of the animation UI is styled inline in index.html; these class
+// names are new and do not collide with any selector there, so nothing existing
+// is overridden. Colours come from colors.less, radius/spacing from
+// variables.less — no new tokens.
+@import 'variables.less';
+
+// Panel header badge, sitting next to #ap-year / .ap-range
+.ap-metric {
+    margin-left: auto;
+    flex-shrink: 0;
+    padding: 2px @space-2;
+    border: 1px solid @unblue;
+    border-radius: @radius-sm;
+    background: @unblue-bg;
+    color: @unblue-text;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+// Map legend badge, same vocabulary at legend scale
+.al-metric {
+    display: inline-block;
+    padding: 1px @space-1;
+    border: 1px solid @unblue;
+    border-radius: @radius-sm;
+    background: @unblue-bg;
+    color: @unblue-text;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}

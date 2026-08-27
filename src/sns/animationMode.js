@@ -1,20 +1,46 @@
 import * as d3 from 'd3';
-import { CONFIG, STATE } from '../config.js';
+import { CONFIG, METRIC_FORMAT, STATE } from '../config.js';
 import { DataLoader } from '../dataLoader.js';
 import { TradeMap } from '../map.js';
 import { iso2Lower } from './iso3toIso2.js';
+// md() = motionDuration: collapses every D3 transition to 0 ms under
+// prefers-reduced-motion. The year still advances and the bars still land on
+// the right values and ranks — they just stop sliding.
+import { motionDuration as md, prefersReducedMotion } from '../motion.js';
 
 const YEARS   = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
 const YEAR_MS = 3000;
 const ROW_H   = 27;          // px — row height in the bar chart (must match CSS .ap-chart)
 
+// ── Active metric ─────────────────────────────────────────────────
+// Everything the panel, the map and the legend print goes through these, so the
+// animation always speaks in the units the header metric toggle selected.
+
+// Display formatter for the active metric — bar labels, count-up tween and
+// legend all use it, so the panel never shows '$' while Weight is selected.
+const fmtMetric = (v) => (METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value).fmt(v);
+
+// Badge copy, matching the header metric toggle's own vocabulary
+// (#metric-group title: "trade value (USD) ... trade weight (tonnes)").
+const METRIC_BADGE = { value: 'Value (USD)', weight: 'Weight (tonnes)' };
+const metricBadge = () => METRIC_BADGE[STATE.metric] || METRIC_BADGE.value;
+
+// Minimum corridor magnitude drawn at all, per metric. Kept in step with
+// App.THRESHOLD_LABELS (src/main.js), which maps the same raw number to '$1M'
+// for value and '1kt' for weight: weight arrives in kilograms, so
+// 1,000,000 kg = 1,000 t = 1 kt is the weight counterpart of the $1M floor.
+// The two are the same number because that is the label table's mapping, not a
+// copy-paste — and it keeps the drawn corridor count in the same band for both
+// metrics (2015–2024: ~320–490 value, ~450–470 weight).
+const MIN_VALUE_BY_METRIC = { value: 1_000_000, weight: 1_000_000 };
+const minValue = () => MIN_VALUE_BY_METRIC[STATE.metric] ?? MIN_VALUE_BY_METRIC.value;
+
 // ── Arc encoding ─────────────────────────────────────────────────
 // WIDTH_EXP > 1 steepens the gradient: small flows stay thin, large flows shoot up.
-const MIN_VALUE = 1_000_000; // $1M — minimum corridor value drawn at all
 const ARC_DUR   = 750;       // arc transition duration (matches map.js)
 const LABEL_N   = 0;         // map text labels (0 = off; set >0 to label the largest corridors)
 const WIDTH_EXP = 1.6;       // power-scale exponent (0.5 = sqrt, 1 = linear, >1 = steeper)
-const MIN_W     = 0.1;       // px — stroke width for the smallest ($1M) corridor
+const MIN_W     = 0.1;       // px — stroke width for the smallest ($1M / 1kt) corridor
 const MAX_W     = 8;         // px — stroke width for the largest corridor
 const MIN_OP    = 0.13;      // opacity for the smallest corridor
 const MAX_OP    = 0.6;       // opacity for the largest corridor
@@ -36,6 +62,8 @@ let _exportRanks   = {};
 let _importRanks   = {};
 let _active        = false;
 let _savedThreshold = 'auto';
+let _savedTopN      = null;
+let _startMetric    = 'value';   // metric this run was started with
 
 // Layer refs (created in TradeMap.g during animation, removed on stop)
 let _arcLayer = null, _particleLayer = null, _haloLayer = null, _nodeLayer = null, _labelLayer = null;
@@ -47,11 +75,18 @@ export async function startAnimation() {
   if (_active) return;
   _active = true;
   _savedThreshold = STATE.thresholdMode;
+  _savedTopN      = STATE.topNMode;
+  _startMetric    = STATE.metric;
+
+  // Rank tables are keyed by year only, so a run under a different metric would
+  // otherwise reuse the previous metric's numbers. Rebuild them every start.
+  _exportRanks = {};
+  _importRanks = {};
 
   // Pre-load all years (DataLoader caches them)
   const loader = document.getElementById('loader');
   if (loader) loader.classList.remove('hidden');
-  await Promise.all(YEARS.map(y => DataLoader.loadYear(y)));
+  await Promise.all(YEARS.map(y => DataLoader.loadYear(y, _startMetric)));
 
   // Compute top-10 exporters and importers per year from ALL flows
   YEARS.forEach(year => {
@@ -71,8 +106,11 @@ export async function startAnimation() {
 
   if (loader) loader.classList.add('hidden');
 
-  // Modify STATE for animation: $1M threshold, no country filter, global view
-  STATE.thresholdMode      = 1_000_000;
+  // Modify STATE for animation: metric-appropriate floor ($1M / 1kt), no country
+  // filter, no Top-N cap (the animation draws every corridor above the floor),
+  // global view.
+  STATE.thresholdMode      = minValue();
+  STATE.topNMode           = null;
   STATE.selectedExporters  = new Set();
   STATE.selectedImporters  = new Set();
   STATE.region             = 'Global';
@@ -135,6 +173,11 @@ export function stopAnimation() {
   }
 
   STATE.thresholdMode = _savedThreshold;
+  STATE.topNMode      = _savedTopN;
+  // The metric needs no restore: startAnimation never writes STATE.metric, and a
+  // metric change requested mid-run stops the animation first (see
+  // stopAnimationForMetricChange),
+  // so whatever metric is active on stop is the one the user chose.
 
   // Wait for the browser to restore the full-width map layout, then
   // recalculate the projection before the dashboard re-renders flows.
@@ -142,6 +185,20 @@ export function stopAnimation() {
     TradeMap.init();
     document.dispatchEvent(new CustomEvent('shc:animation-stopped'));
   }));
+}
+
+// True while a bar-chart-race run is on screen.
+export function isAnimating() {
+  return _active;
+}
+
+// Called by the metric toggle before it switches STATE.metric.
+// Policy: a metric change ends the animation and returns to the normal
+// dashboard. Restarting mid-run would have to re-derive every year's rank table
+// and reset the timeline anyway, and a bar race whose units change halfway is
+// easy to misread — stopping makes the unit change unambiguous.
+export function stopAnimationForMetricChange() {
+  if (_active) stopAnimation();
 }
 
 // ── Internal helpers ──────────────────────────────────────────
@@ -183,9 +240,10 @@ function _drawArcs(year) {
   // Current zoom scale — keep stroke widths visually constant under the g transform
   const k = TradeMap.svg ? d3.zoomTransform(TradeMap.svg.node()).k : 1;
 
-  // Flows ≥ $1M with known coordinates, sorted by value descending
+  // Flows ≥ the metric's floor ($1M / 1kt) with known coordinates, sorted descending
+  const floor = minValue();
   const flows = (STATE.yearCache[year] || [])
-    .filter(d => d.netValue >= MIN_VALUE &&
+    .filter(d => d.netValue >= floor &&
                  STATE.countryCoords[d.exporter] &&
                  STATE.countryCoords[d.importer])
     .sort((a, b) => b.netValue - a.netValue);
@@ -195,18 +253,18 @@ function _drawArcs(year) {
   // Upper anchor = high quantile (not the single max) so one mega-corridor
   // doesn't compress everything else.
   const values   = flows.map(d => d.netValue).sort(d3.ascending);
-  const topAnchor = d3.quantile(values, ARC_TOP_Q) || d3.max(values) || MIN_VALUE;
+  const topAnchor = d3.quantile(values, ARC_TOP_Q) || d3.max(values) || floor;
 
   // Power scale: exponent > 1 → small flows stay thin, large flows shoot up.
   const widthScale = d3.scalePow().exponent(WIDTH_EXP)
-    .domain([MIN_VALUE, topAnchor]).range([MIN_W, MAX_W]).clamp(true);
+    .domain([floor, topAnchor]).range([MIN_W, MAX_W]).clamp(true);
   const opacityScale = d3.scalePow().exponent(WIDTH_EXP)
-    .domain([MIN_VALUE, topAnchor]).range([MIN_OP, MAX_OP]).clamp(true);
+    .domain([floor, topAnchor]).range([MIN_OP, MAX_OP]).clamp(true);
 
   // ── All arcs in one layer (flow colours, thin→thick by value) ──
   const arcs = _arcLayer.selectAll('.anim-arc').data(flows, key);
 
-  arcs.exit().transition().duration(ARC_DUR).style('opacity', 0).remove();
+  arcs.exit().transition().duration(md(ARC_DUR)).style('opacity', 0).remove();
 
   const arcsEnter = arcs.enter().append('path')
       .attr('class', 'anim-arc')
@@ -221,7 +279,7 @@ function _drawArcs(year) {
   // number-interpolate the current computed value "1px" → +"1px" = NaN, so width never applies.
   arcsEnter.merge(arcs)
       .attr('d', d => _arcPath(d.exporter, d.importer))
-      .transition().duration(ARC_DUR).ease(d3.easeCubicOut)
+      .transition().duration(md(ARC_DUR)).ease(d3.easeCubicOut)
       .style('stroke', d => CONFIG.flowColors[d.flowCategory] || '#009EDB')
       .attr('stroke-width', d => widthScale(d.netValue) / k)
       .style('opacity', d => opacityScale(d.netValue));
@@ -258,7 +316,7 @@ function _drawArcs(year) {
       .attr('x', d => _labelPos(d)[0])
       .attr('y', d => _labelPos(d)[1])
       .text(d => `${d.exporter} → ${d.importer}`)
-      .transition().duration(ARC_DUR)
+      .transition().duration(md(ARC_DUR))
       .style('opacity', 0.92);
 }
 
@@ -298,7 +356,7 @@ function _drawNodes(flows, k) {
 
   const nodes = _nodeLayer.selectAll('.anim-node').data(isos, d => d);
 
-  nodes.exit().transition().duration(ARC_DUR)
+  nodes.exit().transition().duration(md(ARC_DUR))
     .attr('r', 0).style('opacity', 0).remove();
 
   const enter = nodes.enter().append('circle')
@@ -313,7 +371,7 @@ function _drawNodes(flows, k) {
   enter.merge(nodes)
     .attr('cx', d => proj(d)[0])
     .attr('cy', d => proj(d)[1])
-    .transition().duration(ARC_DUR)
+    .transition().duration(md(ARC_DUR))
     .attr('r', d => radiusScale(stats[d].gross) / k)
     .attr('fill', d => colorOf(stats[d].net))
     .attr('stroke-width', 1.5 / k)
@@ -359,6 +417,9 @@ function _drawHalos(top3expSet, top3impSet, k) {
 // ── White flowing particle overlay on arcs connected to top-3 countries ──
 function _drawParticles(flows, k, topSet, widthScale) {
   if (!_particleLayer) return;
+  // Flowing dashes are decoration on top of arcs that are already drawn;
+  // under reduced motion they are dropped rather than frozen mid-corridor.
+  if (prefersReducedMotion()) { _particleLayer.selectAll('*').remove(); return; }
   const key = d => `${d.exporter}|${d.importer}`;
 
   // flows is already sorted descending by netValue.
@@ -404,6 +465,7 @@ function _injectOverlays() {
     <div class="ap-header">
       <span id="ap-year">2015</span>
       <span class="ap-range">2015 – 2024</span>
+      <span id="ap-metric-badge" class="ap-metric">${metricBadge()}</span>
     </div>
     <div class="ap-section">
       <div class="ap-label ap-export">▲&nbsp;TOP EXPORTERS</div>
@@ -425,6 +487,11 @@ function _injectOverlays() {
     const legend = document.createElement('div');
     legend.id = 'anim-legend';
     legend.innerHTML = `
+      <div class="al-section">
+        <div class="al-section-title">Showing</div>
+        <div class="al-row"><span class="al-metric">${metricBadge()}</span></div>
+      </div>
+      <div class="al-divider"></div>
       <div class="al-section">
         <div class="al-section-title">Arc colours</div>
         <div class="al-row">
@@ -451,6 +518,10 @@ function _injectOverlays() {
           <span class="al-item"><span class="al-dot" style="background:#72BF44;box-shadow:0 0 4px #72BF44"></span>Top 3 importers</span>
           <span class="al-item"><span class="al-dash"></span>Major corridors (≥10% of max)</span>
         </div>
+      </div>
+      <div class="al-divider"></div>
+      <div class="al-section">
+        <div class="al-row"><span class="al-muted">Corridors below ${fmtMetric(minValue())} are not drawn</span></div>
       </div>`;
     mapContainer.appendChild(legend);
   }
@@ -473,10 +544,11 @@ function _renderRace(containerId, ranks, color) {
 
   // Compute max bar width from the actual container width at render time so bars
   // always fill the available space regardless of --anim-panel-w.
-  // Subtract: flag label (66px) + value text (~44px) + gaps (5px + 4px) + section padding (24px).
+  // Subtract: flag label (66px) + value text (~56px, e.g. "$1.23B" / "1.23 Mt")
+  // + gaps (5px + 4px) + section padding (24px).
   const containerEl = document.getElementById(containerId);
   const barMax = containerEl?.offsetWidth > 0
-    ? Math.max(containerEl.offsetWidth - 66 - 44 - 33, 40)
+    ? Math.max(containerEl.offsetWidth - 66 - 56 - 33, 40)
     : BAR_MAX;
 
   const top     = ranks.slice(0, 10);
@@ -487,7 +559,7 @@ function _renderRace(containerId, ranks, color) {
   const rows = g.selectAll('.ap-row').data(top, d => d.iso);
 
   // EXIT
-  rows.exit().transition().duration(480)
+  rows.exit().transition().duration(md(480))
     .style('opacity', '0').remove();
 
   // ENTER — created at final rank position to avoid wrong-position flash
@@ -511,31 +583,26 @@ function _renderRace(containerId, ranks, color) {
     .style('width', d => `${bw(d.value)}px`);
   bwrap.append('span').attr('class', 'ap-val')
     .property('_prev', d => d.value)
-    .text(d => _fmt(d.value));
+    .text(d => fmtMetric(d.value));
 
   // UPDATE + ENTER — opacity + rank position animate together.
   // Single transition on `all` prevents D3 preempting the enter opacity tween.
   const all = entered.merge(rows);
 
-  all.transition().duration(750)
+  all.transition().duration(md(750))
     .style('opacity', '1')
     .style('transform', d => `translateY(${rankMap.get(d.iso) * ROW_H}px)`);
 
-  all.select('.ap-bar').transition().duration(750)
+  all.select('.ap-bar').transition().duration(md(750))
     .style('width', d => `${bw(d.value)}px`);
 
-  all.select('.ap-val').transition().duration(750)
+  all.select('.ap-val').transition().duration(md(750))
     .tween('text', function(d) {
       const el  = this;
       const prev = (el._prev != null) ? el._prev : d.value;
       el._prev  = d.value;
       const interp = d3.interpolateNumber(prev, d.value);
-      return t => { el.textContent = _fmt(interp(t)); };
+      return t => { el.textContent = fmtMetric(interp(t)); };
     });
 }
 
-function _fmt(v) {
-  if (v >= 1e9) return '$' + d3.format('.1f')(v / 1e9) + 'B';
-  if (v >= 1e6) return '$' + d3.format('.0f')(v / 1e6) + 'M';
-  return '$' + d3.format('.0f')(v / 1e3) + 'K';
-}

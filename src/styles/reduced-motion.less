@@ -1,0 +1,36 @@
+// ── Reduced motion ────────────────────────────────────────────
+// Switches off the purely decorative CSS animations for users who ask their OS
+// to reduce motion. Everything still renders and still updates — only the
+// looping movement stops. The JavaScript half (SVG <animateMotion> particles and
+// D3 transition durations) lives in src/motion.js.
+//
+// Additive only: this file is imported last, so these rules override the
+// animation declarations in styles.less without editing them. Same pattern the
+// tour already uses (tour.less has its own prefers-reduced-motion block, which
+// stays in charge of the tour's own spotlight and card).
+@import 'variables.less';
+
+@media (prefers-reduced-motion: reduce) {
+
+    // Country focus halo (dashboard) — the rings stop pulsing but stay visible
+    // at their resting size, so the focused country is still marked.
+    .focus-halo .halo-pulse-1,
+    .focus-halo .halo-pulse-2 { animation: none; }
+
+    // Animation mode: top-3 exporter / importer halo rings
+    .anim-halo-ring-1,
+    .anim-halo-ring-2 { animation: none; }
+
+    // Animation mode: flowing particle overlay on major corridors.
+    // src/sns/animationMode.js also skips creating these, so this is a
+    // belt-and-braces rule for anything already on screen.
+    .anim-particle-arc { animation: none; }
+
+    // Interactive line filter: marching-ants cursor line + start-point pulse
+    .line-filter-temp { animation: none; }
+    .line-filter-start .lf-start-pulse { animation: none; }
+
+    // Loader caption's opacity pulse. The spinner itself is left spinning —
+    // it is the only signal that the app is still working.
+    #loader p { animation: none; }
+}

@@ -28,7 +28,11 @@ export const Tour = {
     _busy: false,
 
     // Wire the header button + first-visit auto-launch. Call once from App.init().
-    init(app) {
+    // opts.autoLaunch = false suppresses the first-visit auto-open. App passes
+    // false when the URL carries a deep link: the tour resets every filter to its
+    // default, which would silently discard the view the link was meant to show.
+    // The Tour button in the header still works.
+    init(app, opts = {}) {
         this.app = app;
         this.steps = TOUR_STEPS;
         this._ctx = this._buildContext();
@@ -38,7 +42,9 @@ export const Tour = {
         // First visit → auto-open once (the user then advances manually)
         let seen = false;
         try { seen = !!localStorage.getItem(SEEN_KEY); } catch { /* private mode */ }
-        if (!seen) setTimeout(() => { if (!this.active) this.start(); }, 900);
+        if (!seen && opts.autoLaunch !== false) {
+            setTimeout(() => { if (!this.active) this.start(); }, 900);
+        }
     },
 
     _buildContext() {
@@ -337,6 +343,10 @@ export const Tour = {
             STATE.thresholdMode = 'auto';
             const autoBtn = document.querySelector('.threshold-btn[data-threshold="auto"]');
             if (autoBtn) app.updateUIClasses('.threshold-btn', autoBtn);
+
+            // Top-N line limit: off
+            STATE.topNMode = null;
+            app._setActiveTopNButtons?.('all');
 
             // Region: Global
             STATE.region = 'Global';
