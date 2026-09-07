@@ -341,21 +341,21 @@
                 <!-- Flow direction filter -->
                 <div class="ctrl-pill" id="flow-filter-group" title="Filter by economic flow direction">
                     <span class="ctrl-flows-label">Flows</span>
-                    <label class="flow-label" title="North to South">
+                    <label class="flow-label flow-ns" title="Trade from developed to developing economies">
                         <input type="checkbox" class="flow-checkbox" value="north-south" checked>
-                        <span style="color:#009EDB">N→S</span>
+                        <span>North &rarr; South</span>
                     </label>
-                    <label class="flow-label" title="South to North">
+                    <label class="flow-label flow-sn" title="Trade from developing to developed economies">
                         <input type="checkbox" class="flow-checkbox" value="south-north" checked>
-                        <span style="color:#72BF44">S→N</span>
+                        <span>South &rarr; North</span>
                     </label>
-                    <label class="flow-label" title="South to South">
+                    <label class="flow-label flow-ss" title="Trade between developing economies">
                         <input type="checkbox" class="flow-checkbox" value="south-south" checked>
-                        <span style="color:#FBAF17">S→S</span>
+                        <span>South &rarr; South</span>
                     </label>
-                    <label class="flow-label" title="North to North">
+                    <label class="flow-label flow-nn" title="Trade between developed economies">
                         <input type="checkbox" class="flow-checkbox" value="north-north" checked>
-                        <span style="color:#AEA29A">N→N</span>
+                        <span>North &rarr; North</span>
                     </label>
                 </div>
 
@@ -532,22 +532,22 @@
             <div class="kpi-divider"></div>
             <div class="kpi-item kpi-item-col" title="Largest net exporter by trade balance (includes all flows, before threshold and Top-N limit)">
                 <span class="kpi-label">#1 Exporter</span>
-                <span class="kpi-value" id="kpi-top-exp" style="color:#0077B6">—</span>
+                <span class="kpi-value kpi-value-exp" id="kpi-top-exp">—</span>
             </div>
             <div class="kpi-divider"></div>
             <div class="kpi-item kpi-item-col" title="Largest net importer by trade balance (includes all flows, before threshold and Top-N limit)">
                 <span class="kpi-label">#1 Importer</span>
-                <span class="kpi-value" id="kpi-top-imp" style="color:#C0392B">—</span>
+                <span class="kpi-value kpi-value-imp" id="kpi-top-imp">—</span>
             </div>
             <div class="kpi-divider"></div>
             <div class="kpi-item" title="North-to-South flows as share of total visible trade value">
                 <span class="kpi-label">N→S</span>
-                <span class="kpi-value" id="kpi-ns-pct" style="color:#009EDB">—</span>
+                <span class="kpi-value kpi-value-ns" id="kpi-ns-pct">—</span>
             </div>
             <div class="kpi-divider"></div>
             <div class="kpi-item" title="South-to-South flows as share of total visible trade value">
                 <span class="kpi-label">S→S</span>
-                <span class="kpi-value" id="kpi-ss-pct" style="color:#FBAF17">—</span>
+                <span class="kpi-value kpi-value-ss" id="kpi-ss-pct">—</span>
             </div>
         </div>
     </div>

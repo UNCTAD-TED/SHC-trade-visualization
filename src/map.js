@@ -279,7 +279,7 @@ export const TradeMap = {
 
         const landsEnter = lands.enter().append("path")
             .attr("class", "land")
-            .attr("stroke", "#DED9D5")
+            .attr("stroke", "#C8C2BB")
             .attr("stroke-width", 0.5)
             .style("transition", "fill 0.2s ease")
             .on("mouseover", (event, d) => {
@@ -287,7 +287,7 @@ export const TradeMap = {
                 const group = this._getHoverGroup(String(d.properties.code));
                 this.g.selectAll("path.land")
                     .filter(ld => ld && ld.properties && group.has(String(ld.properties.code)))
-                    .attr("fill", ld => this._specialFill(ld, "#EBEAE6"));
+                    .attr("fill", ld => this._specialFill(ld, "#C8C2BB"));
             })
             .on("mouseout", (event, d) => {
                 if (!d || !d.properties) return;
@@ -297,7 +297,7 @@ export const TradeMap = {
                 const focusGroup = new Set([focusCode, ...focusAliases].filter(Boolean));
                 this.g.selectAll("path.land")
                     .filter(ld => ld && ld.properties && group.has(String(ld.properties.code)))
-                    .attr("fill", ld => this._specialFill(ld, focusGroup.has(String(ld.properties.code)) ? "#EAF4FB" : "#FAFAFA"));
+                    .attr("fill", ld => this._specialFill(ld, focusGroup.has(String(ld.properties.code)) ? "#EAF4FB" : "#DED9D5"));
             })
             .on("click", (event, d) => {
                 // Only active in line-filter mode — otherwise land is just the backdrop.
@@ -307,24 +307,30 @@ export const TradeMap = {
             });
 
         landsEnter.merge(lands)
-            .attr("fill", d => this._specialFill(d, "#FAFAFA"))
+            .attr("fill", d => this._specialFill(d, "#DED9D5"))
             .attr("d", this.path);
 
         this._renderBorderLayers(landLayer);
     },
 
-    // Render border lines and small-island point features from TopoJSON layers
+    // Render border lines and small-island point features from TopoJSON layers.
+    // Stroke color for all border classes is set in CSS (see src/styles/styles.less
+    // — `.border-plain / .border-dashed / .border-dotted / .border-dash-dotted`).
+    // Per UN cartographic standard all political border lines are drawn in white
+    // (`#fff`) so they read as negative space between the tan land polygons and do
+    // not visually assert sovereignty on disputed lines (Kashmir, Golan, West Bank,
+    // Kosovo, DMZ, Abyei, Hala'ib, Western Sahara, Ogaden).
     _renderBorderLayers(landLayer) {
         if (!STATE.borderLayers) return;
 
         const specs = [
-            { key: 'plain',      cls: 'border-plain',       dasharray: null,          stroke: '#C8C2BB', width: 0.4 },
-            { key: 'dashed',     cls: 'border-dashed',      dasharray: '4,3',         stroke: '#9B9189', width: 0.5 },
-            { key: 'dotted',     cls: 'border-dotted',      dasharray: '1.5,2.5',     stroke: '#9B9189', width: 0.5 },
-            { key: 'dashDotted', cls: 'border-dash-dotted', dasharray: '5,2,1.5,2',  stroke: '#9B9189', width: 0.5 },
+            { key: 'plain',      cls: 'border-plain',       dasharray: null,          width: 0.4 },
+            { key: 'dashed',     cls: 'border-dashed',      dasharray: '4,3',         width: 0.5 },
+            { key: 'dotted',     cls: 'border-dotted',      dasharray: '1.5,2.5',     width: 0.5 },
+            { key: 'dashDotted', cls: 'border-dash-dotted', dasharray: '5,2,1.5,2',   width: 0.5 },
         ];
 
-        specs.forEach(({ key, cls, dasharray, stroke, width }) => {
+        specs.forEach(({ key, cls, dasharray, width }) => {
             const features = STATE.borderLayers[key];
             if (!features) return;
 
@@ -335,11 +341,7 @@ export const TradeMap = {
 
             const entered = paths.enter().append("path")
                 .attr("class", `border ${cls}`)
-                .attr("fill", "none")
-                .attr("stroke", stroke)
-                .attr("stroke-width", width)
-                .attr("stroke-linecap", "round")
-                .style("pointer-events", "none");
+                .attr("stroke-width", width);
 
             if (dasharray) entered.attr("stroke-dasharray", dasharray);
 
@@ -365,8 +367,8 @@ export const TradeMap = {
             dots.enter().append("circle")
                 .attr("class", "economy-point")
                 .attr("r", 2)
-                .attr("fill", "#FAFAFA")
-                .attr("stroke", "#DED9D5")
+                .attr("fill", "#DED9D5")
+                .attr("stroke", "#C8C2BB")
                 .attr("stroke-width", 0.5)
                 // Pointer-events are toggled on only while line-filter mode is active
                 // (see enable/disableLineFilter) so island nations stay pickable too.
@@ -691,7 +693,7 @@ export const TradeMap = {
         labelsEnter.merge(labels)
             .text(d => STATE.countryNames[d] || d)
             .attr("fill", "#6E6259")
-            .attr("stroke", "#FAFAFA") // 背景や陸地と同じ色で白フチ（Halo）をつける
+            .attr("stroke", "#DED9D5") // 陸地と同じタン色で halo をつけて可読性を確保
             .attr("stroke-linejoin", "round")
             // Position set immediately (same reason as nodes — a following focus transition
             // would otherwise cancel an in-flight position tween and freeze labels).
@@ -800,7 +802,7 @@ export const TradeMap = {
                 return (d && highlightCodes.has(String(d.properties.code))) ? 1 : 0.35;
             })
             .attr("fill", function(d) {
-                const base = (d && highlightCodes.has(String(d.properties.code))) ? "#EAF4FB" : "#FAFAFA";
+                const base = (d && highlightCodes.has(String(d.properties.code))) ? "#EAF4FB" : "#DED9D5";
                 return self._specialFill(d, base);
             });
 
@@ -870,7 +872,7 @@ export const TradeMap = {
         this.g.selectAll(".land")
             .transition().duration(md(400))
             .style("opacity", 1)
-            .attr("fill", d => this._specialFill(d, "#FAFAFA"));
+            .attr("fill", d => this._specialFill(d, "#DED9D5"));
 
         this._clearHalo();
         this._clearParticles();

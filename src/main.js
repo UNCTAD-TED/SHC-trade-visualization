@@ -235,6 +235,8 @@ const App = {
 
         window.addEventListener('resize', () => {
             setMobileHeight();
+            // flex-wrap may have moved the picker to a different row
+            ['exp', 'imp'].forEach(pfx => this._clampPickerMenu(document.getElementById(`${pfx}-menu`)));
             clearTimeout(this._resizeTimer);
             this._resizeTimer = setTimeout(() => {
                 TradeMap.init();
@@ -259,6 +261,7 @@ const App = {
                 const btn = document.getElementById(`${p}-btn`);
                 menu.classList.add('hidden');
                 menu.classList.remove('mobile-menu-fixed');
+                this._resetPickerMenu(menu);
                 if (menu.parentElement !== btn.parentElement) {
                     btn.parentElement.appendChild(menu);
                 }
@@ -309,6 +312,7 @@ const App = {
             const otherBtn = document.getElementById(`${otherPrefix}-btn`);
             otherMenu.classList.add('hidden');
             otherMenu.classList.remove('mobile-menu-fixed');
+            this._resetPickerMenu(otherMenu);
             if (otherMenu.parentElement !== otherBtn.parentElement) {
                 otherBtn.parentElement.appendChild(otherMenu);
             }
@@ -325,7 +329,11 @@ const App = {
                 originalParent.appendChild(menu);
             }
             menu.classList.toggle('hidden');
-            
+
+            // Re-anchor once visible so the menu never hangs off the screen edge
+            if (menu.classList.contains('hidden')) this._resetPickerMenu(menu);
+            else this._clampPickerMenu(menu);
+
             // 開いたメニューが他のボタン（下の要素）に隠れないように z-index を高くする
             originalParent.style.zIndex = menu.classList.contains('hidden') ? '50' : '60';
         });
@@ -340,6 +348,7 @@ const App = {
                 
                 menu.classList.remove('hidden');
                 menu.classList.add('mobile-menu-fixed');
+                this._resetPickerMenu(menu);   // mobile.less positions this one
                 document.getElementById('mobile-country-backdrop')?.classList.remove('hidden');
             });
         }
@@ -349,6 +358,7 @@ const App = {
             if (isOutside) {
                 menu.classList.add('hidden');
                 menu.classList.remove('mobile-menu-fixed');
+                this._resetPickerMenu(menu);
                 if (menu.parentElement !== originalParent) {
                     originalParent.appendChild(menu);
                 }
@@ -387,6 +397,53 @@ const App = {
         clearAll.addEventListener('click', () => {
             selector.clearAll();
         });
+    },
+
+    // ── Country picker dropdown: keep it inside the viewport ──────────
+    // The menu is 256px wide but its button is only 144px, and header.less
+    // anchors it with `right: 0`, so it extends ~112px to the LEFT of the button.
+    // .header-controls uses flex-wrap, so at some viewport widths a picker ends
+    // up first on a wrapped row (x ≈ 16px) and that overhang falls off the left
+    // edge of the screen — clipped and unreachable (measured: up to 96px lost at
+    // 860 / 1440 / 1600 / 1700px wide).
+    //
+    // CSS cannot fix this on its own: how far the button sits from the edge
+    // depends on where flex-wrap happened to break the row. So keep the CSS
+    // position as the preferred one and nudge it back on screen after opening.
+    PICKER_EDGE_GAP: 8,   // px kept between the menu and the viewport edge
+
+    _clampPickerMenu(menu) {
+        if (!menu || menu.classList.contains('hidden')) return;
+        // The mobile sheet is a full-width fixed panel positioned by
+        // mobile.less with !important — nothing to clamp.
+        if (menu.classList.contains('mobile-menu-fixed')) return;
+
+        // Always measure from the CSS default so repeated opens and resizes
+        // never accumulate an offset.
+        this._resetPickerMenu(menu);
+
+        const wrapper = menu.offsetParent;          // .picker-wrapper
+        if (!wrapper) return;
+
+        const m  = menu.getBoundingClientRect();
+        const w  = wrapper.getBoundingClientRect();
+        const vw = document.documentElement.clientWidth;
+        const gap = this.PICKER_EDGE_GAP;
+
+        // Clamp the CSS-preferred position into the viewport. Math.max last, so
+        // on a viewport narrower than the menu the left edge still wins and the
+        // search box stays reachable.
+        const wanted = Math.max(gap, Math.min(m.left, vw - gap - m.width));
+        if (Math.abs(wanted - m.left) < 0.5) return;   // already fits
+
+        menu.style.right = 'auto';
+        menu.style.left  = `${Math.round(wanted - w.left)}px`;
+    },
+
+    _resetPickerMenu(menu) {
+        if (!menu) return;
+        menu.style.left  = '';
+        menu.style.right = '';
     },
 
     updateUIClasses(selector, activeEl) {

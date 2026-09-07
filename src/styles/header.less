@@ -142,6 +142,15 @@
       font-size: 10px;
       font-weight: 700;
     }
+
+    // Semantic color variants. Prefer these over inline `style="color:#…"`
+    // in index.html so palette changes stay in the tokens layer.
+    // Values mirror --flow-* in src/styles/variables.less and
+    // CONFIG.flowColors in src/config.js — keep the three in sync.
+    &.flow-ns span { color: var(--un-color-blue); }
+    &.flow-sn span { color: var(--un-color-green); }
+    &.flow-ss span { color: var(--un-color-yellow); }
+    &.flow-nn span { color: var(--un-color-purple); }
   }
 
   // Country picker dropdown button

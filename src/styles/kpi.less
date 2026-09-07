@@ -36,7 +36,7 @@
   }
 
   .kpi-label {
-    font-size: 9px;
+    font-size: var(--fs-micro);
     color: @ungrey-text;
     text-transform: uppercase;
     font-weight: 600;
@@ -44,11 +44,19 @@
   }
 
   .kpi-value {
-    font-size: 12px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     font-family: @font-mono;
     color: @ungrey-dark;
     transition: color 0.3s ease;
+
+    // Semantic color variants (mirror reference kpi.css). Prefer these
+    // over inline `style="color:#…"` in index.html so palette changes
+    // stay in the tokens layer (src/styles/variables.less).
+    &.kpi-value-exp { color: var(--un-color-blue-dark); }
+    &.kpi-value-imp { color: var(--un-color-red); }
+    &.kpi-value-ns  { color: var(--un-color-blue); }
+    &.kpi-value-ss  { color: var(--un-color-yellow); }
   }
 
   .kpi-divider {

@@ -140,6 +140,30 @@ main {
   &:active { cursor: grabbing; }
 }
 
+// ── Political border lines (UN cartographic standard) ─────────
+// All political border lines render in WHITE so they read as negative
+// space between tan land polygons and do not visually assert sovereignty
+// on disputed lines (Kashmir, Golan, West Bank, Kosovo, DMZ, Abyei,
+// Hala'ib, Western Sahara, Ogaden).
+//
+// stroke-width and stroke-dasharray are refreshed per zoom step by the
+// zoom handler in src/map.js (search "border-dashed"). Only stroke color
+// and shared attributes live here.
+.border {
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+}
+.border-plain       { stroke: var(--col-border-plain); }
+.border-dashed      { stroke: var(--col-border-dashed); }
+.border-dotted      { stroke: var(--col-border-dashed); }
+.border-dash-dotted { stroke: var(--col-border-dashed); }
+
+// Small island-nation point markers
+.economy-point {
+  pointer-events: none;
+}
+
 .trade-arc {
   fill: none;
   stroke-linecap: round;

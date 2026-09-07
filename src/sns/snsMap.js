@@ -11,7 +11,7 @@ const FLOW_COLORS = {
   'north-south': '#009EDB',
   'south-north': '#72BF44',
   'south-south': '#FBAF17',
-  'north-north': '#AEA29A',
+  'north-north': '#A066AA',
 };
 
 let svg, mapG, projection, path, meta;
@@ -223,7 +223,7 @@ function renderLegend() {
 
   // ── Row 1: Arc colours ──────────────────────────────────────────
   secLabel(y1, 'ARCS');
-  [['#009EDB','N→S'], ['#72BF44','S→N'], ['#FBAF17','S→S'], ['#AEA29A','N→N']]
+  [['#009EDB','N→S'], ['#72BF44','S→N'], ['#FBAF17','S→S'], ['#A066AA','N→N']]
     .forEach(([color, text], i) => {
       const x = col + i * 56;
       g.append('rect').attr('x', x).attr('y', y1 - 4).attr('width', 14).attr('height', 4).attr('fill', color).attr('rx', 1);

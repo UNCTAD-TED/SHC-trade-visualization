@@ -498,7 +498,7 @@ function _injectOverlays() {
           <span class="al-item"><span class="al-swatch" style="background:#009EDB"></span>N→S</span>
           <span class="al-item"><span class="al-swatch" style="background:#72BF44"></span>S→N</span>
           <span class="al-item"><span class="al-swatch" style="background:#FBAF17"></span>S→S</span>
-          <span class="al-item"><span class="al-swatch" style="background:#AEA29A"></span>N→N</span>
+          <span class="al-item"><span class="al-swatch" style="background:#A066AA"></span>N→N</span>
         </div>
       </div>
       <div class="al-divider"></div>

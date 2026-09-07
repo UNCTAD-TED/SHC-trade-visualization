@@ -52,7 +52,7 @@ export const TOUR_STEPS = [
                <span style="color:#009EDB">■</span> North→South,
                <span style="color:#72BF44">■</span> South→North,
                <span style="color:#FBAF17">■</span> South→South,
-               <span style="color:#AEA29A">■</span> North→North.
+               <span style="color:#A066AA">■</span> North→North.
                <br><br><b>Circles (nodes)</b> are countries:
                <span style="color:#009EDB">blue</span> = net exporter,
                <span style="color:#ED1847">red</span> = net importer. The larger the circle, the larger the trade.`,

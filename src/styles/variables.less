@@ -30,3 +30,85 @@
 @shadow-sm:  0 1px 3px rgba(0,0,0,0.08);
 @shadow-md:  0 2px 8px rgba(0,0,0,0.10);
 @shadow-lg:  0 10px 40px rgba(0,0,0,0.15);
+
+// ─────────────────────────────────────────────────────────────────
+// CSS custom-property layer (parallel to the Less variables above).
+//
+// Purpose: mirror the token names used by the UNCTAD InfoVis Drupal
+// template (`--un-color-*`, `--map-*`, `--flow-*`, `--col-*`, `--fs-*`).
+// Once emitted these tokens can be referenced from any CSS as
+// `var(--un-color-blue-darkest)` etc, matching
+// unctad-infovis/2026-second_hand_clothes 1:1.
+//
+// The existing Less variables are kept so nothing breaks; new styles
+// should prefer the CSS variables so the Less layer can be dropped
+// once every rule has migrated.
+// ─────────────────────────────────────────────────────────────────
+:root {
+  // Core UN palette (mirrors src/styles/colors.less)
+  --un-color-blue:          #009edb;
+  --un-color-blue-dark:     #004990;
+  --un-color-blue-darkest:  #003a75;
+  --un-color-blue-light:    #7bb7e1;
+  --un-color-blue-lightest: #c3dff0;
+
+  --un-color-red:           #eb1f48;
+  --un-color-red-light:     #f47a94;
+  --un-color-red-lightest:  #fbc5d0;
+
+  --un-color-green:         #72bf44;
+  --un-color-yellow:        #fbaf17;
+  --un-color-purple:        #a066aa;
+
+  --un-color-grey:          #aea29a;
+  --un-color-grey-dark:     #6e6259;
+  --un-color-grey-darkest:  #4f4740;
+  --un-color-grey-light:    #ded9d5;
+  --un-color-grey-lightest: #ebeae6;
+
+  // Tracker-specific tokens (parallel to reference tracker/styles/colors.css)
+  --ungrey-dark:            #231f20;
+  --unblue-bg:              #f2f8fc;
+  --unblue-bg-alt:          #f3f8fd;
+  --unyellow-un:            #ffcb05;
+
+  --col-danger:             #ef4444;
+  --col-compare:            #b45309;
+
+  --col-warning-text:       #92400e;
+  --col-warning-bg:         #fefce8;
+  --col-warning-border:     #fcd34d;
+  --col-badge-yellow-text:  #4a3800;
+
+  // Map tokens (see src/map.js for the render sites that consume these)
+  --map-land-fill:          #ded9d5;
+  --map-hover-fill:         #c8c2bb;
+  --map-focus-fill:         #eaf4fb;
+  --map-land-stroke:        #c8c2bb;
+
+  // Border stroke — UN cartographic standard is white so lines read as
+  // negative space and do not visually assert sovereignty on disputed
+  // boundaries. See src/styles/styles.less .border-* rules.
+  --col-border-plain:       #fff;
+  --col-border-dashed:      #fff;
+
+  // Flow-category colors (developed = "north", developing/LDC = "south")
+  --flow-north-south:       var(--un-color-blue);
+  --flow-south-north:       var(--un-color-green);
+  --flow-south-south:       var(--un-color-yellow);
+  --flow-north-north:       var(--un-color-purple);
+
+  // Font-size scale — matches reference tracker/styles/variables.css exactly
+  --fs-micro:  0.5625rem;  // 9px
+  --fs-xxs:    0.625rem;   // 10px
+  --fs-xs:     0.6875rem;  // 11px
+  --fs-sm:     0.75rem;    // 12px
+  --fs-label:  0.8125rem;  // 13px
+  --fs-base:   0.875rem;   // 14px
+  --fs-body:   0.9375rem;  // 15px
+  --fs-md:     1.0625rem;  // 17px
+  --fs-xl:     1.5rem;     // 24px
+
+  // Chart-grid line color used by SVG data-viz components
+  --chart-grid: #e2e8f0;
+}

@@ -12,12 +12,14 @@ export const CONFIG = {
         weight: { label: "Export Weight (t)",   discrete: { large: "#0ea5e9", medium: "#6366f1", small: "#334155" } },
     },
 
-    // Flow category base colors (North = Developed, South = Developing/LDC)
+    // Flow category base colors (North = Developed, South = Developing/LDC).
+    // Values mirror the UN InfoVis reference (unctad-infovis/2026-second_hand_clothes)
+    // — see --flow-* tokens in src/styles/variables.less.
     flowColors: {
         'north-south': '#009EDB',  // UNCTAD Blue
         'south-north': '#72BF44',  // UNCTAD Green
         'south-south': '#FBAF17',  // UNCTAD Yellow
-        'north-north': '#AEA29A',  // UNCTAD Warm Grey
+        'north-north': '#A066AA',  // UNCTAD Purple
     },
 
     // Development status: 'north' = Developed economies
