@@ -204,7 +204,7 @@
             margin-bottom: 4px; flex-shrink: 0;
         }
         .ap-export { color: #009edb; }
-        .ap-import { color: #72bf44; }
+        .ap-import { color: #ed1847; }
 
         /* Chart area: exactly 10 rows tall — no empty space below bars */
         .ap-chart { position: relative; height: 270px; flex-shrink: 0; overflow: hidden; }
@@ -375,7 +375,7 @@
 
                 <!-- Top-N line limit — how many trade lines to draw, largest first.
                      Metric-independent, so it survives a value ⇄ weight switch. -->
-                <div id="topn-group" class="ctrl-pill" title="Show only the N largest trade lines (independent of the value/weight threshold)">
+                <div id="topn-group" class="ctrl-pill" title="Draw only the N largest net flows. With Auto it replaces the automatic limit; with a fixed threshold both apply.">
                     <span class="ctrl-flows-label">Lines</span>
                     <button class="topn-btn btn-toggle active" data-topn="all">All</button>
                     <button class="topn-btn btn-toggle" data-topn="50">50</button>
@@ -444,7 +444,7 @@
 
                 <!-- CSV export — current map view (country / corridor exports live in the panels) -->
                 <div class="picker-wrapper" id="export-wrapper">
-                    <button id="export-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Download the current map view as a CSV table">
+                    <button id="export-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Download the flows of the current region or selection as a CSV table">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Export view
                     </button>
                     <div id="export-menu" class="export-menu hidden" role="menu">
@@ -454,13 +454,13 @@
                         </div>
                         <button class="export-opt" data-export="flows" role="menuitem">
                             <span class="export-opt-title">Trade flows</span>
-                            <span class="export-opt-sub">One row per corridor · USD, kg &amp; unit value</span>
+                            <span class="export-opt-sub">One row per net flow · net value and weight, gross flow and unit value</span>
                         </button>
                         <button class="export-opt" data-export="summary" role="menuitem">
                             <span class="export-opt-title">Country summary</span>
-                            <span class="export-opt-sub">Ranked · role, net balance, top partner, HHI</span>
+                            <span class="export-opt-sub">Ranked · net flows in this view, role, top partner, HHI</span>
                         </button>
-                        <div class="export-menu-foot">Tip: click a country for its own data, or click a flow line for that corridor's history. Display threshold is not applied to exports.</div>
+                        <div class="export-menu-foot">Tip: click a country for its own data, or click a flow line for that corridor's history. Exports include every flow in the current region or selection: the display threshold is not applied, the Lines limit and flow-direction filters are.</div>
                     </div>
                 </div>
 
@@ -493,11 +493,11 @@
         <div id="legend-content"></div>
         <div id="total-stats">
             <div class="stat-row">
-                <span class="stat-label">Shown</span>
+                <span class="stat-label" title="Net flows drawn on the map">Shown</span>
                 <span class="stat-val" id="stat-value">—</span>
             </div>
             <div class="stat-row">
-                <span class="stat-label">Bilateral</span>
+                <span class="stat-label" title="All net flows in the current region or selection, before the threshold, Lines limit and flow-direction filters">Total</span>
                 <span class="stat-secondary" id="stat-bilateral">—</span>
             </div>
             <span id="stat-coverage"></span>
@@ -515,37 +515,37 @@
                 <span class="kpi-value" id="kpi-scope">Global</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="Total trade value of visible flows — after threshold and Top-N line limit">
-                <span class="kpi-label">Volume</span>
+            <div class="kpi-item" title="Sum of the net flows drawn on the map — after the threshold, Lines limit and flow-direction filters">
+                <span class="kpi-label">Shown</span>
                 <span class="kpi-value" id="kpi-total">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="Number of bilateral trade corridors shown on map — after threshold and Top-N line limit">
+            <div class="kpi-item" title="Number of net flows drawn on the map — after the threshold, Lines limit and flow-direction filters">
                 <span class="kpi-label">Corridors</span>
                 <span class="kpi-value" id="kpi-flows">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="Number of countries active in the current view">
+            <div class="kpi-item" title="Number of economies connected by the flows drawn on the map">
                 <span class="kpi-label">Countries</span>
                 <span class="kpi-value" id="kpi-countries">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item kpi-item-col" title="Largest net exporter by trade balance (includes all flows, before threshold and Top-N limit)">
+            <div class="kpi-item kpi-item-col" title="Largest net exporter (exports minus imports) over all flows in the current region or selection — before the threshold, Lines limit and flow-direction filters">
                 <span class="kpi-label">#1 Exporter</span>
                 <span class="kpi-value kpi-value-exp" id="kpi-top-exp">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item kpi-item-col" title="Largest net importer by trade balance (includes all flows, before threshold and Top-N limit)">
+            <div class="kpi-item kpi-item-col" title="Largest net importer (imports minus exports) over all flows in the current region or selection — before the threshold, Lines limit and flow-direction filters">
                 <span class="kpi-label">#1 Importer</span>
                 <span class="kpi-value kpi-value-imp" id="kpi-top-imp">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="North-to-South flows as share of total visible trade value">
+            <div class="kpi-item" title="North→South share of the net flows drawn on the map">
                 <span class="kpi-label">N→S</span>
                 <span class="kpi-value kpi-value-ns" id="kpi-ns-pct">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="South-to-South flows as share of total visible trade value">
+            <div class="kpi-item" title="South→South share of the net flows drawn on the map">
                 <span class="kpi-label">S→S</span>
                 <span class="kpi-value kpi-value-ss" id="kpi-ss-pct">—</span>
             </div>
@@ -569,7 +569,7 @@
                     <div class="panel-title-group">
                         <div class="panel-country-name-row">
                             <div id="panel-country-name">—</div>
-                            <button id="searoute-btn" class="searoute-btn" title="Show actual shipping routes (experimental feature)" disabled>
+                            <button id="searoute-btn" class="searoute-btn" title="Show indicative sea routes (experimental)" disabled>
                                 <span class="searoute-btn-label">Sea Route</span>
                                 <span class="searoute-experimental-badge">EXPERIMENTAL</span>
                             </button>
@@ -656,7 +656,7 @@
     <!-- ── Map Footer ── -->
     <footer id="map-footer">
         <p>Source: BACI based on UN Comtrade. Data cover HS&nbsp;6309 (Worn clothing and other worn articles).</p>
-        <p>Note: Sea routes are shown only for flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania) and represent major maritime shipping lanes computed via the Eurostat <em>searoute</em> algorithm using representative ports based on UNCTAD PLSCI scores. Flows within the same region are shown as arcs. Routes do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths and may not represent the actual mode of transport used.</p>
+        <p>Note: Sea routes are shown only for flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania) and are indicative routes between representative ports, computed with the Eurostat <em>searoute</em> algorithm (ports chosen mainly by UNCTAD PLSCI). Flows within the same region are shown as curved lines. Routes do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths and may not represent the actual mode of transport used.</p>
         <p class="footer-method-link"><button id="methodology-btn" class="footer-link-btn">Methodology &amp; Data Sources</button></p>
     </footer>
 
@@ -681,30 +681,32 @@
                         <dt>Database</dt>
                         <dd>BACI International Trade Database (CEPII), derived from UN Comtrade mirror data. Harmonized bilateral trade flows at the HS 6-digit level.</dd>
                         <dt>Product coverage</dt>
-                        <dd>HS&nbsp;6309 — <em>Worn clothing and other worn articles.</em> Includes second-hand garments traded in bulk regardless of quality grade.</dd>
+                        <dd>HS&nbsp;6309 &mdash; <em>Worn clothing and other worn articles</em>: worn clothing, clothing accessories, blankets, household linen, furnishing articles, footwear and headgear showing signs of appreciable wear, presented in bulk, bales, sacks or similar packings. Rags (HS&nbsp;6310) are not included.</dd>
                         <dt>Years available</dt>
-                        <dd>2015–2024 (provisional for the most recent year)</dd>
+                        <dd>2015&ndash;2024 (provisional for the most recent year)</dd>
                         <dt>Value unit</dt>
-                        <dd>Current USD (thousands, then converted to display units)</dd>
+                        <dd>Current US dollars (FOB), displayed as $K / $M / $B.</dd>
                         <dt>Weight unit</dt>
                         <dd>Kilograms (BACI harmonized export weight), displayed in metric tonnes (t&thinsp;/&thinsp;kt&thinsp;/&thinsp;Mt).</dd>
                         <dt>Metric toggle</dt>
-                        <dd>The <strong>Value / Weight</strong> switch in the toolbar recomputes every figure on the map, legend, KPIs and country panels from the selected measure. Net flow direction, thresholds and rankings are all derived from whichever metric is active.</dd>
+                        <dd>The <strong>Value / Weight</strong> switch in the toolbar recomputes every figure on the map, legend, KPIs and country panels from the selected measure. Net flow direction, thresholds and rankings are all derived from whichever metric is active, so the direction of a net flow can differ between value and weight.</dd>
+                        <dt>Not shown</dt>
+                        <dd>Trade recorded as &ldquo;Other Asia, nes&rdquo; and with special partner areas (bunkers, free zones, special categories) is not shown.</dd>
                     </dl>
                 </section>
 
                 <section class="method-section">
                     <h3 class="method-section-title">Flow Direction Classification</h3>
-                    <p class="method-note">Countries are classified as <strong>North</strong> (developed) or <strong>South</strong> (developing/least-developed) using the UNCTAD Development Status classification, consistent with UNCTAD flagship publications.</p>
+                    <p class="method-note">Economies are classified as <strong>North</strong> (developed) or <strong>South</strong> (developing, including least developed) using the UNCTAD development status classification, consistent with UNCTAD flagship publications.</p>
                     <dl class="method-dl">
                         <dt><span class="method-flow-dot" style="background:#009EDB"></span> N&rarr;S</dt>
-                        <dd>Export from a developed economy to a developing economy</dd>
+                        <dd>Net flow from a developed economy to a developing economy</dd>
                         <dt><span class="method-flow-dot" style="background:#72BF44"></span> S&rarr;N</dt>
-                        <dd>Export from a developing economy to a developed economy</dd>
+                        <dd>Net flow from a developing economy to a developed economy</dd>
                         <dt><span class="method-flow-dot" style="background:#FBAF17"></span> S&rarr;S</dt>
-                        <dd>Both exporter and importer are developing or least-developed economies</dd>
-                        <dt><span class="method-flow-dot" style="background:#AEA29A"></span> N&rarr;N</dt>
-                        <dd>Both exporter and importer are developed economies</dd>
+                        <dd>Both economies are developing (including least developed)</dd>
+                        <dt><span class="method-flow-dot" style="background:#A066AA"></span> N&rarr;N</dt>
+                        <dd>Both economies are developed</dd>
                     </dl>
                 </section>
 
@@ -712,45 +714,53 @@
                     <h3 class="method-section-title">Trade Flow Calculation</h3>
                     <dl class="method-dl">
                         <dt>Net bilateral flow</dt>
-                        <dd>For each country pair (A, B), the net flow equals the larger reported value between A&rarr;B and B&rarr;A exports. The dominant direction determines the arc direction. This reduces double-counting from mirror reporting in UN Comtrade.</dd>
-                        <dt>Arc width</dt>
-                        <dd>Scaled proportionally to the net trade value on a square-root scale to prevent large flows from dominating small ones visually.</dd>
-                        <dt>Arc curvature</dt>
-                        <dd>All arcs curve in a consistent clockwise direction (SVG <code>sweep-flag = 1</code>). This means eastward flows bend northward and westward flows bend southward, providing a secondary visual cue for flow direction that complements the color encoding.</dd>
+                        <dd>For each pair of economies (A, B), the net flow is A&rsquo;s exports to B minus B&rsquo;s exports to A. The line runs from the net exporter to the net importer, and its size reflects the absolute net amount. Trade in both directions therefore partly offsets; the gross flows in each direction are shown in the corridor history and in the CSV downloads.</dd>
+                        <dt>Line width</dt>
+                        <dd>Square-root scale of the net flow, so that large flows do not hide small ones. Flows above the 98th percentile of those shown are drawn at the maximum width. Larger flows are also drawn more opaque.</dd>
+                        <dt>Line curvature</dt>
+                        <dd>All lines curve in a consistent clockwise direction (SVG <code>sweep-flag = 1</code>). Eastward flows bend northward and westward flows bend southward, a secondary cue for direction that complements the colour.</dd>
+                        <dt>Circles</dt>
+                        <dd>Colour shows the economy&rsquo;s net balance (exports minus imports) over all flows in the current region or selection, before the display threshold: blue for net exporters, red for net importers. Size shows the total of the flows drawn for that economy.</dd>
                     </dl>
                 </section>
 
                 <section class="method-section">
-                    <h3 class="method-section-title">Display Threshold (Auto Mode)</h3>
-                    <p class="method-note">To avoid visual overload, the map limits the number of displayed arcs to a maximum of <strong>40</strong> at a time.</p>
+                    <h3 class="method-section-title">What the Map Shows</h3>
+                    <p class="method-note">To avoid visual overload, the map draws only the largest net flows. The totals in the legend (&ldquo;Shown&rdquo; and &ldquo;Total&rdquo;) tell how much of the trade in the current region or selection is on the map.</p>
                     <dl class="method-dl">
-                        <dt>Global view</dt>
-                        <dd>Minimum threshold: $10&thinsp;M. Arcs below this value are hidden.</dd>
-                        <dt>With country selection</dt>
-                        <dd>Floor scales down with selection breadth (1–3 countries: $10&thinsp;K; 4–10: $100&thinsp;K; 11–30: $500&thinsp;K; 31+: $1&thinsp;M). If the number of arcs above the floor exceeds 40, the threshold is raised to the 40th-highest value.</dd>
-                        <dt>Manual thresholds</dt>
-                        <dd>Fixed cut-off values ($10&thinsp;k – $10&thinsp;M) override the automatic algorithm.</dd>
+                        <dt>Auto (default)</dt>
+                        <dd>At most <strong>40</strong> lines. A minimum flow applies first: $10&thinsp;M in the global view, $1&thinsp;M for a region; with countries selected, $10&thinsp;K (1&ndash;3 countries), $100&thinsp;K (4&ndash;10), $500&thinsp;K (11&ndash;30) or $1&thinsp;M (31 or more). If more than 40 flows clear it, the 40 largest are drawn. In weight mode the same steps apply in tonnes (10&thinsp;kt, 1&thinsp;kt, 10&thinsp;t, 100&thinsp;t, 500&thinsp;t, 1&thinsp;kt).</dd>
+                        <dt>Fixed thresholds</dt>
+                        <dd>$10&thinsp;M to $10&thinsp;K (10&thinsp;kt to 10&thinsp;t in weight mode): every flow at or above the chosen value is drawn.</dd>
+                        <dt>Lines</dt>
+                        <dd>Draws only the N largest flows. With Auto it replaces the 40-line limit; with a fixed threshold both conditions apply. The N largest are taken before the flow-direction boxes, so hiding a direction can leave fewer than N lines.</dd>
+                        <dt>Regions</dt>
+                        <dd>A region shows only flows between economies of that region.</dd>
+                        <dt>Connect</dt>
+                        <dd>Drawn connections are shown whatever their size; the region, threshold and Lines settings do not apply to them.</dd>
+                        <dt>Country panel</dt>
+                        <dd>Gross trade is the economy&rsquo;s exports plus imports with all partners; net balance is exports minus imports. Partner lists, concentration, trade split, fingerprint and flow composition use all of the economy&rsquo;s net flows, never the display threshold, Lines limit or flow-direction boxes; when a region is selected they are limited to partners in that region.</dd>
                     </dl>
                 </section>
 
                 <section class="method-section">
                     <h3 class="method-section-title">Partner Concentration (HHI)</h3>
-                    <p class="method-note">Shown in the country detail panel when a country is clicked. Measures how much a country&rsquo;s trade is spread across partners versus concentrated in just a few analogous to asking &ldquo;does this country trade with everyone, or depend heavily on one partner?&rdquo;</p>
+                    <p class="method-note">Shown in the country panel. Measures how much an economy&rsquo;s trade is spread across partners or concentrated on a few &mdash; does it trade with everyone, or depend heavily on one partner?</p>
                     <dl class="method-dl">
                         <dt>Index used</dt>
-                        <dd>Herfindahl&ndash;Hirschman Index (HHI): the sum of squared partner trade shares, scaled to 0&ndash;10&thinsp;000. A score of 10&thinsp;000 means 100% of trade goes to a single partner; a score near 0 means trade is evenly spread across many partners.</dd>
+                        <dd>Herfindahl&ndash;Hirschman Index (HHI): the sum of squared partner shares, scaled to 0&ndash;10,000. A score of 10,000 means all trade is with a single partner; a score near 0 means trade is spread evenly across many partners.</dd>
                         <dt>Formula</dt>
-                        <dd><code>HHI = &sum;(share<sub>i</sub>&sup2;) &times; 10&thinsp;000</code>, where share<sub>i</sub> is each partner&rsquo;s fraction of that country&rsquo;s total bilateral trade value.</dd>
+                        <dd><code>HHI = &sum;(share<sub>i</sub>&sup2;) &times; 10,000</code>, where share<sub>i</sub> is partner i&rsquo;s share of the economy&rsquo;s net bilateral flows. Export and import partners are counted together, in the selected measure (value or weight).</dd>
                         <dt>Interpretation</dt>
                         <dd>
-                            <span class="method-hhi-band" style="color:#72BF44">&#9632;</span> <strong>Diversified</strong> (0–2&thinsp;000): trade spread across many partners<br>
-                            <span class="method-hhi-band" style="color:#FBAF17">&#9632;</span> <strong>Moderate</strong> (2&thinsp;000–4&thinsp;000): some partners dominate but diversification remains<br>
-                            <span class="method-hhi-band" style="color:#ef4444">&#9632;</span> <strong>Highly concentrated</strong> (&gt;4&thinsp;000): trade heavily dependent on one or two partners
+                            <span class="method-hhi-band" style="color:#72BF44">&#9632;</span> <strong>Diversified</strong> (below 2,000): trade spread across many partners<br>
+                            <span class="method-hhi-band" style="color:#FBAF17">&#9632;</span> <strong>Moderate</strong> (2,000 to below 4,000): some partners dominate but diversification remains<br>
+                            <span class="method-hhi-band" style="color:#ef4444">&#9632;</span> <strong>Highly concentrated</strong> (4,000 and above): trade heavily dependent on one or two partners
                         </dd>
                         <dt>Threshold note</dt>
-                        <dd>These bands are calibrated for international trade dependency analysis. They are deliberately lower than the antitrust thresholds used in competition law (which start at 2&thinsp;500 for &ldquo;concentrated markets&rdquo;), reflecting that even moderate trade concentration poses diversification risks.</dd>
+                        <dd>These bands are specific to this tool and indicative. They are more lenient than the thresholds used in competition law (for example, the 2023 United States Merger Guidelines treat markets above 1,800 as highly concentrated).</dd>
                         <dt>Data scope</dt>
-                        <dd>Computed from all net bilateral flows for the selected year, regardless of the display threshold. This ensures the score is not distorted by the map&rsquo;s visibility filter.</dd>
+                        <dd>All of the economy&rsquo;s net bilateral flows for the selected year, regardless of the display threshold, Lines limit and flow-direction boxes; limited to partners in the region when a region is selected.</dd>
                     </dl>
                 </section>
 
@@ -758,11 +768,11 @@
                     <h3 class="method-section-title">Maritime Route Visualization</h3>
                     <dl class="method-dl">
                         <dt>Coverage</dt>
-                        <dd>Sea routes are displayed only for trade flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania). Flows within the same region are shown as straight arcs to avoid visual clutter from short intra-regional routes.</dd>
+                        <dd>Sea routes can be switched on in the country panel (&ldquo;Sea Route&rdquo;, experimental). They are drawn only for flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania); flows within a region keep their curved line to avoid clutter from short routes.</dd>
                         <dt>Algorithm</dt>
-                        <dd>Routes are computed using the Eurostat <em>searoute</em> algorithm over a navigable sea graph.</dd>
+                        <dd>Routes are computed with the Eurostat <em>searoute</em> algorithm over a navigable sea graph.</dd>
                         <dt>Port selection</dt>
-                        <dd>Representative ports are chosen based on UNCTAD Liner Shipping Connectivity Index (LSCI) scores; the highest-ranked port in each country is used as the routing node. For large countries spanning multiple coasts (United States, Canada, Australia), the nearest coast port to the partner country is selected.</dd>
+                        <dd>Each economy is routed through one representative port, chosen mainly as its highest-ranked port in the UNCTAD Port Liner Shipping Connectivity Index (PLSCI), with some ports set manually. Landlocked economies are routed through a gateway port of a neighbouring country. For the United States, Canada and Australia, a Pacific-coast port is used when the partner lies east of 60&deg;E and an Atlantic- or Indian-Ocean-coast port otherwise.</dd>
                         <dt>Disclaimer</dt>
                         <dd>Routes are indicative only. They do not represent actual tracked HS&nbsp;6309 cargo paths, may not reflect the mode of transport used, and should not be used for navigation.</dd>
                     </dl>
@@ -775,7 +785,7 @@
 
                 <section class="method-section method-section-last">
                     <h3 class="method-section-title">How to Cite</h3>
-                    <p class="method-cite">UNCTAD (2025). <em>Global Second-Hand Clothes Trade Monitor.</em> United Nations Conference on Trade and Development, Geneva.</p>
+                    <p class="method-cite">UN Trade and Development (UNCTAD) (2026). <em>Global Second-Hand Clothes Trade Monitor.</em> Geneva.</p>
                 </section>
 
             </div>
@@ -845,8 +855,8 @@
                         <span style="color:#FBAF17">S → S</span>
                     </label>
                     <label class="flow-label-lg">
-                        <input type="checkbox" class="flow-checkbox" value="north-north" checked style="accent-color:#AEA29A">
-                        <span style="color:#AEA29A">N → N</span>
+                        <input type="checkbox" class="flow-checkbox" value="north-north" checked style="accent-color:#A066AA">
+                        <span style="color:#A066AA">N → N</span>
                     </label>
                 </div>
             </div>

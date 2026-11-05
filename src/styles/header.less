@@ -215,64 +215,66 @@
     }
   }
 
-  // Country picker dropdown menu
-  .country-picker-menu {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: 8px;
-    width: 256px;
-    background: #fff;
-    border: 1px solid @ungrey-border;
-    border-radius: @radius-md;
-    box-shadow: @shadow-md;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    max-height: 400px;
-    z-index: 50;
-
-    &.hidden { display: none; }
-
-    .picker-search-area {
-      padding: 8px;
-      border-bottom: 1px solid @ungrey-bg;
-      background: @unblue-bg;
-
-      input {
-        width: 100%;
-        background: #fff;
-        font-size: 11px;
-        color: @ungrey-dark;
-        padding: 6px 8px;
-        border-radius: @radius-sm;
-        border: 1px solid @ungrey-border;
-        outline: none;
-        box-sizing: border-box;
-
-        &:focus { border-color: @unblue-dark; }
-      }
-
-      .picker-clear {
-        font-size: 10px;
-        color: #e53e3e;
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 4px 0 0;
-        float: right;
-      }
-    }
-
-    .picker-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px;
-    }
-  }
-
   .picker-wrapper {
     position: relative;
     z-index: 50;
+  }
+}
+
+// Country picker dropdown menu — top level, not nested in #main-header: on phones
+// the menu is moved to <body> (mobile sheet), where nested rules would not reach it
+// and it would render transparent and unscrollable.
+.country-picker-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 256px;
+  background: #fff;
+  border: 1px solid @ungrey-border;
+  border-radius: @radius-md;
+  box-shadow: @shadow-md;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 400px;
+  z-index: 50;
+
+  &.hidden { display: none; }
+
+  .picker-search-area {
+    padding: 8px;
+    border-bottom: 1px solid @ungrey-bg;
+    background: @unblue-bg;
+
+    input {
+      width: 100%;
+      background: #fff;
+      font-size: 11px;
+      color: @ungrey-dark;
+      padding: 6px 8px;
+      border-radius: @radius-sm;
+      border: 1px solid @ungrey-border;
+      outline: none;
+      box-sizing: border-box;
+
+      &:focus { border-color: @unblue-dark; }
+    }
+
+    .picker-clear {
+      font-size: 10px;
+      color: #e53e3e;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 0 0;
+      float: right;
+    }
+  }
+
+  .picker-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
   }
 }

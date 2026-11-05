@@ -4,10 +4,20 @@ import { CONFIG, STATE } from './config.js';
 import { RegionConfig } from './regions.js';
 import { TradeMap } from './map.js';
 
+// fetch + JSON that fails loudly on HTTP errors instead of parsing an error page.
+async function getJSON(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+    return r.json();
+}
+
 export const DataLoader = {
     // Cache key for pre-threshold stats (metric|year|region|exporters|importers).
     // Threshold and flow-category changes must not trigger a recompute.
     _preThresholdKey: null,
+
+    // Incremented on every metric request; only the latest request may commit.
+    _metricSeq: 0,
 
     // Directory prefix for a metric's pre-computed JSON files.
     //   value  -> data/        weight -> data/weight/
@@ -21,9 +31,9 @@ export const DataLoader = {
             const prefix = this._prefix(metric);
             const [world, meta, trendSummary, yearFlows] = await Promise.all([
                 d3.json(CONFIG.geoJsonUrl),
-                fetch('data/meta.json').then(r => r.json()),
-                fetch(`${prefix}trend_summary.json`).then(r => r.json()),
-                fetch(`${prefix}${STATE.year}.json`).then(r => r.json()),
+                getJSON('data/meta.json'),
+                getJSON(`${prefix}trend_summary.json`),
+                getJSON(`${prefix}${STATE.year}.json`),
             ]);
 
             // Correct the ~11.314° westward longitude shift in the UNCTAD TopoJSON transform
@@ -61,8 +71,7 @@ export const DataLoader = {
 
             // Load routes.json in the background — not needed until a country is clicked.
             // Routes are geographic (metric-independent), so they are shared across metrics.
-            STATE._routesPromise = fetch('data/routes.json')
-                .then(r => r.json())
+            STATE._routesPromise = getJSON('data/routes.json')
                 .then(data => { STATE.routes = data; })
                 .catch(err => console.warn('routes.json load failed:', err));
 
@@ -85,39 +94,55 @@ export const DataLoader = {
             return store._bilateralPromise || Promise.resolve(store.bilateralHistory);
         }
         if (!store._bilateralPromise) {
-            store._bilateralPromise = fetch(`${this._prefix(metric)}bilateral_history.json`)
-                .then(r => r.json())
+            store._bilateralPromise = getJSON(`${this._prefix(metric)}bilateral_history.json`)
                 .then(data => {
                     store.bilateralHistory = data;
                     if (STATE.metric === metric) STATE.bilateralHistory = data;
+                    // Views drawn before the file arrived (corridor pop-up, the
+                    // panel's trade split and split badges) re-render on this.
+                    document.dispatchEvent(new CustomEvent('shc:bilateral-loaded', { detail: { metric } }));
                     return data;
                 })
-                .catch(err => console.warn('bilateral_history.json load failed:', err));
+                .catch(err => {
+                    console.warn('bilateral_history.json load failed:', err);
+                    store._bilateralPromise = null;   // allow a retry on the next request
+                });
         }
         return store._bilateralPromise;
     },
 
     // Switch the active metric ('value' | 'weight'), loading its files on demand.
-    // Repoints the active views (yearCache / trendSummary / bilateralHistory) and
-    // invalidates the pre-threshold stats cache so figures recompute.
+    // The files are loaded FIRST and the switch is committed only afterwards, and
+    // only if this is still the latest request — so STATE.metric (which drives the
+    // units) and the data it points at can never disagree, even when the user
+    // clicks Value / Weight faster than the files arrive.
+    // Resolves true when the switch was committed; false when the metric was
+    // already active (this also cancels a pending switch) or a later request won.
     async switchMetric(metric) {
-        if (metric === STATE.metric || !STATE.metricStore[metric]) return;
-        STATE.metric = metric;
+        const seq = ++this._metricSeq;
+        if (metric === STATE.metric || !STATE.metricStore[metric]) return false;
 
         const store  = STATE.metricStore[metric];
         const prefix = this._prefix(metric);
+        const year   = STATE.year;
 
         if (!store.trendSummary) {
-            store.trendSummary = await fetch(`${prefix}trend_summary.json`).then(r => r.json());
+            const ts = await getJSON(`${prefix}trend_summary.json`);
+            store.trendSummary = ts;
         }
-        await this.loadYear(STATE.year, metric);
+        await this.loadYear(year, metric);
+        if (seq !== this._metricSeq) return false;
+        if (year !== STATE.year) await this.loadYear(STATE.year, metric);
+        if (seq !== this._metricSeq) return false;
 
+        STATE.metric           = metric;
         STATE.yearCache        = store.years;
         STATE.trendSummary     = store.trendSummary;
         STATE.bilateralHistory = store.bilateralHistory; // may be null until loaded
         this._loadBilateral(metric);
 
         this._preThresholdKey = null;
+        return true;
     },
 
     processGeoData(geoData) {
@@ -134,7 +159,7 @@ export const DataLoader = {
     async loadYear(year, metric = STATE.metric) {
         const store = STATE.metricStore[metric];
         if (store.years[year]) return store.years[year];
-        const data = await fetch(`${this._prefix(metric)}${year}.json`).then(r => r.json());
+        const data = await getJSON(`${this._prefix(metric)}${year}.json`);
         store.years[year] = data;
         return data;
     },
@@ -164,6 +189,9 @@ export const DataLoader = {
             STATE.totalBilateral      = d3.sum(pairFlows, d => d.netValue);
             STATE.totalBilateralCount = pairFlows.length;
             STATE.rawNodeStats        = this.computeStatsFromNetFlows(pairFlows);
+            // These pair-only totals overwrite the cached pre-threshold figures, so
+            // the normal path below must recompute them once the pairs are gone.
+            this._preThresholdKey     = null;
 
             const finalFlows   = pairFlows.filter(d => STATE.flowFilters.has(d.flowCategory));
             STATE.nodeStats    = this.computeStatsFromNetFlows(finalFlows);
@@ -265,6 +293,22 @@ export const DataLoader = {
         // Raise threshold until arc count ≤ targetMax
         const sorted = aboveFloor.slice().sort((a, b) => b.netValue - a.netValue);
         return sorted[targetMax - 1].netValue;
+    },
+
+    // A country's own figures for the year, independent of every display filter
+    // (threshold, Lines limit, flow-direction boxes, region, selection):
+    //   gross = its exports + imports (gross directional flows; = trend_summary)
+    //   net   = exports − imports    (= sum of its signed net bilateral flows)
+    // Returns null when the country has no trade in the active metric that year.
+    countryTotals(iso, year = STATE.year) {
+        const gross = STATE.trendSummary?.[iso]?.[String(year)] || 0;
+        let net = 0, any = false;
+        (STATE.yearCache[year] || []).forEach(d => {
+            if (d.exporter === d.importer) return;          // self-trade nets to zero
+            if (d.exporter === iso)      { net += d.netValue; any = true; }
+            else if (d.importer === iso) { net -= d.netValue; any = true; }
+        });
+        return (gross > 0 || any) ? { gross, net } : null;
     },
 
     computeStatsFromNetFlows(netFlows) {

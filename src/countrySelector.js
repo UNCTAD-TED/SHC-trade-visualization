@@ -1,6 +1,16 @@
 // countrySelector.js - Hierarchical country selection with collapsible groups
+import { STATE } from './config.js';
 
 let _classificationCache = null;
+
+// Economies listed in country_classification.json that are NOT offered in the
+// pickers because the dataset holds no trade for them in any year, so picking
+// one could only produce an empty map. This is a data-coverage rule, not a
+// cartographic or political one:
+//   TWN — the source (BACI / UN Comtrade) records this trade under
+//         "Other Asia, nes", which the dataset excludes.
+//   PRI — no flow in any year or metric of the dataset.
+export const NO_DATA_CODES = new Set(['TWN', 'PRI']);
 
 class CountrySelector {
     constructor(elementId, labelId, type) {
@@ -10,7 +20,9 @@ class CountrySelector {
         this.classificationData = null;
         this.selectedCountries = new Set();
         this.allCountries = [];
-        this._checkboxByCode = {};
+        // A country can sit in several groups (e.g. Kenya under "Eastern Africa"
+        // AND "Developing economies"), so each code maps to ALL of its checkboxes.
+        this._checkboxesByCode = {};
     }
 
     async init() {
@@ -26,7 +38,7 @@ class CountrySelector {
                 _classificationCache = await response.json();
             }
             this.classificationData = _classificationCache;
-            this.allCountries = Object.keys(this.classificationData.countries)
+            this.allCountries = this._codes()
                 .map(code => ({ code, name: this.classificationData.countries[code].name }))
                 .sort((a, b) => a.name.localeCompare(b.name));
         } catch (error) {
@@ -34,8 +46,18 @@ class CountrySelector {
         }
     }
 
+    // Codes the pickers offer (classification minus the no-data economies).
+    _codes() {
+        return Object.keys(this.classificationData.countries).filter(code => !NO_DATA_CODES.has(code));
+    }
+
+    // True when `code` is an economy this picker lists.
+    hasCountry(code) {
+        return !!this.classificationData?.countries[code] && !NO_DATA_CODES.has(code);
+    }
+
     getCountriesInRegion(regionCode) {
-        return Object.keys(this.classificationData.countries).filter(code =>
+        return this._codes().filter(code =>
             this.classificationData.countries[code].regions.includes(regionCode)
         );
     }
@@ -45,6 +67,8 @@ class CountrySelector {
         const list = document.getElementById(`${this.elementId}-list`);
         if (!list) return;
         list.innerHTML = '';
+        this._checkboxesByCode = {};
+        this._installSearchDedup();
 
         // ── Geographic Regions ────────────────────────────────────
         this._addSectionHeader(list, '🌍 Geographic Regions');
@@ -89,13 +113,32 @@ class CountrySelector {
         ['1500', '1400', '1610'].forEach(devCode => {
             const devGroup = this.classificationData.development[devCode];
             if (!devGroup) return;
+            const devCountries = devGroup.countries.filter(code => !NO_DATA_CODES.has(code));
             const { childContainer } = this._addGroupRow(list, {
                 label: devGroup.name,
-                countries: devGroup.countries,
+                countries: devCountries,
                 indent: 0,
                 icon: '▶',
             });
-            this._addSortedCountries(childContainer, devGroup.countries, 1);
+            this._addSortedCountries(childContainer, devCountries, 1);
+        });
+    }
+
+    // While the search box holds a term, App's search handler (main.js) shows
+    // every matching .country-option — so a country listed in several groups
+    // would appear two or three times. Every occurrence after the first carries
+    // data-dup="1"; this listener sits on the menu (bubble phase, i.e. AFTER the
+    // handler on the input itself) and hides those repeats. The kept row shares
+    // its checked state with the hidden ones, so nothing is lost.
+    _installSearchDedup() {
+        if (this._searchDedupInstalled) return;
+        const menu = document.getElementById(`${this.elementId}-menu`);
+        const search = document.getElementById(`${this.elementId}-search`);
+        if (!menu || !search) return;
+        this._searchDedupInstalled = true;
+        menu.addEventListener('input', (e) => {
+            if (e.target !== search || !search.value.trim()) return;
+            menu.querySelectorAll('.country-option[data-dup="1"]').forEach(el => { el.style.display = 'none'; });
         });
     }
 
@@ -198,9 +241,15 @@ class CountrySelector {
             e.stopPropagation();
             if (e.target.checked) this.selectedCountries.add(code);
             else this.selectedCountries.delete(code);
+            // updateSelection → _syncUI mirrors the new state onto this country's
+            // checkboxes in every other group it appears in.
             this.updateSelection();
         });
-        this._checkboxByCode[code] = checkbox;
+        if (!this._checkboxesByCode[code]) this._checkboxesByCode[code] = [];
+        const boxes = this._checkboxesByCode[code];
+        // Repeat occurrences are hidden while searching (see _installSearchDedup)
+        if (boxes.length) item.dataset.dup = '1';
+        boxes.push(checkbox);
 
         const span = document.createElement('span');
         span.textContent = name;
@@ -225,13 +274,15 @@ class CountrySelector {
         } else if (count === 1) {
             const code = Array.from(this.selectedCountries)[0];
             const country = this.classificationData?.countries[code];
-            labelEl.textContent = country ? country.name : code;
+            // Drawn connections can end in economies the classification does
+            // not list (e.g. MAC, NRU): fall back to the map's name for them.
+            labelEl.textContent = country ? country.name : (STATE.countryNames[code] || code);
         } else {
             labelEl.textContent = `${count} Countries`;
         }
-        for (const [code, cb] of Object.entries(this._checkboxByCode)) {
+        for (const [code, boxes] of Object.entries(this._checkboxesByCode)) {
             const should = this.selectedCountries.has(code);
-            if (cb.checked !== should) cb.checked = should;
+            boxes.forEach(cb => { if (cb.checked !== should) cb.checked = should; });
         }
         this.syncGroupCheckboxes();
         const badge = document.getElementById(`${this.elementId}-count`);

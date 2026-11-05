@@ -130,7 +130,20 @@ NAME_TO_ISO = {
 
 # Fallback coordinates: mirrors DataLoader.fallbackData from dataLoader.js
 # These always override CSV-derived coords (same behaviour as JS).
+# GRL, NCL and KIR correct CSV coordinates that sat on Denmark, France and the
+# open sea; VAT ... BVT are economies in the data that the CSV gives no position.
 FALLBACK = {
+    "GRL": {"name": "Greenland",                "coords": [-42.0, 72.0]},
+    "NCL": {"name": "New Caledonia",            "coords": [165.6, -21.3]},
+    "KIR": {"name": "Kiribati",                 "coords": [173.0, 1.4]},
+    "VAT": {"name": "Holy See",                 "coords": [12.45, 41.9]},
+    "TKL": {"name": "Tokelau",                  "coords": [-171.85, -9.2]},
+    "PCN": {"name": "Pitcairn",                 "coords": [-130.1, -25.07]},
+    "SGS": {"name": "South Georgia and the South Sandwich Islands", "coords": [-36.6, -54.4]},
+    "NFK": {"name": "Norfolk Island",           "coords": [167.95, -29.04]},
+    "UMI": {"name": "United States Minor Outlying Islands", "coords": [166.63, 19.29]},
+    "CCK": {"name": "Cocos (Keeling) Islands",  "coords": [96.83, -12.19]},
+    "BVT": {"name": "Bouvet Island",            "coords": [3.4, -54.43]},
     "AGO": {"name": "Angola",                   "coords": [17.87, -11.20]},
     "ARM": {"name": "Armenia",                  "coords": [45.03, 40.06]},
     "ATG": {"name": "Antigua and Barbuda",       "coords": [-61.79, 17.06]},
@@ -180,7 +193,6 @@ FALLBACK = {
     "GIB": {"name": "Gibraltar",               "coords": [-5.35, 36.14]},
     "GUM": {"name": "Guam",                    "coords": [144.79, 13.44]},
     "IOT": {"name": "British Indian Ocean Territory", "coords": [71.88, -6.34]},
-    "KIR": {"name": "Kiribati",                "coords": [-168.73, -3.37]},
     "KNA": {"name": "Saint Kitts and Nevis",   "coords": [-62.78, 17.36]},
     "LCA": {"name": "Saint Lucia",             "coords": [-60.98, 13.91]},
     "MHL": {"name": "Marshall Islands",        "coords": [171.18, 7.13]},
@@ -358,9 +370,21 @@ for iso, fb in FALLBACK.items():
     if iso not in merged_names:
         merged_names[iso] = fb['name']
 
+# Display names: the official UN name (UNSD M49) wherever one exists. The CSV
+# carries BACI abbreviations ("Br. Virgin Isds") and some names garbled by a
+# character-encoding mix-up ("CuraÁao"); meta.json names are only used where
+# the map file has no label of its own, so this mainly affects small economies.
+M49_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'un_m49_names.csv')
+with open(M49_PATH, newline='', encoding='utf-8') as f:
+    un_names = {r['ISO3']: r['Name'] for r in csv.DictReader(f)}
+for iso in merged_names:
+    if iso in un_names:
+        merged_names[iso] = un_names[iso]
+
 # Combine into meta: only export entries that have both coords and name
+# (sorted, so that re-running the script gives a byte-identical file)
 meta = {}
-all_isos = set(merged_coords.keys()) | set(merged_names.keys())
+all_isos = sorted(set(merged_coords.keys()) | set(merged_names.keys()))
 for iso in all_isos:
     if iso in merged_coords and iso in merged_names:
         meta[iso] = {'name': merged_names[iso], 'coords': merged_coords[iso]}

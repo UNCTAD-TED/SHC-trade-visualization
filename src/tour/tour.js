@@ -10,7 +10,7 @@
 import { STATE } from '../config.js';
 import { DataLoader } from '../dataLoader.js';
 import { TradeMap } from '../map.js';
-import { startAnimation, stopAnimation } from '../sns/animationMode.js';
+import { startAnimation, stopAnimation, isAnimating } from '../sns/animationMode.js';
 import { TOUR_STEPS } from './steps.js';
 
 const SEEN_KEY = 'shc_tour_seen_v1';
@@ -26,6 +26,13 @@ export const Tour = {
     _els: null,            // { spot, card, bar }
     _ctx: null,
     _busy: false,
+    // Generation: bumped by start() and end(). Every async step of goTo()/onEnter
+    // re-checks it, so work begun by a tour that has since ended stops there
+    // instead of opening panels or drawing pairs over the restored view.
+    _gen: 0,
+    _snapshot: null,       // the user's view when the tour started (App.captureViewState)
+    _ending: null,         // promise of the hand-back in progress, if any
+    _starting: false,
 
     // Wire the header button + first-visit auto-launch. Call once from App.init().
     // opts.autoLaunch = false suppresses the first-visit auto-open. App passes
@@ -75,7 +82,8 @@ export const Tour = {
                 for (const f of flows) if (!best || f.netValue > best.netValue) best = f;
                 return best;
             },
-            resetView: () => tour._resetView(),
+            // alive (optional): the step's "still current?" check — see goTo().
+            resetView: (alive) => tour._resetView(alive),
         };
     },
 
@@ -94,9 +102,25 @@ export const Tour = {
 
     // ── Lifecycle ───────────────────────────────────────────────────────────
     async start() {
-        if (this.active) return;
-        this.active = true;
-        this.index = 0;
+        if (this.active || this._starting) return;
+        this._starting = true;
+        try {
+            // A previous tour may still be handing the dashboard back; the
+            // snapshot below must be of the user's view, not a half-restored one.
+            if (this._ending) { try { await this._ending; } catch { /* ignore */ } }
+            // Likewise, a running bar-chart race is not the user's view: end it
+            // (it restores the view it found) before taking the snapshot.
+            if (isAnimating()) { try { await stopAnimation(); } catch { /* ignore */ } }
+            if (this.active) return;
+
+            this._snapshot = this._captureView();
+            this.active = true;
+            this._gen++;
+            this._busy = false;
+            this.index = 0;
+        } finally {
+            this._starting = false;
+        }
         try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* ignore */ }
 
         this._mount();
@@ -105,55 +129,113 @@ export const Tour = {
         await this.goTo(0);
     },
 
-    async end() {
-        if (!this.active) return;
+    // Ends the tour (Done, ×, Esc) and hands the dashboard back exactly as the
+    // user left it when the tour started: metric, year, region, filters,
+    // selections, drawn connections, and the country panel if one was open.
+    end() {
+        if (!this.active) return this._ending || Promise.resolve();
         this.active = false;
+        this._gen++;            // invalidates every goTo()/onEnter still in flight
+        this._busy = false;     // ...so a fresh start() is never blocked by them
         this._clearSettle();
         clearTimeout(this._reposTimer);
         window.removeEventListener('resize', this._onResize);
         document.removeEventListener('keydown', this._onKey, true);
 
-        // Run the last step's cleanup, then return to a predictable starting point
-        try { await this.steps[this.index]?.onExit?.(this._ctx); } catch { /* ignore */ }
-        try { stopAnimation(); } catch { /* ignore */ }
-        await this._resetView();
-
+        // Take the card down straight away — the hand-back below may await data.
         if (this._els) {
-            this._els.card.style.opacity = '0';
-            this._els.spot.style.opacity = '0';
             const els = this._els; this._els = null;
+            els.card.style.opacity = '0';
+            els.spot.style.opacity = '0';
             setTimeout(() => { els.spot.remove(); els.card.remove(); els.bar.remove(); }, 260);
         }
+
+        const step = this.steps[this.index];
+        const snap = this._snapshot;
+        this._snapshot = null;
+        const done = this._handBack(step, snap).finally(() => {
+            if (this._ending === done) this._ending = null;
+        });
+        this._ending = done;
+        return done;
+    },
+
+    async _handBack(step, snap) {
+        const app = this.app;
+        // The current chapter's own cleanup first (e.g. the animation chapter
+        // stops the race), then end anything a chapter may have left running.
+        try { await step?.onExit?.(this._ctx); } catch (e) { console.warn('tour onExit', e); }
+        try { await stopAnimation(); } catch { /* ignore */ }
+        try {
+            TradeMap.cancelLineDraw?.();
+            app.closeInsightPanel?.();      // also closes the connections panel
+            TradeMap.clearFocus?.();
+        } catch (e) { console.warn('tour cleanup', e); }
+
+        if (snap?.view && app.restoreViewState) {
+            try {
+                await app.restoreViewState(snap.view);
+                if (snap.panelIso && !STATE.bilateralPairs?.length && !TradeMap.lineFilterMode) {
+                    app.openInsightPanel?.(snap.panelIso);
+                }
+                setTimeout(() => TradeMap.zoomToRegion(STATE.region || 'Global'), 60);
+                return;
+            } catch (e) { console.warn('tour restore', e); }
+        }
+        // No snapshot API (older controller): fall back to the default view.
+        await this._resetView();
+    },
+
+    _captureView() {
+        const app = this.app;
+        const view = app?.captureViewState?.();
+        if (!view) return null;
+        const panelOpen = document.getElementById('insight-panel')?.classList.contains('open');
+        return { view, panelIso: panelOpen ? (app._currentPanelIso || null) : null };
     },
 
     async next() { if (this.index < this.steps.length - 1) await this.goTo(this.index + 1); else await this.end(); },
     async prev() { if (this.index > 0) await this.goTo(this.index - 1); },
 
     async goTo(i) {
-        if (this._busy) return;
+        if (this._busy || !this.active) return;
+        const step = this.steps[i];
+        if (!step) return;
         this._busy = true;
         this._clearSettle();
 
-        const prev = this.steps[this.index];
-        const step = this.steps[i];
-        if (prev && prev !== step) { try { await prev.onExit?.(this._ctx); } catch (e) { console.warn('tour onExit', e); } }
+        // alive(): is this navigation still the current one? False once the
+        // tour has ended (or ended and restarted) — every await re-checks it,
+        // and chapters receive it as onEnter's second argument for theirs.
+        const gen = this._gen;
+        const alive = () => this.active && this._gen === gen;
 
-        this.index = i;
-        try { await step.onEnter?.(this._ctx); } catch (e) { console.warn('tour onEnter', e); }
+        try {
+            const prev = this.steps[this.index];
+            if (prev && prev !== step) { try { await prev.onExit?.(this._ctx); } catch (e) { console.warn('tour onExit', e); } }
+            if (!alive()) return;
 
-        // Resolve the target after the action has run (panels may have just opened)
-        const sel = typeof step.target === 'function' ? step.target(this._ctx) : step.target;
-        let targetEl = null;
-        if (sel) targetEl = await this._waitFor(sel, step.targetTimeout ?? 2500);
+            this.index = i;
+            try { await step.onEnter?.(this._ctx, alive); } catch (e) { console.warn('tour onEnter', e); }
+            if (!alive()) return;
 
-        this._renderCard(step);
-        this._place(targetEl, step.placement || 'auto');
-        this._updateProgress();
+            // Resolve the target after the action has run (panels may have just opened)
+            const sel = typeof step.target === 'function' ? step.target(this._ctx) : step.target;
+            let targetEl = null;
+            if (sel) targetEl = await this._waitFor(sel, step.targetTimeout ?? 2500);
+            if (!alive()) return;
 
-        this._busy = false;
-        // Re-measure shortly after, so spotlights on elements that slide/zoom in
-        // (e.g. the insight side-panel) settle onto their final position.
-        this._scheduleSettle();
+            this._renderCard(step);
+            this._place(targetEl, step.placement || 'auto');
+            this._updateProgress();
+
+            // Re-measure shortly after, so spotlights on elements that slide/zoom in
+            // (e.g. the insight side-panel) settle onto their final position.
+            this._scheduleSettle();
+        } finally {
+            // end() already released the lock for a newer tour; leave it alone.
+            if (this._gen === gen) this._busy = false;
+        }
     },
 
     // Re-anchor a few times after a step renders to catch CSS transitions
@@ -178,6 +260,7 @@ export const Tour = {
     },
 
     _renderCard(step) {
+        if (!this._els) return;
         const card = this._els.card;
         const n = String(this.index + 1).padStart(2, '0');
         const total = String(this.steps.length).padStart(2, '0');
@@ -222,6 +305,7 @@ export const Tour = {
 
     // Position the spotlight over the target (or full-dim center if none)
     _place(targetEl, placement) {
+        if (!this._els) return;
         const spot = this._els.spot;
         const card = this._els.card;
         const step = this.steps[this.index];
@@ -260,6 +344,7 @@ export const Tour = {
     // Dock the card into a screen corner, clearing the header and KPI bar so it
     // never floats over the centre of the map.
     _dockCard(dock) {
+        if (!this._els) return;
         const card = this._els.card;
         const m = 16;
         const vw = window.innerWidth, vh = window.innerHeight;
@@ -326,11 +411,16 @@ export const Tour = {
     },
 
     // Return the app to a clean, predictable global/value view.
-    async _resetView() {
+    // alive (optional): when it turns false during the metric load, the tour has
+    // ended and its hand-back owns the view — stop instead of overwriting it.
+    async _resetView(alive = () => true) {
         const app = this.app;
         try {
             STATE.bilateralPairs = [];
             TradeMap.cancelLineDraw?.();
+            // Draw mode shows only drawn pairs (none now) — i.e. a blank map.
+            // The hand-back at the end turns it on again if the user had it on.
+            if (TradeMap.lineFilterMode) TradeMap.disableLineFilter?.();
             app.closeConnectionsPanel?.();
             app.closeInsightPanel?.();
             TradeMap.clearFocus?.();
@@ -341,8 +431,6 @@ export const Tour = {
 
             // Threshold: auto
             STATE.thresholdMode = 'auto';
-            const autoBtn = document.querySelector('.threshold-btn[data-threshold="auto"]');
-            if (autoBtn) app.updateUIClasses('.threshold-btn', autoBtn);
 
             // Top-N line limit: off
             STATE.topNMode = null;
@@ -350,8 +438,7 @@ export const Tour = {
 
             // Region: Global
             STATE.region = 'Global';
-            const allBtn = document.querySelector('.region-btn[data-region="Global"]');
-            if (allBtn) app.updateUIClasses('.region-btn', allBtn);
+            app.syncControlsFromState?.();   // desktop bar + mobile sheet
 
             // Selections: none
             app.exporterSelector?.setCountries([]);
@@ -360,12 +447,19 @@ export const Tour = {
             // Metric: value
             if (STATE.metric !== 'value') {
                 await DataLoader.switchMetric('value');
-                app._setActiveMetricButtons('value');
-                app.updateThresholdLabels('value');
+                if (!alive()) return;
+                // Only relabel when the switch actually committed (a later
+                // request may have superseded it while the files loaded).
+                if (STATE.metric === 'value') {
+                    app._globalRankCache = {};
+                    TradeMap._lastLegendKey = null;
+                }
+                app._setActiveMetricButtons(STATE.metric);
+                app.updateThresholdLabels(STATE.metric);
             }
 
             app.updateDashboard(false);
-            setTimeout(() => TradeMap.zoomToRegion('Global'), 60);
+            setTimeout(() => { if (alive()) TradeMap.zoomToRegion('Global'); }, 60);
         } catch (e) { console.warn('tour resetView', e); }
     },
 
@@ -376,6 +470,7 @@ export const Tour = {
     // Re-anchor on the current step's target without re-running its action
     async _reanchor() {
         const step = this.steps[this.index];
+        if (!step || !this._els) return;
         const sel = typeof step.target === 'function' ? step.target(this._ctx) : step.target;
         const el = sel ? document.querySelector(sel) : null;
         this._place(el, step.placement || 'auto');

@@ -16,8 +16,8 @@
 // get the full data for the chosen scope. The one display control that IS carried
 // through is the explicit "Lines" Top-N limit (STATE.topNMode): it is a deliberate
 // "give me the top N corridors" request rather than a decluttering side effect, so
-// the export matches what is on screen. Value is USD, weight is kilograms, unit
-// value is USD/kg.
+// the export matches what is on screen; so are the flow-direction boxes. Value is
+// USD, weight is kilograms, unit value is USD/kg.
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONFIG, STATE } from './config.js';
 import { RegionConfig } from './regions.js';
@@ -153,6 +153,7 @@ export async function exportCountry(iso) {
             else if (d.importer === iso) partners.add(d.exporter);
         });
     });
+    partners.delete(iso);   // no economy is its own partner
 
     const vNet = netMap('value'), wNet = netMap('weight');
     const catOf = (p) => {
@@ -220,32 +221,36 @@ export async function exportCorridor(expIso, impIso) {
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. CURRENT VIEW — flows + country summary for the active map scope
 // ═══════════════════════════════════════════════════════════════════════════
+// One row per net flow of the active metric (the lines of the map, before the
+// display threshold). Each row is oriented exporter → importer of that net flow:
+//   net_value_usd / net_weight_kg  exporter→importer minus importer→exporter, so the
+//                                  inactive metric can be NEGATIVE when its net
+//                                  flow runs the other way (value and weight nets
+//                                  do not always point in the same direction);
+//   exp_to_imp_*                   the gross flow exporter→importer, and the unit
+//                                  value computed from that gross flow (never from
+//                                  two net figures).
 export async function exportFlows() {
-    await Promise.all([
-        DataLoader.loadYear(STATE.year, 'value'),
-        DataLoader.loadYear(STATE.year, 'weight'),
-    ]);
+    await ensureLoaded();
 
     const spine = scopedFlows(STATE.metric).slice().sort((a, b) => b.netValue - a.netValue);
-    const other = STATE.metric === 'value' ? 'weight' : 'value';
-    const otherMap = new Map();
-    ((STATE.metricStore[other]?.years?.[STATE.year]) || [])
-        .forEach(d => otherMap.set(pairKey(d.exporter, d.importer), d.netValue));
+    const vNet = netMap('value'), wNet = netMap('weight');
 
     const header = [
         'year', 'exporter_iso3', 'exporter', 'importer_iso3', 'importer',
         'exporter_region', 'importer_region', 'exporter_status', 'importer_status',
-        'flow_category', 'net_value_usd', 'net_weight_kg', 'unit_value_usd_per_kg',
+        'flow_category', 'net_value_usd', 'net_weight_kg',
+        'exp_to_imp_value_usd', 'exp_to_imp_weight_kg', 'exp_to_imp_unit_value_usd_per_kg',
     ];
     const rows = spine.map(d => {
-        const k = pairKey(d.exporter, d.importer);
-        const value  = STATE.metric === 'value'  ? d.netValue : otherMap.get(k) ?? '';
-        const weight = STATE.metric === 'weight' ? d.netValue : otherMap.get(k) ?? '';
+        const v = dirFlow('value', d.exporter, d.importer, STATE.year, vNet);    // USD
+        const w = dirFlow('weight', d.exporter, d.importer, STATE.year, wNet);   // kg
         return [
             STATE.year, d.exporter, nameOf(d.exporter), d.importer, nameOf(d.importer),
             regionOf(d.exporter), regionOf(d.importer), statusOf(d.exporter), statusOf(d.importer),
             CAT_LABEL[d.flowCategory] || d.flowCategory,
-            round(value), round(weight), unitVal(value, weight),
+            round(v.out - v.in), round(w.out - w.in),
+            round(v.out), round(w.out), unitVal(v.out, w.out),
         ];
     });
     download(`SHC-6309_flows_${STATE.year}_${scopeTag()}_${today()}.csv`, toCSV([header, ...rows]));
@@ -258,6 +263,7 @@ export function exportSummary() {
     const agg = {};
     const touch = (iso) => (agg[iso] ||= { exports: 0, imports: 0, partners: {}, cat: {} });
     flows.forEach(d => {
+        if (d.exporter === d.importer) return;   // no economy is its own partner
         const v = d.netValue;
         const e = touch(d.exporter), i = touch(d.importer);
         e.exports += v; i.imports += v;
@@ -287,10 +293,12 @@ export function exportSummary() {
         };
     }).sort((a, b) => b.gross - a.gross);
 
+    // All amounts are sums of the NET bilateral flows in this view (the map's lines
+    // before the display threshold), not gross exports / imports — hence the names.
     const header = [
         'rank', 'iso3', 'country', 'region', 'development_status', 'role',
-        `gross_${unit}`, `exports_${unit}`, `imports_${unit}`, `net_balance_${unit}`,
-        'num_partners', 'top_partner', 'top_partner_share_pct', 'hhi',
+        `net_flows_total_${unit}`, `net_flows_out_${unit}`, `net_flows_in_${unit}`, `net_balance_${unit}`,
+        'num_partners', 'top_partner', 'top_partner_share_pct', 'hhi_net_flows',
         'north_south_pct', 'south_north_pct', 'south_south_pct', 'north_north_pct',
     ];
     download(

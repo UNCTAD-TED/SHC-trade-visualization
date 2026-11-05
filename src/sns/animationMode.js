@@ -56,17 +56,78 @@ const NODE_TOP_Q = 0.98;     // quantile used as the upper anchor for node radiu
 const BAR_MAX = 300;         // px — fallback max bar width (used when container width is unknown)
 const BAR_H   = 20;          // px — bar height (overrides .ap-bar CSS height)
 
+// ── Role colours ──────────────────────────────────────────────────
+// Same semantics as the dashboard's node legend: blue = (net) exporter,
+// red = (net) importer. Green is reserved for South→North arcs
+// (CONFIG.flowColors['south-north']), so it is never used for a role here.
+const EXPORTER_COLOR = '#009EDB';
+const IMPORTER_COLOR = '#ED1847';
+
+const ALL_FLOW_CATEGORIES = ['north-south', 'south-north', 'south-south', 'north-north'];
+
 let _interval      = null;
 let _index         = 0;
 let _exportRanks   = {};
 let _importRanks   = {};
-let _active        = false;
-let _savedThreshold = 'auto';
-let _savedTopN      = null;
 let _startMetric    = 'value';   // metric this run was started with
+
+// Run lifecycle
+//   _active    true from the moment Animate is pressed (including the year
+//              preload) until stopAnimation(). isAnimating() reports it.
+//   _onScreen  true while anim-mode is applied (STATE overridden, overlays in
+//              the DOM). Only then does a stop have anything to restore.
+//   _runToken  bumped by every start AND every stop. Each await in
+//              startAnimation re-checks it, so a start that was stopped (or
+//              superseded) while it was loading never enters anim-mode.
+let _active   = false;
+let _onScreen = false;
+let _runToken = 0;
+let _saved    = null;            // the user's view, captured just before anim-mode
+let _timers   = [];              // one-shot timeouts of the current run
+let _stopDone = Promise.resolve();
 
 // Layer refs (created in TradeMap.g during animation, removed on stop)
 let _arcLayer = null, _particleLayer = null, _haloLayer = null, _nodeLayer = null, _labelLayer = null;
+
+const nextFrames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+const loaderEl   = () => document.getElementById('loader');
+
+// Escape ends a run (while the bar race is on screen the header — and with it
+// the Stop button — is the only way out otherwise).
+function _onKey(e) {
+  if (e.key !== 'Escape' || !_active) return;
+  stopAnimation();
+}
+
+// Everything the animation overrides, so stop can hand the view back as found.
+// App.captureViewState() (main.js) is preferred; the STATE fallback keeps this
+// module usable on pages without the dashboard controller.
+function _captureView() {
+  const snap = window.App?.captureViewState?.();
+  if (snap) return snap;
+  return {
+    year:          STATE.year,
+    region:        STATE.region || 'Global',
+    flowFilters:   [...(STATE.flowFilters || ALL_FLOW_CATEGORIES)],
+    thresholdMode: STATE.thresholdMode,
+    topNMode:      STATE.topNMode ?? null,
+    exporters:     [...(STATE.selectedExporters || [])],
+    importers:     [...(STATE.selectedImporters || [])],
+  };
+}
+
+function _restoreView(s) {
+  if (!s) return;
+  STATE.year              = s.year;
+  STATE.region            = s.region || 'Global';
+  STATE.flowFilters       = new Set(s.flowFilters);
+  STATE.thresholdMode     = s.thresholdMode;
+  STATE.topNMode          = s.topNMode ?? null;
+  // The pickers were never touched (updateDashboard rebuilds these from them),
+  // but STATE must not keep the run's empty selection in the meantime.
+  STATE.selectedExporters = new Set(s.exporters || []);
+  STATE.selectedImporters = new Set(s.importers || []);
+}
 
 // ── Public API ────────────────────────────────────────────────
 
@@ -74,21 +135,47 @@ export async function startAnimation() {
   if (document.body.classList.contains('story-mode')) return;
   if (_active) return;
   _active = true;
-  _savedThreshold = STATE.thresholdMode;
-  _savedTopN      = STATE.topNMode;
-  _startMetric    = STATE.metric;
+  const token = ++_runToken;
+  const live  = () => token === _runToken;
+  _startMetric = STATE.metric;
+  document.addEventListener('keydown', _onKey);
 
   // Rank tables are keyed by year only, so a run under a different metric would
   // otherwise reuse the previous metric's numbers. Rebuild them every start.
   _exportRanks = {};
   _importRanks = {};
 
-  // Pre-load all years (DataLoader caches them)
-  const loader = document.getElementById('loader');
-  if (loader) loader.classList.remove('hidden');
-  await Promise.all(YEARS.map(y => DataLoader.loadYear(y, _startMetric)));
+  // A previous run may still be handing the dashboard back (2 frames).
+  await _stopDone;
+  if (!live()) return;
 
-  // Compute top-10 exporters and importers per year from ALL flows
+  // Pre-load all years (DataLoader caches them)
+  const loader = loaderEl();
+  loader?.classList.remove('hidden');
+  try {
+    await Promise.all(YEARS.map(y => DataLoader.loadYear(y, _startMetric)));
+  } catch (err) {
+    if (live()) {
+      console.error('Animation: could not load every year — not starting.', err);
+      _abortStart();
+    }
+    return;
+  } finally {
+    // A stop during the preload has already hidden the loader — and the loader
+    // may by now belong to whatever replaced this run (e.g. a metric switch).
+    if (live()) loader?.classList.add('hidden');
+  }
+  if (!live()) return;
+  // A metric switch that was already in flight when Animate was pressed may
+  // have committed meanwhile: the preloaded years would be in the wrong units.
+  if (STATE.metric !== _startMetric) { _abortStart(); return; }
+
+  // Rank countries per year from ALL flows (not just those above the drawing
+  // floor). Each record is a NET bilateral flow (one per country pair, from
+  // the net exporter to the net importer), so a country's bar is the sum of
+  // the pairs in which it is the net exporter (resp. importer). That is neither
+  // its gross exports nor its overall net balance — a country can appear in
+  // both lists — and the panel labels say so.
   YEARS.forEach(year => {
     const flows = STATE.yearCache[year] || [];
     const exp = {}, imp = {};
@@ -104,25 +191,26 @@ export async function startAnimation() {
       .sort((a, b) => b.value - a.value).slice(0, 10);
   });
 
-  if (loader) loader.classList.add('hidden');
-
-  // Modify STATE for animation: metric-appropriate floor ($1M / 1kt), no country
-  // filter, no Top-N cap (the animation draws every corridor above the floor),
-  // global view.
+  // Snapshot the user's view, then modify STATE for animation: metric-
+  // appropriate floor ($1M / 1kt), no country filter, no Top-N cap (the
+  // animation draws every corridor above the floor), global view.
+  _saved = _captureView();
   STATE.thresholdMode      = minValue();
   STATE.topNMode           = null;
   STATE.selectedExporters  = new Set();
   STATE.selectedImporters  = new Set();
   STATE.region             = 'Global';
-  STATE.flowFilters        = new Set(['north-south', 'south-north', 'south-south', 'north-north']);
+  STATE.flowFilters        = new Set(ALL_FLOW_CATEGORIES);
 
   // Show animation UI
+  _onScreen = true;
   document.body.classList.add('anim-mode');
   _injectOverlays();
 
   // Wait two rAF frames so the browser applies the flex layout (panel takes --anim-panel-w,
   // map-container gets the remaining width), then recalculate the map projection.
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await nextFrames();
+  if (!live()) return;            // stopped meanwhile — stopAnimation cleaned up
   TradeMap.init();
 
   // Hide the dashboard's own flow/node/label layers — animation draws its own arcs
@@ -139,23 +227,50 @@ export async function startAnimation() {
   }
 
   // Reset map zoom to global
-  setTimeout(() => TradeMap.zoomToRegion('Global'), 80);
+  _timers.push(setTimeout(() => { if (live()) TradeMap.zoomToRegion('Global'); }, 80));
 
   // Start at year 2015 (slight delay so the global zoom settles before first draw)
   _index = 0;
-  setTimeout(() => _playYear(_index), 120);
+  _timers.push(setTimeout(() => { if (live()) _playYear(_index); }, 120));
 
   _interval = setInterval(() => {
+    if (!live()) return;
     _index = (_index + 1) % YEARS.length;
     _playYear(_index);
   }, YEAR_MS);
 }
 
-export function stopAnimation() {
-  if (!_active) return;
+// A start that cannot go ahead (load failure, metric changed under it) before
+// anything was put on screen: release the run without touching STATE.
+function _abortStart() {
+  _runToken++;
   _active = false;
+  document.removeEventListener('keydown', _onKey);
+  loaderEl()?.classList.add('hidden');
+}
+
+// Ends the run (or cancels one still loading) and hands the dashboard back:
+// STATE gets the user's pre-animation year, region, flow categories, threshold,
+// Top-N and selection back synchronously, then — once the full-width layout is
+// applied and that year's data is in the cache — `shc:animation-stopped` lets
+// App re-sync every control and re-render. Returns a promise that settles when
+// that hand-back is complete.
+export function stopAnimation() {
+  if (!_active) return _stopDone;
+  _active = false;
+  _runToken++;
+  document.removeEventListener('keydown', _onKey);
   clearInterval(_interval);
   _interval = null;
+  _timers.forEach(clearTimeout);
+  _timers = [];
+
+  if (!_onScreen) {
+    // Stopped during the preload: nothing was changed yet.
+    loaderEl()?.classList.add('hidden');
+    return _stopDone;
+  }
+  _onScreen = false;
 
   document.body.classList.remove('anim-mode');
   document.getElementById('anim-panel')?.remove();
@@ -172,22 +287,33 @@ export function stopAnimation() {
       .style('display', null);
   }
 
-  STATE.thresholdMode = _savedThreshold;
-  STATE.topNMode      = _savedTopN;
+  // Restore synchronously, so anything that reads STATE right after stopping
+  // (e.g. the metric toggle, which loads the new metric for STATE.year) already
+  // sees the user's view rather than the race's last frame.
   // The metric needs no restore: startAnimation never writes STATE.metric, and a
   // metric change requested mid-run stops the animation first (see
-  // stopAnimationForMetricChange),
-  // so whatever metric is active on stop is the one the user chose.
+  // stopAnimationForMetricChange), so whatever metric is active on stop is the
+  // one the user chose.
+  const saved = _saved;
+  _saved = null;
+  _restoreView(saved);
 
-  // Wait for the browser to restore the full-width map layout, then
-  // recalculate the projection before the dashboard re-renders flows.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  // Wait for the browser to restore the full-width map layout and make sure
+  // the restored year is loaded, then recalculate the projection before the
+  // dashboard re-renders flows.
+  const year = STATE.year;
+  _stopDone = Promise.all([
+    DataLoader.loadYear(year).catch(err => console.error('Animation: could not reload year', year, err)),
+    nextFrames(),
+  ]).then(() => {
+    if (_onScreen) return;        // a newer run is already on screen
     TradeMap.init();
     document.dispatchEvent(new CustomEvent('shc:animation-stopped'));
-  }));
+  });
+  return _stopDone;
 }
 
-// True while a bar-chart-race run is on screen.
+// True while a bar-chart-race run is on screen (or loading).
 export function isAnimating() {
   return _active;
 }
@@ -198,12 +324,16 @@ export function isAnimating() {
 // and reset the timeline anyway, and a bar race whose units change halfway is
 // easy to misread — stopping makes the unit change unambiguous.
 export function stopAnimationForMetricChange() {
-  if (_active) stopAnimation();
+  return stopAnimation();
 }
 
 // ── Internal helpers ──────────────────────────────────────────
 
 function _playYear(index) {
+  if (!_onScreen) return;
+  // A metric switch committed under the run (it bypassed the toggle) — the
+  // ranks and units no longer match the data: end the run.
+  if (STATE.metric !== _startMetric) { stopAnimation(); return; }
   const year = YEARS[index];
   STATE.year = year;
 
@@ -337,8 +467,20 @@ function _drawNodes(flows, k) {
   const isos = Object.keys(stats).filter(iso => STATE.countryCoords[iso]);
   if (!isos.length) return;
 
+  // Colour = the economy's net balance over ALL its flows that year (the same
+  // basis as the dashboard circles and the country panel), so a net exporter is
+  // never painted red because only its import corridors clear the race's cut-off.
+  // Size stays the total of the corridors drawn.
+  const fullNet = {};
+  (STATE.yearCache[STATE.year] || flows).forEach(d => {
+    if (d.exporter === d.importer) return;
+    fullNet[d.exporter] = (fullNet[d.exporter] || 0) + d.netValue;
+    fullNet[d.importer] = (fullNet[d.importer] || 0) - d.netValue;
+  });
+  const netOf = iso => (iso in fullNet ? fullNet[iso] : stats[iso].net);
+
   const grossSorted = isos.map(i => stats[i].gross).sort(d3.ascending);
-  const netSorted   = isos.map(i => Math.abs(stats[i].net)).sort(d3.ascending);
+  const netSorted   = isos.map(i => Math.abs(netOf(i))).sort(d3.ascending);
   const p98Gross = d3.quantile(grossSorted, NODE_TOP_Q) || d3.max(grossSorted) || 1;
   const p98Net   = d3.quantile(netSorted,   NODE_TOP_Q) || d3.max(netSorted)   || 1;
 
@@ -373,19 +515,19 @@ function _drawNodes(flows, k) {
     .attr('cy', d => proj(d)[1])
     .transition().duration(md(ARC_DUR))
     .attr('r', d => radiusScale(stats[d].gross) / k)
-    .attr('fill', d => colorOf(stats[d].net))
+    .attr('fill', d => colorOf(netOf(d)))
     .attr('stroke-width', 1.5 / k)
     .style('opacity', 1);
 }
 
-// ── Pulsing halo rings for top-3 export (blue) and import (green) countries ──
+// ── Pulsing halo rings for top-3 export (blue) and import (red) countries ──
 function _drawHalos(top3expSet, top3impSet, k) {
   if (!_haloLayer) return;
   const baseR = 10 / k;
 
   const haloData = [
-    ...[...top3expSet].map(iso => ({ iso, color: '#009EDB' })),
-    ...[...top3impSet].map(iso => ({ iso, color: '#72BF44' })),
+    ...[...top3expSet].map(iso => ({ iso, color: EXPORTER_COLOR })),
+    ...[...top3impSet].map(iso => ({ iso, color: IMPORTER_COLOR })),
   ].filter(d => STATE.countryCoords[d.iso]);
 
   // Two rings per country with staggered animation-delay via CSS class
@@ -458,7 +600,18 @@ function _injectOverlays() {
   const area = document.querySelector('.map-area');
   if (!area) return;
 
-  // Bar chart race panel
+  // Bar chart race panel.
+  // Ranking basis (see startAnimation): each country pair is netted first, and a
+  // bar sums the pairs in which the country is the net exporter (importer). The
+  // sub-labels and tooltips state that, since it is neither gross trade nor the
+  // overall net balance. Role colours are set inline: index.html's .ap-import
+  // rule still carries the old green.
+  const subStyle = 'display:block;margin-top:1px;font-size:9px;font-weight:400;letter-spacing:0;color:#6e6259;';
+  const basisTip = (role) =>
+    `Each country pair is netted first (exports minus imports between the two). ` +
+    `The bar adds up the pairs in which the country is the net ${role}. ` +
+    `This is neither gross ${role === 'exporter' ? 'exports' : 'imports'} nor the overall net trade balance, ` +
+    `so a country can appear in both lists.`;
   const panel = document.createElement('div');
   panel.id = 'anim-panel';
   panel.innerHTML = `
@@ -468,12 +621,16 @@ function _injectOverlays() {
       <span id="ap-metric-badge" class="ap-metric">${metricBadge()}</span>
     </div>
     <div class="ap-section">
-      <div class="ap-label ap-export">▲&nbsp;TOP EXPORTERS</div>
+      <div class="ap-label ap-export" style="color:${EXPORTER_COLOR}" title="${basisTip('exporter')}">▲&nbsp;TOP EXPORTERS
+        <span class="ap-basis" style="${subStyle}">Sum of net bilateral flows out</span>
+      </div>
       <div id="ap-export" class="ap-chart"></div>
     </div>
     <div class="ap-sep"></div>
     <div class="ap-section">
-      <div class="ap-label ap-import">▼&nbsp;TOP IMPORTERS</div>
+      <div class="ap-label ap-import" style="color:${IMPORTER_COLOR}" title="${basisTip('importer')}">▼&nbsp;TOP IMPORTERS
+        <span class="ap-basis" style="${subStyle}">Sum of net bilateral flows in</span>
+      </div>
       <div id="ap-import" class="ap-chart"></div>
     </div>
     <div class="ap-timeline-wrap">
@@ -495,28 +652,28 @@ function _injectOverlays() {
       <div class="al-section">
         <div class="al-section-title">Arc colours</div>
         <div class="al-row">
-          <span class="al-item"><span class="al-swatch" style="background:#009EDB"></span>N→S</span>
-          <span class="al-item"><span class="al-swatch" style="background:#72BF44"></span>S→N</span>
-          <span class="al-item"><span class="al-swatch" style="background:#FBAF17"></span>S→S</span>
-          <span class="al-item"><span class="al-swatch" style="background:#A066AA"></span>N→N</span>
+          <span class="al-item"><span class="al-swatch" style="background:${CONFIG.flowColors['north-south']}"></span>N→S</span>
+          <span class="al-item"><span class="al-swatch" style="background:${CONFIG.flowColors['south-north']}"></span>S→N</span>
+          <span class="al-item"><span class="al-swatch" style="background:${CONFIG.flowColors['south-south']}"></span>S→S</span>
+          <span class="al-item"><span class="al-swatch" style="background:${CONFIG.flowColors['north-north']}"></span>N→N</span>
         </div>
       </div>
       <div class="al-divider"></div>
       <div class="al-section">
         <div class="al-section-title">Country nodes</div>
         <div class="al-row">
-          <span class="al-item"><span class="al-dot" style="background:#009EDB"></span>Net exporter</span>
-          <span class="al-item"><span class="al-dot" style="background:#ED1847"></span>Net importer</span>
-          <span class="al-muted">· size = trade volume</span>
+          <span class="al-item"><span class="al-dot" style="background:${EXPORTER_COLOR}"></span>Net exporter</span>
+          <span class="al-item"><span class="al-dot" style="background:${IMPORTER_COLOR}"></span>Net importer</span>
+          <span class="al-muted">· size = ${STATE.metric === 'weight' ? 'weight' : 'value'} of drawn corridors</span>
         </div>
       </div>
       <div class="al-divider"></div>
       <div class="al-section">
         <div class="al-section-title">Highlights</div>
         <div class="al-row">
-          <span class="al-item"><span class="al-dot" style="background:#009EDB;box-shadow:0 0 4px #009EDB"></span>Top 3 exporters</span>
-          <span class="al-item"><span class="al-dot" style="background:#72BF44;box-shadow:0 0 4px #72BF44"></span>Top 3 importers</span>
-          <span class="al-item"><span class="al-dash"></span>Major corridors (≥10% of max)</span>
+          <span class="al-item"><span class="al-dot" style="background:${EXPORTER_COLOR};box-shadow:0 0 4px ${EXPORTER_COLOR}"></span>Top 3 exporters</span>
+          <span class="al-item"><span class="al-dot" style="background:${IMPORTER_COLOR};box-shadow:0 0 4px ${IMPORTER_COLOR}"></span>Top 3 importers</span>
+          <span class="al-item"><span class="al-dash"></span>Their major corridors (≥10% of max)</span>
         </div>
       </div>
       <div class="al-divider"></div>
@@ -534,8 +691,8 @@ function _updateOverlays(year, index) {
   const fill = document.getElementById('ap-tl-fill');
   if (fill) fill.style.width = `${(index / (YEARS.length - 1)) * 100}%`;
 
-  _renderRace('ap-export', _exportRanks[year], '#009EDB');
-  _renderRace('ap-import', _importRanks[year], '#72BF44');
+  _renderRace('ap-export', _exportRanks[year], EXPORTER_COLOR);
+  _renderRace('ap-import', _importRanks[year], IMPORTER_COLOR);
 }
 
 function _renderRace(containerId, ranks, color) {

@@ -41,33 +41,43 @@ export const CONFIG = {
 };
 
 // Metric display formatting (used by tooltips and legends)
+// Unit steps switch on the ROUNDED figure, so 999,999 reads "$1.00M" rather than
+// "$1000.00K". Negative figures carry a true minus sign (U+2212).
+const MINUS = '−';
 export const METRIC_FORMAT = {
     value: {
-        grossLabel: 'Gross Volume:', netLabel: 'Net Balance:',
+        grossLabel: 'Gross trade:', netLabel: 'Net balance:',
         fmt: (v) => {
             const a = Math.abs(v);
-            const s = v < 0 ? '-' : '';
-            if (a >= 1e9) return s + '$' + d3.format('.2f')(a / 1e9) + 'B';
-            if (a >= 1e6) return s + '$' + d3.format('.2f')(a / 1e6) + 'M';
-            if (a >= 1e3) return s + '$' + d3.format('.2f')(a / 1e3) + 'K';
+            const s = v < 0 ? MINUS : '';
+            if (a >= 999.995e6) return s + '$' + d3.format('.2f')(a / 1e9) + 'B';
+            if (a >= 999.995e3) return s + '$' + d3.format('.2f')(a / 1e6) + 'M';
+            if (a >= 999.995)   return s + '$' + d3.format('.2f')(a / 1e3) + 'K';
             return s + '$' + d3.format(',.0f')(a);
         }
     },
     // Weight figures arrive in kilograms (BACI harmonized export weight) and are
     // displayed in metric tonnes (t / kt / Mt) for readability.
     weight: {
-        grossLabel: 'Gross Volume:', netLabel: 'Net Balance:',
+        grossLabel: 'Gross trade:', netLabel: 'Net balance:',
         fmt: (v) => {
             const a = Math.abs(v);
-            const s = v < 0 ? '-' : '';
+            const s = v < 0 ? MINUS : '';
             const t = a / 1000;                        // kilograms → tonnes
-            if (t >= 1e6) return s + d3.format('.2f')(t / 1e6) + ' Mt';
-            if (t >= 1e3) return s + d3.format('.2f')(t / 1e3) + ' kt';
-            if (t >= 1)   return s + d3.format('.2f')(t) + ' t';
+            if (t >= 999.995e3) return s + d3.format('.2f')(t / 1e6) + ' Mt';
+            if (t >= 999.995)   return s + d3.format('.2f')(t / 1e3) + ' kt';
+            if (t >= 0.995)     return s + d3.format('.2f')(t) + ' t';
             return s + d3.format(',.0f')(a) + ' kg';
         }
     },
 };
+
+// Signed figure: "+$5.00M" / "−$5.00M" / "$0". Used wherever a net balance or a
+// net flow is shown, so direction never depends on colour alone.
+export function fmtSigned(v, metric = STATE.metric) {
+    const mf = METRIC_FORMAT[metric] || METRIC_FORMAT.value;
+    return (v > 0 ? '+' : '') + mf.fmt(v);
+}
 
 export const STATE = {
     // Per-metric data stores. The active-metric views (yearCache, trendSummary,

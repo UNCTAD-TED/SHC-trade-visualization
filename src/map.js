@@ -494,10 +494,19 @@ export const TradeMap = {
         const nodeStatsArr  = Object.values(nodeStats);
         const isFocused = STATE.selectedExporters.size > 0 || STATE.selectedImporters.size > 0;
 
+        // Circle COLOUR = the economy's net balance over all flows in the current
+        // region / selection, before the threshold, Lines limit and flow boxes
+        // (same basis as the #1 Exporter / Importer KPIs and the country panel's
+        // role), so a net exporter is never painted as an importer just because
+        // its export lines fall under the display cut-off. Circle SIZE stays the
+        // total of the lines drawn for it.
+        const rawStats = STATE.rawNodeStats || nodeStats;
+        const netOf = (iso) => (rawStats[iso] || nodeStats[iso]).netBalance;
+
         if (nodeStatsArr.length === 0 || netFlows.length === 0) return;
 
         const sortedGross   = nodeStatsArr.map(d => d.grossVolume).sort(d3.ascending);
-        const sortedNetBal  = nodeStatsArr.map(d => Math.abs(d.netBalance)).sort(d3.ascending);
+        const sortedNetBal  = Object.keys(nodeStats).map(iso => Math.abs(netOf(iso))).sort(d3.ascending);
         const sortedNetFlows= netFlows.map(d => d.netValue).sort(d3.ascending);
 
         const p98Gross      = d3.quantile(sortedGross, 0.98) || d3.max(sortedGross) || 1;
@@ -645,8 +654,13 @@ export const TradeMap = {
             .attr("cx", d => projOf(d)[0])
             .attr("cy", d => projOf(d)[1])
             .transition().duration(md(750)).ease(d3.easeElasticOut)
-            .attr("r", d => radiusScale(nodeStats[d].grossVolume) / currentK)
-            .attr("fill", d => colorScale(nodeStats[d].netBalance))
+            // The elastic ease overshoots below the start value; clamp so a
+            // shrinking circle never gets a negative (invalid) radius.
+            .attrTween("r", function (d) {
+                const i = d3.interpolateNumber(+this.getAttribute("r") || 0, radiusScale(nodeStats[d].grossVolume) / currentK);
+                return t => Math.max(0, i(t));
+            })
+            .attr("fill", d => colorScale(netOf(d)))
             .attr("stroke-width", 1.5 / currentK)
             .style("opacity", nodeOpacity);
 
@@ -658,7 +672,7 @@ export const TradeMap = {
         const volumeThreshold = sortedNodes.length > 15 ? nodeStats[sortedNodes[14]].grossVolume : 0;
 
         const isLabelVisible = (d) => {
-            const isNetExporter = nodeStats[d].netBalance >= 0;
+            const isNetExporter = netOf(d) >= 0;
             if (isNetExporter  && !STATE.showExporterLabels) return false;
             if (!isNetExporter && !STATE.showImporterLabels) return false;
             if (currentK >= 2.5) return true;
@@ -1091,7 +1105,7 @@ export const TradeMap = {
 
         const netFlows = STATE.filteredData || [];
 
-        const _legendKey = `${STATE.metric}_${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.topNMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}`;
+        const _legendKey = `${STATE.metric}_${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.topNMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}_${this.lineFilterMode}_${(STATE.bilateralPairs || []).length}`;
         if (this._lastLegendKey === _legendKey) return;
         this._lastLegendKey = _legendKey;
 
@@ -1126,10 +1140,28 @@ export const TradeMap = {
             </div>`;
         }).join('');
 
-        // Threshold
-        const isManual = STATE.thresholdMode !== 'auto';
-        const currentThreshold = STATE.effectiveThreshold ?? (isManual ? STATE.thresholdMode : 10000000);
-        const arcCount = netFlows.length;
+        // Threshold — say what actually limits the lines on the map.
+        const isManual   = STATE.thresholdMode !== 'auto';
+        const isConnect  = this.lineFilterMode || (STATE.bilateralPairs && STATE.bilateralPairs.length > 0);
+        const topN       = STATE.topNMode;
+        const arcCount   = netFlows.length;
+        const linesLabel = `${arcCount.toLocaleString('en-US')} line${arcCount === 1 ? '' : 's'}`;
+        let badge, badgeCls, valText;
+        if (isConnect) {
+            badge = 'CONNECT'; badgeCls = ' manual'; valText = 'drawn connections only';
+        } else if (!isManual && topN) {
+            badge = 'TOP ' + topN; badgeCls = ' manual'; valText = `largest ${topN}`;
+        } else if (!isManual) {
+            badge = 'AUTO'; badgeCls = ''; valText = `≥ ${mf.fmt(STATE.effectiveThreshold ?? 10000000)}`;
+        } else {
+            badge = topN ? `MANUAL · TOP ${topN}` : 'MANUAL'; badgeCls = ' manual';
+            valText = `≥ ${mf.fmt(STATE.thresholdMode)}`;
+        }
+
+        // Nodes: colour = net balance (all flows in the current region or
+        // selection); size = total of the lines drawn for the economy.
+        const swatch = (bg, title, extra = '') =>
+            `<span class="legend-node" style="width:10px;height:10px;background:${bg};${extra}" title="${title}"></span>`;
 
         container.innerHTML = `
             <div class="legend-section">
@@ -1137,26 +1169,24 @@ export const TradeMap = {
                 <div class="legend-flows">${flowItems}</div>
             </div>
             <span class="legend-bar-divider"></span>
-            <div class="legend-section">
-                <span class="legend-section-label">Nodes</span>
+            <div class="legend-section" title="Circle colour: net balance (exports minus imports) over all flows in the current region or selection. Circle size: total of the lines drawn for the economy.">
+                <span class="legend-section-label">Circles</span>
                 <div class="legend-nodes">
-                    <span class="legend-nodes-hint">← Imp</span>
-                    <span class="legend-node" style="width:14px;height:14px;background:#ED1847" title="Strong net importer"></span>
-                    <span class="legend-node" style="width:10px;height:10px;background:#F9C0C5" title="Net importer"></span>
-                    <span class="legend-node" style="width:7px;height:7px;background:#F7DFDF"  title="Slight net importer"></span>
-                    <span class="legend-node" style="width:4px;height:4px;background:#DED9D5;border:1px solid #AEA29A" title="Balanced"></span>
-                    <span class="legend-node" style="width:7px;height:7px;background:#E3EDF6"  title="Slight net exporter"></span>
-                    <span class="legend-node" style="width:10px;height:10px;background:#C5DFEF" title="Net exporter"></span>
-                    <span class="legend-node" style="width:14px;height:14px;background:#009EDB" title="Strong net exporter"></span>
-                    <span class="legend-nodes-hint">Exp →</span>
+                    <span class="legend-nodes-hint">Net imp.</span>
+                    ${swatch('#ED1847', 'Large net importer')}
+                    ${swatch('#F9C0C5', 'Net importer')}
+                    ${swatch('#ffffff', 'Balanced', 'border:1px solid #AEA29A')}
+                    ${swatch('#C5DFEF', 'Net exporter')}
+                    ${swatch('#009EDB', 'Large net exporter')}
+                    <span class="legend-nodes-hint">Net exp. · size = lines drawn</span>
                 </div>
             </div>
             <span class="legend-bar-divider"></span>
             <div class="legend-section">
-                <span class="legend-section-label">Threshold</span>
-                <span class="legend-threshold-badge${isManual ? ' manual' : ''}">${isManual ? 'MANUAL' : 'AUTO'}</span>
-                <span class="legend-threshold-val">${mf.fmt(currentThreshold)}</span>
-                <span class="legend-arc-count">${arcCount} arcs</span>
+                <span class="legend-section-label">Shown</span>
+                <span class="legend-threshold-badge${badgeCls}">${badge}</span>
+                <span class="legend-threshold-val">${valText}</span>
+                <span class="legend-arc-count">${linesLabel}</span>
             </div>
         `;
 

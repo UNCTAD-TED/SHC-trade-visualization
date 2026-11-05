@@ -331,6 +331,9 @@
   border-left: none !important;
   border-right: none !important;
   border-bottom: none !important;
+
+  // A flex child only scrolls if it may shrink below its content height
+  .picker-list { min-height: 0; overflow-y: auto; }
 }
 
 // ── Mobile: Backdrops (hidden class controls visibility) ──────

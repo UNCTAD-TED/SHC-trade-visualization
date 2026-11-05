@@ -1,6 +1,6 @@
 import './styles/styles.less';
 import * as d3 from 'd3';
-import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
+import { CONFIG, STATE, METRIC_FORMAT, fmtSigned } from './config.js';
 import { startAnimation, stopAnimation, stopAnimationForMetricChange } from './sns/animationMode.js';
 import { RegionConfig } from './regions.js';
 import { CountrySelector } from './countrySelector.js';
@@ -10,6 +10,9 @@ import { Tour } from './tour/tour.js';
 import { CsvExport } from './csvExport.js';
 import { DeepLink } from './deepLink.js';
 
+// "+5.2%" / "−3.7%" with a true minus sign (U+2212), like every net figure.
+const signedPct = (v, dp) => `${v >= 0 ? '+' : '\u2212'}${Math.abs(v).toFixed(dp)}%`;
+
 const App = {
     exporterSelector: null,
     importerSelector: null,
@@ -17,6 +20,20 @@ const App = {
     _globalRankCache: {},
     _resizeTimer: null,
     _prevSelectionCount: 0,
+    _yearReq: 0,      // latest year request; older ones may not apply
+    _metricReq: 0,    // latest metric request
+
+    // Keep the loading overlay up, but say that loading failed instead of spinning forever.
+    _showLoadError(message) {
+        const loader = document.getElementById('loader');
+        if (!loader) return;
+        loader.classList.remove('hidden');
+        loader.classList.add('load-error');
+        const p = loader.querySelector('p');
+        if (p) p.textContent = message;
+        const spinner = loader.querySelector('.loader-spinner, .spinner');
+        if (spinner) spinner.style.display = 'none';
+    },
 
     async init() {
         STATE.selectedExporters = new Set();
@@ -31,7 +48,10 @@ const App = {
         DeepLink.applyPreLoad(this._deepLink);
 
         const success = await DataLoader.loadAll();
-        if (!success) return;
+        if (!success) {
+            this._showLoadError('The trade data could not be loaded. Please reload the page.');
+            return;
+        }
 
         console.log('Initializing country selectors...');
         this.exporterSelector = new CountrySelector('exp', 'exp-label', 'exporter');
@@ -46,7 +66,7 @@ const App = {
             DeepLink.applyPostLoad(this._deepLink, this);
         } catch (error) {
             console.error('Failed to initialize country selectors:', error);
-            alert('国選択機能の初期化に失敗しました。詳細はコンソールを確認してください。');
+            this._showLoadError('The country lists could not be loaded. Please reload the page.');
             return;
         }
 
@@ -68,35 +88,51 @@ const App = {
         // Region Buttons
         document.querySelectorAll('.region-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const region = e.target.dataset.region;
-                STATE.region = region;
+                STATE.region = e.currentTarget.dataset.region;
+                this.syncControlsFromState();   // desktop bar + mobile sheet
 
-                this.updateUIClasses('.region-btn', e.target);
-
-                this.exporterSelector.setCountries([]);
-                this.importerSelector.setCountries([]);
+                // The pickers list economies of every region, so a region change
+                // starts from an empty selection inside the new region — unless
+                // connections are drawn: they ignore the region and the pickers
+                // keep mirroring them.
+                if (STATE.bilateralPairs?.length) {
+                    this._syncBilateralSelectors();
+                } else {
+                    this.exporterSelector.setCountries([]);
+                    this.importerSelector.setCountries([]);
+                }
 
                 this.updateDashboard();
             });
         });
 
-        // Year
+        // Year. Only the latest choice may apply: a slow file for an earlier choice
+        // must not overwrite the year the user picked last. The exporter/importer
+        // selection is kept — the same economies are meaningful in every year.
         const yearSelect = document.getElementById('year-select');
         if (yearSelect) {
             yearSelect.addEventListener('change', async (e) => {
                 const year = +e.target.value;
+                const req = ++this._yearReq;
                 const loader = document.getElementById('loader');
                 loader.classList.remove('hidden');
                 try {
                     await DataLoader.loadYear(year);
+                    if (req !== this._yearReq) return;
+                    // The metric may have switched while the file was loading: make
+                    // sure the year is there for the metric now shown.
+                    while (!STATE.yearCache[year]) {
+                        await DataLoader.loadYear(year, STATE.metric);
+                        if (req !== this._yearReq) return;
+                    }
                     STATE.year = year;
-                    this.exporterSelector.setCountries([]);
-                    this.importerSelector.setCountries([]);
+                    this.syncControlsFromState();
                     this.updateDashboard();
                 } catch (err) {
                     console.error('Failed to load year data:', err);
+                    if (req === this._yearReq) this.syncControlsFromState();   // put the selects back on the shown year
                 } finally {
-                    loader.classList.add('hidden');
+                    if (req === this._yearReq) loader.classList.add('hidden');
                 }
             });
         }
@@ -104,9 +140,9 @@ const App = {
         // Threshold toggle
         document.querySelectorAll('.threshold-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const val = e.target.dataset.threshold;
+                const val = e.currentTarget.dataset.threshold;
                 STATE.thresholdMode = val === 'auto' ? 'auto' : +val;
-                this.updateUIClasses('.threshold-btn', e.target);
+                this.syncControlsFromState();
                 // 50ms debounce: prevents overlapping D3 transitions when buttons are clicked rapidly
                 clearTimeout(this._filterDebounce);
                 this._filterDebounce = setTimeout(() => this.updateDashboard(false), 50);
@@ -128,38 +164,49 @@ const App = {
 
         // Metric toggle (trade value ⇄ trade weight). Loads the metric's pre-computed
         // JSON on demand, relabels the unit-bearing controls and re-renders.
+        // Every click goes to DataLoader.switchMetric, even a click on the active
+        // metric: that cancels a switch still in flight, so the last click wins.
+        // Units, labels and data change together only when the switch commits.
         document.querySelectorAll('.metric-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const metric = e.currentTarget.dataset.metric;
-                if (!metric || metric === STATE.metric) return;
+                if (!metric) return;
                 // A metric change ends the bar-chart-race run and returns to the
                 // normal dashboard — a race whose units change halfway is easy to
                 // misread. (The header controls are hidden in anim-mode, so this
                 // only fires for a programmatic switch.)
-                stopAnimationForMetricChange();
+                if (metric !== STATE.metric) stopAnimationForMetricChange();
+                const req = ++this._metricReq;
+                this._setActiveMetricButtons(metric);    // show the click at once
                 const loader = document.getElementById('loader');
                 loader?.classList.remove('hidden');
                 try {
-                    await DataLoader.switchMetric(metric);
-                    this._setActiveMetricButtons(metric);
-                    this.updateThresholdLabels(metric);
-                    this._globalRankCache = {};          // ranks are metric-specific
-                    TradeMap._lastLegendKey = null;      // force legend refresh
-                    this.updateDashboard(false);
+                    const switched = await DataLoader.switchMetric(metric);
+                    if (switched) {
+                        this._globalRankCache = {};          // ranks are metric-specific
+                        TradeMap._lastLegendKey = null;      // force legend refresh
+                        this.syncControlsFromState();
+                        this.updateDashboard(false);
+                    }
                 } catch (err) {
                     console.error('Failed to switch metric:', err);
                 } finally {
-                    loader?.classList.add('hidden');
+                    if (req === this._metricReq) {
+                        // Whatever happened, the buttons end up on the metric shown.
+                        this._setActiveMetricButtons(STATE.metric);
+                        loader?.classList.add('hidden');
+                    }
                 }
             });
         });
 
-        // Flow category checkboxes
+        // Flow category checkboxes (desktop bar and mobile sheet carry one each)
         document.querySelectorAll('.flow-checkbox').forEach(cb => {
             cb.addEventListener('change', (e) => {
                 const val = e.target.value;
                 if (e.target.checked) STATE.flowFilters.add(val);
                 else STATE.flowFilters.delete(val);
+                document.querySelectorAll(`.flow-checkbox[value="${val}"]`).forEach(o => { o.checked = e.target.checked; });
                 clearTimeout(this._filterDebounce);
                 this._filterDebounce = setTimeout(() => this.updateDashboard(false), 50);
             });
@@ -287,12 +334,14 @@ const App = {
         document.getElementById('anim-btn')?.addEventListener('click', startAnimation);
         document.getElementById('anim-stop-btn')?.addEventListener('click', stopAnimation);
 
+        document.addEventListener('shc:bilateral-loaded', (e) => {
+            if (e.detail?.metric === STATE.metric) this._refreshOpenViews();
+        });
+
         document.addEventListener('shc:animation-stopped', () => {
-            // Restore threshold + Top-N UI and re-render dashboard
-            const threshVal = STATE.thresholdMode === 'auto' ? 'auto' : String(STATE.thresholdMode);
-            const threshBtn = document.querySelector(`.threshold-btn[data-threshold="${threshVal}"]`);
-            if (threshBtn) this.updateUIClasses('.threshold-btn', threshBtn);
-            this._setActiveTopNButtons(STATE.topNMode == null ? 'all' : String(STATE.topNMode));
+            // animationMode has put STATE back to the pre-animation view; make every
+            // control show it and re-render (this also refreshes an open panel).
+            this.syncControlsFromState();
             this.updateDashboard();
         });
     },
@@ -549,6 +598,10 @@ const App = {
     },
 
     _buildScopeText() {
+        const nPairs = STATE.bilateralPairs?.length || 0;
+        if (nPairs > 0 || TradeMap.lineFilterMode) {
+            return nPairs > 0 ? `${nPairs} connection${nPairs > 1 ? 's' : ''}` : 'Connect';
+        }
         const region = STATE.region && STATE.region !== 'Global' ? STATE.region : null;
         const nExp = STATE.selectedExporters?.size || 0;
         const nImp = STATE.selectedImporters?.size || 0;
@@ -570,15 +623,7 @@ const App = {
         if (document.getElementById('mobile-filter-panel')?.classList.contains('open')) {
             this.toggleMobileFilter();
         }
-        const name = STATE.countryNames[iso] || iso;
-        const stats = STATE.nodeStats[iso];
-        const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
-        const region = RegionConfig.getRegion(iso) || 'Unknown';
-        const devStatus = CONFIG.development[iso] === 'north' ? 'Developed' : 'Developing';
-
-        document.getElementById('panel-country-name').textContent = name;
-        document.getElementById('panel-country-meta').textContent = `${region} · ${devStatus} · ${STATE.year}`;
-        document.getElementById('panel-body').innerHTML = this._buildPanelContent(iso, stats, mf);
+        this._renderInsightPanel(iso);
 
         document.getElementById('insight-panel').classList.add('open');
         document.body.classList.add('insight-open');
@@ -592,22 +637,58 @@ const App = {
         this._connectionsPanelOpen = false; // single-country insight now owns the panel
         this.hideTooltip();
 
-        // Reset Sea Route button to OFF for each new country
+        // Reset Sea Route to OFF for each new country — the mode as well as the
+        // button, or routes keep being drawn behind a button that reads OFF.
         const searouteBtn = document.getElementById('searoute-btn');
         if (searouteBtn) {
             searouteBtn.disabled = false;
             searouteBtn.classList.remove('active');
         }
+        if (TradeMap) TradeMap.searouteMode = false;
 
         // Country-level CSV export belongs to single-country focus
         const exportBtn = document.getElementById('panel-export-btn');
         if (exportBtn) exportBtn.style.display = '';
 
         if (TradeMap && TradeMap.setFocus) {
-            // Ensure routes.json is loaded before switching to sea-route rendering
-            const doFocus = () => TradeMap.setFocus(iso);
+            // Ensure routes.json is loaded before switching to sea-route rendering —
+            // but only focus if this country's panel is still the one open.
+            const doFocus = () => { if (this._currentPanelIso === iso) TradeMap.setFocus(iso); };
             STATE._routesPromise ? STATE._routesPromise.then(doFocus) : doFocus();
         }
+    },
+
+    // Fill the open panel for `iso` from the current year / metric / region.
+    // Also used to refresh an open panel when those change.
+    _renderInsightPanel(iso) {
+        const name = STATE.countryNames[iso] || iso;
+        const stats = DataLoader.countryTotals(iso);
+        const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
+        const region = RegionConfig.getRegion(iso) || 'Unknown';
+        const devStatus = CONFIG.development[iso] === 'north' ? 'Developed' : 'Developing';
+
+        document.getElementById('panel-country-name').textContent = name;
+        document.getElementById('panel-country-meta').textContent = `${region} · ${devStatus} · ${STATE.year}`;
+        document.getElementById('panel-body').innerHTML = this._buildPanelContent(iso, stats, mf);
+    },
+
+    // Flows behind the partner-based panel sections (partners, HHI, trade split,
+    // fingerprint, flow composition): every net bilateral flow of `iso` for the
+    // year — never the display threshold, Lines limit or flow-direction filter —
+    // restricted to intra-regional partners when a region is selected, the same
+    // scope as the map. A country is never its own partner.
+    _panelFlows(iso) {
+        const isRegional = STATE.region && STATE.region !== 'Global';
+        return (STATE.yearCache[STATE.year] || []).filter(d =>
+            (d.exporter === iso || d.importer === iso) && d.exporter !== d.importer &&
+            (!isRegional || (RegionConfig.getRegion(d.exporter) === STATE.region &&
+                             RegionConfig.getRegion(d.importer) === STATE.region)));
+    },
+
+    _panelScopeNote() {
+        return STATE.region && STATE.region !== 'Global'
+            ? `${STATE.region} intra-regional · all flows, before display filters`
+            : 'All partners · all flows, before display filters';
     },
 
     closeInsightPanel() {
@@ -630,21 +711,39 @@ const App = {
     // ── P2-A: Arc Detail Modal ──────────────────────────────────────
 
     async openArcModal(expIso, impIso) {
+        // The history file loads in the background; wait for it rather than
+        // showing an empty "$0" history.
         if (!STATE.bilateralHistory) {
-            await STATE._bilateralPromise;
+            try { await DataLoader._loadBilateral(STATE.metric); } catch (e) { /* shown as no data */ }
         }
-        const expName = STATE.countryNames[expIso] || expIso;
-        const impName = STATE.countryNames[impIso] || impIso;
-        const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
-
         this._arcPair = { expIso, impIso };   // consumed by the corridor CSV export button
-        document.getElementById('arc-modal-title').textContent = `${expName}  →  ${impName}`;
-        document.getElementById('arc-modal-meta').textContent = `Net exporter: ${expName} · ${STATE.year}`;
-        document.getElementById('arc-modal-body').innerHTML = this._buildArcDetailContent(expIso, impIso, mf);
+        this._renderArcModal();
 
         const modal = document.getElementById('arc-modal');
         modal.classList.remove('hidden');
         this.hideTooltip();
+    },
+
+    // Fill the corridor pop-up for this._arcPair from the current year / metric.
+    _renderArcModal() {
+        const p = this._arcPair;
+        if (!p) return;
+        const { expIso, impIso } = p;
+        const expName = STATE.countryNames[expIso] || expIso;
+        const impName = STATE.countryNames[impIso] || impIso;
+        const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
+
+        // The net exporter is whoever ships more this year — not simply the first
+        // country of the pair (a drawn connection can run against the net flow).
+        const [a, b] = [expIso, impIso].sort();
+        const e = STATE.bilateralHistory?.[`${a}|${b}`]?.[String(STATE.year)];
+        const out = e ? (expIso === a ? e.aToB : e.bToA) : 0;
+        const inn = e ? (expIso === a ? e.bToA : e.aToB) : 0;
+        const netText = out > inn ? `Net exporter: ${expName}` : inn > out ? `Net exporter: ${impName}` : 'No net flow';
+
+        document.getElementById('arc-modal-title').textContent = `${expName}  →  ${impName}`;
+        document.getElementById('arc-modal-meta').textContent = `${netText} · ${STATE.year}`;
+        document.getElementById('arc-modal-body').innerHTML = this._buildArcDetailContent(expIso, impIso, mf);
     },
 
     closeArcModal() {
@@ -684,7 +783,6 @@ const App = {
         const curBtoA = yearData[cy] ? yearData[cy].bToA : 0;
         const curNet  = curAtoB - curBtoA;
         const netCol  = curNet >= 0 ? '#009EDB' : '#ED1847';
-        const netSign = curNet >= 0 ? '+' : '';
         const fc = STATE.filteredData.find(d =>
             (d.exporter === expIso && d.importer === impIso) ||
             (d.exporter === impIso && d.importer === expIso)
@@ -701,9 +799,9 @@ const App = {
                 <div class="si-kpi-label">${expName} →</div>
                 <div class="si-kpi-value">${mf.fmt(curAtoB)}</div>
             </div>
-            <div class="si-kpi-card net">
+            <div class="si-kpi-card net" title="${expName} → ${impName} minus ${impName} → ${expName}">
                 <div class="si-kpi-label">Net (${cy})</div>
-                <div class="si-kpi-value" style="color:${netCol}">${netSign}${mf.fmt(Math.abs(curNet))}</div>
+                <div class="si-kpi-value" style="color:${netCol}">${fmtSigned(curNet)}</div>
             </div>
             <div class="si-kpi-card imp">
                 <div class="si-kpi-label">← ${impName}</div>
@@ -734,7 +832,7 @@ const App = {
                 <div class="si-legend-item"><div class="si-legend-swatch" style="background:#009EDB"></div><span>${expName} exports</span></div>
                 <div class="si-legend-item"><div class="si-legend-swatch" style="background:#ED1847"></div><span>${impName} exports</span></div>
             </div>
-            <svg width="${W}" height="${H + 14}" style="width:100%;overflow:visible">
+            <svg viewBox="0 0 ${W} ${H + 14}" width="${W}" height="${H + 14}" style="width:100%;height:auto;overflow:visible">
                 <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#DED9D5" stroke-width="0.5"/>
                 ${bars}
             </svg>
@@ -749,7 +847,7 @@ const App = {
                 <td class="al${isCur ? ' cur' : ' muted'}">${y}</td>
                 <td class="ar" style="color:#0077B8">${mf.fmt(atoBs[idx])}</td>
                 <td class="ar" style="color:#ED1847">${mf.fmt(bToAs[idx])}</td>
-                <td class="ar bold" style="color:${nCol}">${net >= 0 ? '+' : ''}${mf.fmt(Math.abs(net))}</td>
+                <td class="ar bold" style="color:${nCol}">${fmtSigned(net)}</td>
             </tr>`;
         }).join('');
 
@@ -781,6 +879,7 @@ const App = {
 
         document.getElementById('compare-modal-title').textContent = `${nameA}  vs  ${nameB}`;
         document.getElementById('compare-modal-body').innerHTML = this._buildCompareContent(isoA, isoB, mf);
+        this._comparePair = { isoA, isoB };
 
         document.getElementById('compare-modal').classList.remove('hidden');
         this.hideTooltip();
@@ -789,6 +888,7 @@ const App = {
     closeCompareModal() {
         document.getElementById('compare-modal').classList.add('hidden');
         this._compareIso = null;
+        this._comparePair = null;
     },
 
     openMethodologyModal() {
@@ -802,8 +902,10 @@ const App = {
     _buildCompareContent(isoA, isoB, mf) {
         const nameA = STATE.countryNames[isoA] || isoA;
         const nameB = STATE.countryNames[isoB] || isoB;
-        const statsA = STATE.nodeStats[isoA];
-        const statsB = STATE.nodeStats[isoB];
+        // Same country-level figures as the insight panel: all partners, before
+        // display filters — so "Gross trade" equals the table's current-year row.
+        const statsA = DataLoader.countryTotals(isoA);
+        const statsB = DataLoader.countryTotals(isoB);
 
         const devA = CONFIG.development[isoA] === 'north' ? 'Developed' : 'Developing';
         const devB = CONFIG.development[isoB] === 'north' ? 'Developed' : 'Developing';
@@ -824,11 +926,11 @@ const App = {
         const metricRows = [
             { label: 'Region', vA: regA, vB: regB, raw: false },
             { label: 'Status', vA: devA, vB: devB, raw: false },
-            { label: 'Gross Volume', vA: statsA ? mf.fmt(statsA.grossVolume) : '—', vB: statsB ? mf.fmt(statsB.grossVolume) : '—', raw: false,
-              winA: statsA && statsB ? statsA.grossVolume > statsB.grossVolume : null },
-            { label: 'Net Balance', vA: statsA ? mf.fmt(Math.abs(statsA.netBalance)) : '—', vB: statsB ? mf.fmt(Math.abs(statsB.netBalance)) : '—', raw: false },
-            { label: 'Role', vA: statsA ? (statsA.netBalance >= 0 ? 'Net Exporter' : 'Net Importer') : '—',
-                           vB: statsB ? (statsB.netBalance >= 0 ? 'Net Exporter' : 'Net Importer') : '—', raw: false },
+            { label: `Gross trade ${STATE.year}`, vA: statsA ? mf.fmt(statsA.gross) : '—', vB: statsB ? mf.fmt(statsB.gross) : '—', raw: false,
+              winA: statsA && statsB ? statsA.gross > statsB.gross : null },
+            { label: `Net balance ${STATE.year}`, vA: statsA ? fmtSigned(statsA.net) : '—', vB: statsB ? fmtSigned(statsB.net) : '—', raw: false },
+            { label: 'Role', vA: statsA ? (statsA.net >= 0 ? 'Net Exporter' : 'Net Importer') : '—',
+                           vB: statsB ? (statsB.net >= 0 ? 'Net Exporter' : 'Net Importer') : '—', raw: false },
         ];
 
         const headerRows = metricRows.map(r => {
@@ -883,12 +985,12 @@ const App = {
 
         html += `
         <div class="si-section">
-            <div class="si-label">Trade Volume Trend</div>
+            <div class="si-label">Gross Trade Trend (exports + imports)</div>
             <div class="si-chart-legend">
                 <div class="si-legend-item"><div class="si-legend-swatch" style="background:#009EDB;height:2px"></div><span>${nameA}</span></div>
                 <div class="si-legend-item"><div class="si-legend-swatch" style="background:#FBAF17;height:2px"></div><span>${nameB}</span></div>
             </div>
-            <svg width="${W}" height="${H + 16}" style="width:100%;overflow:visible">
+            <svg viewBox="0 0 ${W} ${H + 16}" width="${W}" height="${H + 16}" style="width:100%;height:auto;overflow:visible">
                 <polyline points="${points(totA)}" fill="none" stroke="#009EDB" stroke-width="1.5" opacity="0.8"/>
                 <polyline points="${points(totB)}" fill="none" stroke="#B06E2A" stroke-width="1.5" opacity="0.8"/>
                 ${dotsA}${dotsB}${xLabels}
@@ -924,8 +1026,9 @@ const App = {
     },
 
     _buildPanelContent(iso, stats, mf) {
+        const panelFlows = this._panelFlows(iso);
         const partnerExports = {}, partnerImports = {};
-        STATE.filteredData.forEach(d => {
+        panelFlows.forEach(d => {
             if (d.exporter === iso) partnerExports[d.importer] = (partnerExports[d.importer] || 0) + d.netValue;
             else if (d.importer === iso) partnerImports[d.exporter] = (partnerImports[d.exporter] || 0) + d.netValue;
         });
@@ -938,23 +1041,24 @@ const App = {
 
         html += `<div class="si-narrative-box">
             <div class="si-narrative-title">Auto Insights</div>
-            ${this._generateNarrative(iso, stats, partnerExports, partnerImports, yearlyTotals, mf)}
+            ${this._generateNarrative(iso, stats, partnerExports, partnerImports, yearlyTotals, mf, panelFlows)}
         </div>`;
 
         if (!stats) return html;
 
-        const isExp = stats.netBalance >= 0;
+        const isExp = stats.net >= 0;
         const balColor = isExp ? '#009EDB' : '#ED1847';
         html += `<div class="si-section">
             <div class="si-label">Key Metrics (${STATE.year})</div>
+            <div class="si-sublabel">All partners · exports and imports, before display filters</div>
             <div class="si-kpi-grid cols-2">
-                <div class="si-kpi-card net">
+                <div class="si-kpi-card net" title="Exports plus imports with all partners">
                     <div class="si-kpi-label">${mf.grossLabel.replace(':','')}</div>
-                    <div class="si-kpi-value">${mf.fmt(stats.grossVolume)}</div>
+                    <div class="si-kpi-value">${mf.fmt(stats.gross)}</div>
                 </div>
-                <div class="si-kpi-card ${isExp ? 'exp' : 'imp'}">
+                <div class="si-kpi-card ${isExp ? 'exp' : 'imp'}" title="Exports minus imports with all partners">
                     <div class="si-kpi-label">${mf.netLabel.replace(':','')}</div>
-                    <div class="si-kpi-value" style="color:${balColor}">${isExp ? '+' : ''}${mf.fmt(Math.abs(stats.netBalance))}</div>
+                    <div class="si-kpi-value" style="color:${balColor}">${fmtSigned(stats.net)}</div>
                 </div>
             </div>
             <div class="si-role-wrap">
@@ -973,9 +1077,12 @@ const App = {
             const maxPVal = sortedPartners[0][1];
 
             // Build bilateral totals from yearCache (pre-threshold) once for rank lookups.
-            const bilatRaw = STATE.yearCache[STATE.year] || [];
+            const isRegionalRank = STATE.region && STATE.region !== 'Global';
+            const bilatRaw = (STATE.yearCache[STATE.year] || []).filter(d => !isRegionalRank ||
+                (RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region));
             const bilatTotals = {};
             bilatRaw.forEach(d => {
+                if (d.exporter === d.importer) return;   // no country is its own partner
                 if (!bilatTotals[d.exporter]) bilatTotals[d.exporter] = {};
                 bilatTotals[d.exporter][d.importer] = (bilatTotals[d.exporter][d.importer] || 0) + d.netValue;
                 if (!bilatTotals[d.importer]) bilatTotals[d.importer] = {};
@@ -1004,7 +1111,8 @@ const App = {
                 // Rank asymmetry: where does iso rank in pIso's own partner list? (pre-threshold)
                 const theirRank = getPartnerRank(iso, pIso);
                 const rankCol = theirRank <= 3 ? '#72BF44' : theirRank <= 10 ? '#FBAF17' : '#AEA29A';
-                const rankTip = theirRank > 0 ? `${pName} ranks ${isoName} as their #${theirRank} trading partner (pre-threshold)` : '';
+                const rankScope = isRegionalRank ? ` within ${STATE.region}` : '';
+                const rankTip = theirRank > 0 ? `${pName} ranks ${isoName} as their #${theirRank} trading partner${rankScope} (all net flows, before display filters)` : '';
                 const rankDisplay = theirRank > 0
                     ? `<span title="${rankTip}" style="font-size:9px;font-family:monospace;color:#AEA29A">${idx + 1}·<span style="color:${rankCol};font-weight:700">#${theirRank}</span></span>`
                     : `<span style="font-size:9px;font-family:monospace;color:#AEA29A">${idx + 1}</span>`;
@@ -1047,9 +1155,10 @@ const App = {
             }).join('');
             html += `<div class="si-section">
                 <div class="si-partners-hdr">
-                    <div class="si-label" style="margin-bottom:0">Trading Partners</div>
+                    <div class="si-label" style="margin-bottom:0">Trading Partners · net flow</div>
                     <span class="si-partners-hint">rank you · them · split</span>
                 </div>
+                <div class="si-sublabel">${this._panelScopeNote()}</div>
                 <div class="si-partners">${rows}</div>
             </div>`;
         }
@@ -1072,18 +1181,17 @@ const App = {
                 return `<rect x="${x}" y="${H - h}" width="${barW}" height="${h}" rx="2" fill="${isCur ? '#004990' : '#DED9D5'}" ${isCur ? 'stroke="#0077B8" stroke-width="1"' : ''}/><text x="${x + barW / 2}" y="${H + 11}" text-anchor="middle" font-size="7" fill="${isCur ? '#0077B8' : '#AEA29A'}" font-family="Inter,monospace">${yLabel}</text>`;
             }).join('');
             html += `<div class="si-section">
-                <div class="si-label">Trade Trend (2015–${STATE.year})</div>
-                <svg width="${W}" height="${H + 14}" style="width:100%;overflow:visible">${bars}</svg>
+                <div class="si-label">Gross Trade, ${years[0]}–${years[years.length - 1]}</div>
+                <div class="si-sublabel">Exports + imports with all partners · ${STATE.year} highlighted</div>
+                <svg viewBox="0 0 ${W} ${H + 14}" width="${W}" height="${H + 14}" style="width:100%;height:auto;overflow:visible">${bars}</svg>
             </div>`;
         }
 
         const catTotals = {};
         let countryTotal = 0;
-        (STATE.yearCache[STATE.year] || []).forEach(d => {
-            if (d.exporter === iso || d.importer === iso) {
-                catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
-                countryTotal += d.netValue;
-            }
+        panelFlows.forEach(d => {
+            catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
+            countryTotal += d.netValue;
         });
         if (countryTotal > 0) {
             const catFull = { 'north-south': 'North → South', 'south-north': 'South → North', 'south-south': 'South → South', 'north-north': 'North → North' };
@@ -1096,6 +1204,7 @@ const App = {
             </div>`).join('');
             html += `<div class="si-section">
                 <div class="si-label">Flow Composition</div>
+                <div class="si-sublabel">Share of net flows · ${this._panelScopeNote()}</div>
                 <div class="si-flow-bar">${barSegs}</div>
                 <div class="si-comp-rows">${compRows}</div>
             </div>`;
@@ -1106,19 +1215,14 @@ const App = {
 
     // HHI computed from pre-threshold raw data to avoid zoom-level distortion.
     _buildConcentrationGauge(iso, mf) {
-        const rawFlows = STATE.yearCache[STATE.year] || [];
-        const isRegional = STATE.region && STATE.region !== 'Global';
         const combined = {};
-        rawFlows.forEach(d => {
-            if (!isRegional ||
-                (RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region)) {
-                if (d.exporter === iso) combined[d.importer] = (combined[d.importer] || 0) + d.netValue;
-                else if (d.importer === iso) combined[d.exporter] = (combined[d.exporter] || 0) + d.netValue;
-            }
+        this._panelFlows(iso).forEach(d => {
+            if (d.exporter === iso) combined[d.importer] = (combined[d.importer] || 0) + d.netValue;
+            else combined[d.exporter] = (combined[d.exporter] || 0) + d.netValue;
         });
         const total = Object.values(combined).reduce((s, v) => s + v, 0);
         if (total === 0) return '';
-        const scopeNote = isRegional ? `${STATE.region} intra-regional · pre-threshold` : 'All net bilateral flows · pre-threshold';
+        const scopeNote = `Net flows with each partner (export and import partners together) · ${this._panelScopeNote()}`;
 
         const shares = Object.values(combined).map(v => v / total);
         const hhi = shares.reduce((s, sh) => s + sh * sh, 0);
@@ -1197,21 +1301,15 @@ const App = {
         const sectorImp = new Array(SECTORS).fill(0);
         let anyData = false;
 
-        const rawFlows = STATE.yearCache[STATE.year] || [];
-        const isRegional = STATE.region && STATE.region !== 'Global';
-        rawFlows.forEach(d => {
-            if (!isRegional ||
-                (RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region)) {
-                const isExport = d.exporter === iso, isImport = d.importer === iso;
-                if (!isExport && !isImport) return;
-                const partnerIso = isExport ? d.importer : d.exporter;
-                const c = STATE.countryCoords[partnerIso];
-                if (!c) return;
-                const idx = Math.floor((bearingTo(c[0], c[1]) + SECTOR_WIDTH / 2) / SECTOR_WIDTH) % SECTORS;
-                if (isExport) sectorExp[idx] += d.netValue;
-                else          sectorImp[idx] += d.netValue;
-                anyData = true;
-            }
+        this._panelFlows(iso).forEach(d => {
+            const isExport = d.exporter === iso;
+            const partnerIso = isExport ? d.importer : d.exporter;
+            const c = STATE.countryCoords[partnerIso];
+            if (!c) return;
+            const idx = Math.floor((bearingTo(c[0], c[1]) + SECTOR_WIDTH / 2) / SECTOR_WIDTH) % SECTORS;
+            if (isExport) sectorExp[idx] += d.netValue;
+            else          sectorImp[idx] += d.netValue;
+            anyData = true;
         });
         if (!anyData) return '';
 
@@ -1246,12 +1344,13 @@ const App = {
         }
         parts.push(`<circle cx="${cx}" cy="${cy}" r="3.2" fill="#231F20"/>`);
 
-        const scopeNote = isRegional ? `${STATE.region} intra-regional · pre-threshold` : 'All net bilateral flows · pre-threshold';
+        const scopeNote = `Net flows by direction of the partner · ${this._panelScopeNote()}`;
+        // 16px margin on every side: the compass letters sit outside the bars.
         return `<div class="si-section">
             <div class="si-label">Trade Fingerprint</div>
             <div class="si-sublabel">${scopeNote}</div>
             <div class="si-card" style="display:flex;flex-direction:column;align-items:center">
-                <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:220px" preserveAspectRatio="xMidYMid meet">
+                <svg viewBox="-16 -16 ${W + 32} ${H + 32}" style="width:100%;max-width:240px" preserveAspectRatio="xMidYMid meet">
                     ${parts.join('')}
                 </svg>
                 <div class="si-chart-footer">
@@ -1267,14 +1366,12 @@ const App = {
     // and import bar (left, red). Lengths are scaled to the maximum single-direction value.
     // Source: bilateralHistory (gross flows, both directions). Falls back to yearCache net direction.
     _buildButterflyChart(iso) {
-        const rawFlows = STATE.yearCache[STATE.year] || [];
+        const rawFlows = this._panelFlows(iso);
         const isRegional = STATE.region && STATE.region !== 'Global';
         const combined = {};
         rawFlows.forEach(d => {
-            if (isRegional &&
-                !(RegionConfig.getRegion(d.exporter) === STATE.region && RegionConfig.getRegion(d.importer) === STATE.region)) return;
             if (d.exporter === iso) combined[d.importer] = (combined[d.importer] || 0) + d.netValue;
-            else if (d.importer === iso) combined[d.exporter] = (combined[d.exporter] || 0) + d.netValue;
+            else combined[d.exporter] = (combined[d.exporter] || 0) + d.netValue;
         });
 
         const topPartners = Object.entries(combined)
@@ -1344,8 +1441,8 @@ const App = {
             <line x1="${rightEdge}" y1="0" x2="${rightEdge}" y2="${totalH}" stroke="#E2E8F0" stroke-width="0.6" stroke-dasharray="2,2"/>`;
 
         const scopeNote = isRegional
-            ? `${STATE.region} · top 7 · pre-threshold`
-            : 'Top 7 partners · gross bilateral · pre-threshold';
+            ? `Top 7 partners by net flow · exports and imports in each direction · ${STATE.region} intra-regional`
+            : 'Top 7 partners by net flow · exports and imports in each direction · all partners';
 
         return `<div class="si-section">
             <div class="si-label">Bilateral Trade Split</div>
@@ -1359,12 +1456,12 @@ const App = {
         </div>`;
     },
 
-    _generateNarrative(iso, stats, partnerExports, partnerImports, yearlyTotals, mf) {
+    _generateNarrative(iso, stats, partnerExports, partnerImports, yearlyTotals, mf, panelFlows = this._panelFlows(iso)) {
         const name = STATE.countryNames[iso] || iso;
         const sentences = [];
 
         if (stats) {
-            const isExp = stats.netBalance >= 0;
+            const isExp = stats.net >= 0;
             const role = isExp ? 'net exporter' : 'net importer';
 
             const _yearStr = String(STATE.year);
@@ -1379,8 +1476,9 @@ const App = {
             const sortedGlobal = this._globalRankCache[_yearStr];
             const globalRank = sortedGlobal.findIndex(([k]) => k === iso) + 1;
             const totalCountries = sortedGlobal.length;
-            const rankStr = globalRank > 0 ? `ranked <strong>#${globalRank} of ${totalCountries}</strong> globally` : 'active';
-            sentences.push(`<strong>${name}</strong> is a <strong>${role}</strong> of used clothing, ${rankStr} by gross trade volume in ${STATE.year} (${mf.fmt(stats.grossVolume)}).`);
+            const rankStr = globalRank > 0 ? `ranked <strong>#${globalRank} of ${totalCountries}</strong> economies` : 'active';
+            const measure = STATE.metric === 'weight' ? 'gross trade by weight' : 'gross trade';
+            sentences.push(`<strong>${name}</strong> is a <strong>${role}</strong> of used clothing, ${rankStr} by ${measure} (exports + imports) in ${STATE.year}: ${mf.fmt(stats.gross)}.`);
         }
 
         const years = Object.keys(yearlyTotals).map(Number).sort();
@@ -1397,9 +1495,10 @@ const App = {
                 if (firstNZ >= 0 && curIdx > firstNZ && yearlyTotals[years[firstNZ]] > 0) {
                     const n = curIdx - firstNZ;
                     const cagr = (Math.pow(curVal / yearlyTotals[years[firstNZ]], 1 / n) - 1) * 100;
-                    if (isFinite(cagr)) cagrStr = ` (CAGR ${cagr >= 0 ? '+' : ''}${cagr.toFixed(1)}% since ${years[firstNZ]})`;
+                    if (isFinite(cagr)) cagrStr = ` (CAGR ${signedPct(cagr, 1)} since ${years[firstNZ]})`;
                 }
-                sentences.push(`Trade volumes <strong style="color:${col}">${dir} ${Math.abs(yoy).toFixed(1)}%</strong> from ${years[curIdx - 1]} to ${STATE.year}${cagrStr}.`);
+                const what = STATE.metric === 'weight' ? 'Gross trade by weight' : 'Gross trade';
+                sentences.push(`${what} <strong style="color:${col}">${dir} ${Math.abs(yoy).toFixed(1)}%</strong> from ${years[curIdx - 1]} to ${STATE.year}${cagrStr}.`);
             }
         }
 
@@ -1410,25 +1509,24 @@ const App = {
 
         const catTotals = {};
         let countryTotal = 0;
-        (STATE.yearCache[STATE.year] || []).forEach(d => {
-            if (d.exporter === iso || d.importer === iso) {
-                catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
-                countryTotal += d.netValue;
-            }
+        panelFlows.forEach(d => {
+            catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
+            countryTotal += d.netValue;
         });
         const domCat = Object.entries(catTotals).sort((a, b) => b[1] - a[1])[0];
         const catFull = { 'north-south': 'North→South', 'south-north': 'South→North', 'south-south': 'South→South', 'north-north': 'North→North' };
 
+        const within = STATE.region && STATE.region !== 'Global' ? ` within ${STATE.region}` : '';
         if (topEntry || domCat) {
             let s = '';
             if (topEntry) {
                 const tpName = STATE.countryNames[topEntry[0]] || topEntry[0];
-                s += `Top trading partner is <strong>${tpName}</strong>.`;
+                s += `Largest partner by net flow${within} is <strong>${tpName}</strong>.`;
             }
             if (domCat && countryTotal > 0) {
                 const domPct = Math.round((domCat[1] / countryTotal) * 100);
                 const catCol = CONFIG.flowColors[domCat[0]];
-                s += ` <strong style="color:${catCol}">${catFull[domCat[0]]}</strong> flows dominate at ${domPct}%.`;
+                s += ` <strong style="color:${catCol}">${catFull[domCat[0]]}</strong> flows are the largest share of its net flows${within} (${domPct}%).`;
             }
             if (s) sentences.push(s);
         }
@@ -1445,8 +1543,7 @@ const App = {
         const currentSelectionCount = STATE.selectedExporters.size + STATE.selectedImporters.size;
         if (currentSelectionCount === 0 && this._prevSelectionCount > 0 && STATE.thresholdMode !== 'auto') {
             STATE.thresholdMode = 'auto';
-            const autoBtn = document.querySelector('.threshold-btn[data-threshold="auto"]');
-            if (autoBtn) this.updateUIClasses('.threshold-btn', autoBtn);
+            this.syncControlsFromState();
         }
         this._prevSelectionCount = currentSelectionCount;
 
@@ -1458,12 +1555,23 @@ const App = {
         // updateDashboard(), so the hash always describes what is on screen.
         DeepLink.write();
 
-        // Keep the open connections panel (mini history cards) in sync with year etc.
-        if (this._connectionsPanelOpen) this.openConnectionsPanel();
+        // Keep whatever is open in step with the year / metric / region just applied.
+        this._refreshOpenViews();
 
         if (this._lastRenderedRegion !== STATE.region) {
             this._lastRenderedRegion = STATE.region;
             setTimeout(() => TradeMap.zoomToRegion(STATE.region), 50);
+        }
+    },
+
+    // Re-render every open panel / pop-up from the current STATE.
+    _refreshOpenViews() {
+        if (this._connectionsPanelOpen) this.openConnectionsPanel();
+        else if (this._currentPanelIso) this._renderInsightPanel(this._currentPanelIso);
+        if (this._arcPair && !document.getElementById('arc-modal').classList.contains('hidden')) this._renderArcModal();
+        if (this._comparePair && !document.getElementById('compare-modal').classList.contains('hidden')) {
+            const { isoA, isoB } = this._comparePair;
+            this.openCompareModal(isoA, isoB);
         }
     },
 
@@ -1486,6 +1594,9 @@ const App = {
         const key = [exporter, importer].sort().join('|');
         STATE.bilateralPairs = STATE.bilateralPairs.filter(p => [p.exporter, p.importer].sort().join('|') !== key);
         this._syncBilateralSelectors();
+        // The pickers only mirrored the pairs: emptying them must not trigger the
+        // "selection cleared → threshold back to Auto" rule in updateDashboard.
+        this._prevSelectionCount = 0;
         this.updateDashboard(false);
         this._updateLineFilterUI({ active: TradeMap.lineFilterMode, stage: TradeMap._pendingExporter ? 'import' : 'export' });
         if (STATE.bilateralPairs.length > 0 || TradeMap.lineFilterMode) this.openConnectionsPanel();
@@ -1499,6 +1610,7 @@ const App = {
         // setCountries syncs the checkbox UI without dispatching (avoids a double render)
         this.exporterSelector.setCountries([]);
         this.importerSelector.setCountries([]);
+        this._prevSelectionCount = 0;   // see removeBilateralPair
         this.updateDashboard(false);
         this._updateLineFilterUI({ active: TradeMap.lineFilterMode, stage: 'export' });
         if (TradeMap.lineFilterMode) this.openConnectionsPanel();
@@ -1542,9 +1654,15 @@ const App = {
     // Mirrors the single-country Data Insight box, but stacks one simplified
     // bilateral-history card per drawn connection.
     async openConnectionsPanel() {
+        // The connections panel replaces a single-country panel: drop that
+        // country's focus, which would otherwise hide the drawn lines.
+        if (this._currentPanelIso || TradeMap.focusedIso) {
+            this._currentPanelIso = null;
+            if (TradeMap.clearFocus) TradeMap.clearFocus();
+        }
         // Mini history charts need the precomputed bilateral history (lazy-loaded)
-        if (!STATE.bilateralHistory && STATE._bilateralPromise) {
-            try { await STATE._bilateralPromise; } catch (e) { /* fall back to net-only */ }
+        if (!STATE.bilateralHistory) {
+            try { await DataLoader._loadBilateral(STATE.metric); } catch (e) { /* fall back to net-only */ }
         }
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
         const n = STATE.bilateralPairs.length;
@@ -1619,7 +1737,6 @@ const App = {
         const curBtoA = yearData[cy] ? yearData[cy].bToA : 0;
         const curNet  = curAtoB - curBtoA;
         const netCol  = curNet >= 0 ? '#009EDB' : '#ED1847';
-        const netSign = curNet >= 0 ? '+' : '';
         const hasData = atoBs.some(v => v > 0) || bToAs.some(v => v > 0);
 
         const W = 248, H = 30, barH = 12, gap = 2;
@@ -1636,7 +1753,7 @@ const App = {
         }).join('');
 
         const chart = hasData
-            ? `<svg width="${W}" height="${H + 10}" style="width:100%;overflow:visible">
+            ? `<svg viewBox="0 0 ${W} ${H + 10}" width="${W}" height="${H + 10}" style="width:100%;height:auto;overflow:visible">
                    <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#DED9D5" stroke-width="0.5"/>${bars}
                </svg>`
             : `<div class="conn-nodata">No recorded bilateral trade</div>`;
@@ -1649,7 +1766,7 @@ const App = {
             <div class="conn-card-stats">
                 <span class="conn-stat"><span class="conn-stat-lbl">${expName} →</span><b style="color:#0077B8">${mf.fmt(curAtoB)}</b></span>
                 <span class="conn-stat"><span class="conn-stat-lbl">← ${impName}</span><b style="color:#ED1847">${mf.fmt(curBtoA)}</b></span>
-                <span class="conn-stat"><span class="conn-stat-lbl">Net ${cy}</span><b style="color:${netCol}">${netSign}${mf.fmt(Math.abs(curNet))}</b></span>
+                <span class="conn-stat" title="${expName} → ${impName} minus ${impName} → ${expName}"><span class="conn-stat-lbl">Net ${cy}</span><b style="color:${netCol}">${fmtSigned(curNet)}</b></span>
             </div>
             ${chart}
             <div class="conn-card-foot">
@@ -1662,7 +1779,7 @@ const App = {
     showTooltip(event, iso) {
         const tooltip = document.getElementById('tooltip');
         const name = STATE.countryNames[iso] || iso;
-        const stats = STATE.nodeStats[iso];
+        const stats = DataLoader.countryTotals(iso);   // all partners, before display filters
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
 
         const region = RegionConfig.getRegion(iso);
@@ -1682,9 +1799,8 @@ const App = {
             return;
         }
 
-        const isNetExporter = stats.netBalance >= 0;
+        const isNetExporter = stats.net >= 0;
         const balanceColor = isNetExporter ? '#009EDB' : '#ED1847';
-        const balanceSign  = isNetExporter ? '+' : '';
         const roleLabel    = isNetExporter ? 'Net Exporter' : 'Net Importer';
         const roleBg       = isNetExporter ? 'background:rgba(0,158,219,0.15);color:#009EDB' : 'background:rgba(237,24,71,0.15);color:#ED1847';
 
@@ -1692,23 +1808,24 @@ const App = {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <div style="background:#f2f8fc;border:1px solid #DED9D5;border-radius:6px;padding:6px 8px">
                 <div style="font-size:8px;color:#6E6259;text-transform:uppercase;font-weight:700;margin-bottom:2px">${mf.grossLabel.replace(':','')}</div>
-                <div style="font-size:12px;font-weight:700;color:#231F20;font-family:monospace">${mf.fmt(stats.grossVolume)}</div>
+                <div style="font-size:12px;font-weight:700;color:#231F20;font-family:monospace">${mf.fmt(stats.gross)}</div>
             </div>
             <div style="background:#f2f8fc;border:1px solid #DED9D5;border-radius:6px;padding:6px 8px">
                 <div style="font-size:8px;color:#6E6259;text-transform:uppercase;font-weight:700;margin-bottom:2px">${mf.netLabel.replace(':','')}</div>
-                <div style="font-size:12px;font-weight:700;font-family:monospace;color:${balanceColor}">${balanceSign}${mf.fmt(Math.abs(stats.netBalance))}</div>
+                <div style="font-size:12px;font-weight:700;font-family:monospace;color:${balanceColor}">${fmtSigned(stats.net)}</div>
             </div>
         </div>
         <div style="text-align:center;margin-bottom:8px">
             <span style="font-size:9px;font-weight:700;padding:2px 10px;border-radius:99px;${roleBg}">${roleLabel}</span>
         </div>`;
 
+        const panelFlows = this._panelFlows(iso);
         const partnerExports = {};
         const partnerImports = {};
-        STATE.filteredData.forEach(d => {
+        panelFlows.forEach(d => {
             if (d.exporter === iso) {
                 partnerExports[d.importer] = (partnerExports[d.importer] || 0) + d.netValue;
-            } else if (d.importer === iso) {
+            } else {
                 partnerImports[d.exporter] = (partnerImports[d.exporter] || 0) + d.netValue;
             }
         });
@@ -1743,18 +1860,16 @@ const App = {
 
             content += `
             <div style="padding-top:8px;border-top:1px solid #DED9D5;margin-top:2px">
-                <div style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Top Partners</div>
+                <div style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Top Partners · net flow${STATE.region && STATE.region !== 'Global' ? ` · within ${STATE.region}` : ''}</div>
                 ${partnerRows}
             </div>`;
         }
 
         const catTotals = {};
         let countryTotal = 0;
-        (STATE.yearCache[STATE.year] || []).forEach(d => {
-            if (d.exporter === iso || d.importer === iso) {
-                catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
-                countryTotal += d.netValue;
-            }
+        panelFlows.forEach(d => {
+            catTotals[d.flowCategory] = (catTotals[d.flowCategory] || 0) + d.netValue;
+            countryTotal += d.netValue;
         });
 
         if (countryTotal > 0) {
@@ -1772,7 +1887,7 @@ const App = {
 
             content += `
             <div style="margin-top:8px;padding-top:8px;border-top:1px solid #DED9D5">
-                <div style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Flow Composition</div>
+                <div style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Flow Composition${STATE.region && STATE.region !== 'Global' ? ` · within ${STATE.region}` : ''}</div>
                 <div style="display:flex;height:4px;border-radius:99px;overflow:hidden;gap:1px">${barSegments}</div>
                 <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:5px;flex-wrap:wrap">${labelSpans}</div>
             </div>`;
@@ -1801,8 +1916,7 @@ const App = {
             if (curIdx > 0 && yVals[curIdx - 1] > 0) {
                 const yoy = ((yVals[curIdx] - yVals[curIdx - 1]) / yVals[curIdx - 1]) * 100;
                 const yoyCol = yoy >= 0 ? '#72BF44' : '#ED1847';
-                const yoySign = yoy >= 0 ? '+' : '';
-                yoyHtml = `<span style="font-size:9px;font-family:monospace;font-weight:700;color:${yoyCol}">${yoySign}${yoy.toFixed(0)}% YoY</span>`;
+                yoyHtml = `<span style="font-size:9px;font-family:monospace;font-weight:700;color:${yoyCol}">${signedPct(yoy, 0)} YoY</span>`;
             }
             let cagrHtml = '';
             const firstNonZeroIdx = yVals.findIndex(v => v > 0);
@@ -1811,14 +1925,14 @@ const App = {
                 const cagr = (Math.pow(yVals[curIdx] / yVals[firstNonZeroIdx], 1 / n) - 1) * 100;
                 if (isFinite(cagr)) {
                     const cagrCol = cagr >= 0 ? '#72BF44' : '#ED1847';
-                    cagrHtml = `<span style="font-size:8px;font-family:monospace;color:${cagrCol}">CAGR ${cagr >= 0 ? '+' : ''}${cagr.toFixed(1)}%</span>`;
+                    cagrHtml = `<span style="font-size:8px;font-family:monospace;color:${cagrCol}">CAGR ${signedPct(cagr, 1)}</span>`;
                 }
             }
 
             content += `
             <div style="margin-top:8px;padding-top:8px;border-top:1px solid #DED9D5">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-                    <span style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Trend</span>
+                    <span style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Gross trade trend</span>
                     <div style="display:flex;align-items:center;gap:8px">${yoyHtml}${cagrHtml}</div>
                 </div>
                 <svg width="${W}" height="${H}" style="width:100%">${bars}</svg>
@@ -1829,16 +1943,19 @@ const App = {
         }
 
         if (region && region !== 'Other') {
-            const regionCountries = Object.entries(STATE.nodeStats)
-                .filter(([code]) => RegionConfig.getRegion(code) === region)
-                .sort((a, b) => b[1].grossVolume - a[1].grossVolume);
+            // Rank by the country's own gross trade among all economies of its
+            // region with trade that year — not just the ones drawn on the map.
+            const yStr = String(STATE.year);
+            const regionCountries = Object.entries(STATE.trendSummary || {})
+                .filter(([code, ys]) => (ys[yStr] || 0) > 0 && RegionConfig.getRegion(code) === region)
+                .sort((a, b) => b[1][yStr] - a[1][yStr]);
             const rank = regionCountries.findIndex(([code]) => code === iso) + 1;
             const total = regionCountries.length;
             if (rank > 0) {
                 content += `
                 <div style="margin-top:6px;padding-top:6px;border-top:1px solid #DED9D5;font-size:9px;color:#6E6259;display:flex;align-items:center;gap:4px">
                     <span style="color:#004990;font-weight:700;font-size:10px">#${rank}</span>
-                    <span>of ${total} in ${region}</span>
+                    <span>of ${total} in ${region} by gross trade</span>
                     <span style="margin-left:auto;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;${roleBg}">${roleLabel}</span>
                 </div>`;
             }
@@ -1913,16 +2030,74 @@ const App = {
     },
 
     syncMobileFilterState() {
-        const activeRegion = document.querySelector(`.region-btn[data-region="${STATE.region || 'Global'}"]`);
-        if (activeRegion) this.updateUIClasses('.region-btn', activeRegion);
-        const threshVal = (STATE.thresholdMode === 'auto' || STATE.thresholdMode === undefined) ? 'auto' : String(STATE.thresholdMode);
-        const activeThreshold = document.querySelector(`.threshold-btn[data-threshold="${threshVal}"]`);
-        if (activeThreshold) this.updateUIClasses('.threshold-btn', activeThreshold);
-        // Top-N label is unit-free, so only the active state needs syncing
+        this.syncControlsFromState();
+    },
+
+    // Make every filter control — the desktop bar AND the mobile sheet — show what
+    // STATE holds. Controls are matched by their data value, never by the clicked
+    // node, so the two surfaces cannot drift apart.
+    syncControlsFromState() {
+        const region = STATE.region || 'Global';
+        document.querySelectorAll('.region-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.region === region));
+        const thresh = (STATE.thresholdMode === 'auto' || STATE.thresholdMode == null) ? 'auto' : String(STATE.thresholdMode);
+        document.querySelectorAll('.threshold-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.threshold === thresh));
         this._setActiveTopNButtons(STATE.topNMode == null ? 'all' : String(STATE.topNMode));
-        // Metric toggle + unit-aware threshold labels (desktop and mobile share classes)
         this._setActiveMetricButtons(STATE.metric || 'value');
         this.updateThresholdLabels(STATE.metric || 'value');
+        document.querySelectorAll('.flow-checkbox').forEach(cb => { cb.checked = STATE.flowFilters.has(cb.value); });
+        ['year-select', 'm-year-select'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = String(STATE.year);
+        });
+    },
+
+    // Snapshot of everything the user can set, so a guided tour or the animation
+    // can hand the dashboard back exactly as they found it.
+    captureViewState() {
+        return {
+            metric:         STATE.metric,
+            year:           STATE.year,
+            region:         STATE.region || 'Global',
+            flowFilters:    [...STATE.flowFilters],
+            thresholdMode:  STATE.thresholdMode,
+            topNMode:       STATE.topNMode ?? null,
+            exporters:      this.exporterSelector ? this.exporterSelector.getSelectedCountries() : [],
+            importers:      this.importerSelector ? this.importerSelector.getSelectedCountries() : [],
+            bilateralPairs: (STATE.bilateralPairs || []).map(p => ({ exporter: p.exporter, importer: p.importer })),
+            lineFilterMode: !!TradeMap.lineFilterMode,
+        };
+    },
+
+    async restoreViewState(s) {
+        if (!s) return;
+        if (s.metric && s.metric !== STATE.metric) {
+            const switched = await DataLoader.switchMetric(s.metric);
+            if (switched) { this._globalRankCache = {}; TradeMap._lastLegendKey = null; }
+        }
+        if (s.year !== STATE.year) {
+            await DataLoader.loadYear(s.year);
+            STATE.year = s.year;
+        }
+        STATE.region        = s.region;
+        STATE.flowFilters   = new Set(s.flowFilters);
+        STATE.thresholdMode = s.thresholdMode;
+        STATE.topNMode      = s.topNMode;
+        STATE.bilateralPairs = s.bilateralPairs.map(p => ({ ...p }));
+        if (TradeMap.lineFilterMode !== s.lineFilterMode) {
+            s.lineFilterMode ? TradeMap.enableLineFilter() : TradeMap.disableLineFilter();
+        }
+        this.exporterSelector.setCountries(s.exporters);
+        this.importerSelector.setCountries(s.importers);
+        // The restored selection is not a "selection was just cleared" transition,
+        // so the threshold auto-reset in updateDashboard must not fire.
+        this._prevSelectionCount = s.exporters.length + s.importers.length;
+        this.syncControlsFromState();
+        this.updateDashboard(false);
+        this._updateLineFilterUI({ active: TradeMap.lineFilterMode, stage: 'export' });
+        if (TradeMap.lineFilterMode || STATE.bilateralPairs.length > 0) this.openConnectionsPanel();
+        else this.closeConnectionsPanel();
     }
 };
 

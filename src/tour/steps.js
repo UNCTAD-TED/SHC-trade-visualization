@@ -10,9 +10,17 @@
 //   target   : CSS selector or (ctx) => selector  (resolved AFTER onEnter runs)
 //   placement: 'auto' | 'top' | 'bottom' | 'left' | 'right' | 'center'
 //   body/title may be strings or (ctx) => string
+//   onEnter(ctx, alive): alive() turns false once the user has ended the tour
+//              (or moved on). An async onEnter must check it after every await
+//              and stop, so it never acts on the view the tour handed back.
+//
+// When the tour ends (Done, × or Esc) the dashboard is returned to the view the
+// user had when the tour started (Tour._handBack), so chapters may change any
+// setting freely.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const name = (ctx, iso) => (iso && (ctx.STATE.countryNames[iso] || iso)) || '—';
+const always = () => true;
 
 // Restore all four flow filters (used by several onExit hooks)
 function allFlows(ctx) {
@@ -21,9 +29,12 @@ function allFlows(ctx) {
     ctx.app.updateDashboard(false);
 }
 
-async function setMetric(ctx, metric) {
+async function setMetric(ctx, metric, alive = always) {
     if (ctx.STATE.metric === metric) return;
     await ctx.DataLoader.switchMetric(metric);
+    // Ended meanwhile, or superseded by a later switch (e.g. the hand-back):
+    // the switch did not commit, so the controls must not claim it did.
+    if (!alive() || ctx.STATE.metric !== metric) return;
     ctx.app._setActiveMetricButtons(metric);
     ctx.app.updateThresholdLabels(metric);
     ctx.app._globalRankCache = {};
@@ -41,7 +52,7 @@ export const TOUR_STEPS = [
                driving the map live as we go. Click <b>Next</b> (or press the <b>&rarr;</b> key)
                to advance at your own pace.`,
         placement: 'center',
-        async onEnter(ctx) { await ctx.resetView(); },
+        async onEnter(ctx, alive) { await ctx.resetView(alive); },
     },
 
     // 02 ─ Reading the map ────────────────────────────────────────────────────
@@ -55,7 +66,7 @@ export const TOUR_STEPS = [
                <span style="color:#A066AA">■</span> North→North.
                <br><br><b>Circles (nodes)</b> are countries:
                <span style="color:#009EDB">blue</span> = net exporter,
-               <span style="color:#ED1847">red</span> = net importer. The larger the circle, the larger the trade.`,
+               <span style="color:#ED1847">red</span> = net importer. The larger the circle, the more of its trade is drawn on the map.`,
         target: '#legend-content',
         placement: 'auto',
         dock: 'br',
@@ -67,7 +78,7 @@ export const TOUR_STEPS = [
         id: 'kpi',
         title: 'Who leads the trade',
         body: `The bar below summarises the current view: the <b>#1&nbsp;Exporter / #1&nbsp;Importer</b>
-               (largest net traders), the number of <b>Corridors</b> on screen, and the total <b>Volume</b>.
+               (largest net traders), the number of <b>Corridors</b> on screen, and the <b>Shown</b> total of the lines drawn.
                It refreshes instantly whenever you change the year or any filter.`,
         target: '#kpi-bar',
         placement: 'top',
@@ -104,7 +115,7 @@ export const TOUR_STEPS = [
         target: '#metric-group',
         placement: 'bottom',
         dock: 'br',
-        async onEnter(ctx) { await setMetric(ctx, 'weight'); },
+        async onEnter(ctx, alive) { await setMetric(ctx, 'weight', alive); },
         async onExit(ctx) { await setMetric(ctx, 'value'); },
         dwell: 9000,
     },
@@ -122,13 +133,14 @@ export const TOUR_STEPS = [
         target: '#insight-panel',
         placement: 'left',
         dock: 'bl',
-        async onEnter(ctx) {
+        async onEnter(ctx, alive = () => true) {
             const iso = ctx.pickImporter();
             ctx.deepIso = iso;
             if (iso) {
                 ctx.app.importerSelector?.setCountries([iso]);
                 ctx.app.updateDashboard();
                 await ctx.wait(250);
+                if (!alive()) return;
                 ctx.app.openInsightPanel(iso);
                 ctx.TradeMap.zoomToCountry?.(iso, 3, 1100);
                 await ctx.wait(350);
@@ -179,16 +191,14 @@ export const TOUR_STEPS = [
         dock: 'br',
         onEnter(ctx) {
             ctx.STATE.region = 'Africa';
-            const b = document.querySelector('.region-btn[data-region="Africa"]');
-            if (b) ctx.app.updateUIClasses('.region-btn', b);
+            ctx.app.syncControlsFromState();
             ctx.app.exporterSelector?.setCountries([]);
             ctx.app.importerSelector?.setCountries([]);
             ctx.app.updateDashboard();
         },
         onExit(ctx) {
             ctx.STATE.region = 'Global';
-            const b = document.querySelector('.region-btn[data-region="Global"]');
-            if (b) ctx.app.updateUIClasses('.region-btn', b);
+            ctx.app.syncControlsFromState();
             ctx.app.updateDashboard();
         },
         dwell: 8500,
@@ -199,13 +209,19 @@ export const TOUR_STEPS = [
         id: 'animate',
         title: 'Travel through time',
         body: `<b>Animate</b> auto-plays 2015→2024 as a <b>bar-chart race</b>. Watch the rankings shuffle
-               and volumes grow as motion rather than numbers.
+               and trade grows as motion rather than numbers.
                <br><br>It's playing now, moving to the next chapter will stop it automatically.`,
         placement: 'center',
         dim: false,            // keep the bar-chart race fully visible
         cardAnchor: 'bottom',
-        async onEnter(ctx) { try { await ctx.startAnimation(); } catch { /* ignore */ } },
-        onExit(ctx) { try { ctx.stopAnimation(); } catch { /* ignore */ } },
+        async onEnter(ctx, alive = () => true) {
+            if (!alive()) return;
+            // A tour that ends during the year preload stops the animation,
+            // which cancels this start (see animationMode.startAnimation).
+            try { await ctx.startAnimation(); } catch { /* ignore */ }
+        },
+        // Awaited, so the next chapter starts from the restored dashboard.
+        async onExit(ctx) { try { await ctx.stopAnimation(); } catch { /* ignore */ } },
         dwell: 11000,
     },
 
@@ -213,12 +229,12 @@ export const TOUR_STEPS = [
     {
         id: 'finish',
         title: "Now it's your turn",
-        body: `That completes the tour.
+        body: `That completes the tour. Closing it returns the map to the view you had before it started.
                <br><br>Mix year, region, <b>value / weight</b>, flow direction and thresholds freely,
                and click any country to dig deeper. You can replay this walkthrough anytime from the
                <b>Tour</b> button in the header.`,
         placement: 'center',
         advance: 'manual',
-        async onEnter(ctx) { await ctx.resetView(); },
+        async onEnter(ctx, alive) { await ctx.resetView(alive); },
     },
 ];
