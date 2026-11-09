@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
-import { CONFIG, STATE, METRIC_FORMAT } from './config.js';
+import { CONFIG, STATE, METRIC_FORMAT, isCompact, isCompactTall } from './config.js';
 import { RegionConfig } from './regions.js';
 // md() = motionDuration: every D3 transition below runs through it so that
 // under prefers-reduced-motion the end state is applied instantly (0 ms) while
@@ -88,13 +88,13 @@ export const TradeMap = {
         const group = new Set([codeStr]);
         const iso3 = this.isoMap[codeStr];
         if (iso3) {
-            (this._territoryAliases[iso3] || []).forEach(c => group.add(String(c)));
+            (this._territoryAliases[iso3] || []).forEach(c => { group.add(String(c)); });
         }
         for (const [mainIso, aliasList] of Object.entries(this._territoryAliases)) {
             if (aliasList.includes(codeStr)) {
                 const mainCode = this._reverseIsoMap[mainIso];
                 if (mainCode) group.add(String(mainCode));
-                aliasList.forEach(c => group.add(String(c)));
+                aliasList.forEach(c => { group.add(String(c)); });
             }
         }
         return group;
@@ -117,6 +117,9 @@ export const TradeMap = {
         this.height = container.getBoundingClientRect().height;
 
         if (!this.svg) this.init2D(container);
+        const pageScrolls = document.documentElement.scrollHeight > window.innerHeight + 4;
+        this._twoFingerPan = !!window.matchMedia?.('(pointer: coarse)').matches && (isCompactTall() || pageScrolls);
+        this.svg.style('touch-action', this._twoFingerPan ? 'pan-y' : 'none');
 
         this.updateDimensions();
         this.updateProjection();
@@ -129,7 +132,7 @@ export const TradeMap = {
             .style("position", "absolute")
             .style("top", "0").style("left", "0")
             .style("z-index", "1")
-            .style("touch-action", "none"); // スマホでのブラウザスクロールを無効化し、地図のパン操作を可能にする
+            .style("touch-action", "none"); // touch drags pan the map instead of scrolling the page
 
         const defs = this.svg.append("defs");
         const hatch = defs.append("pattern")
@@ -142,7 +145,7 @@ export const TradeMap = {
             .attr("stroke", "#AEA29A").attr("stroke-width", 0.8);
 
         this.g = this.svg.append("g");
-        this._graticuleGeo = d3.geoGraticule()(); // GeoJSONは不変なので一度だけ生成
+        this._graticuleGeo = d3.geoGraticule()(); // static GeoJSON: build once
 
         this.zoomBehavior = d3.zoom()
             .scaleExtent([0.2, 8])
@@ -178,7 +181,37 @@ export const TradeMap = {
                     this.g.selectAll(".lf-start-core").attr("r", 4 / k);
                 });
             });
+        this.zoomBehavior.filter(event => this._zoomFilter(event));
         this.svg.call(this.zoomBehavior);
+
+        // Portrait phones: one finger scrolls the page, two fingers move the map
+        this.svg.on('touchmove.hint', (event) => {
+            if (this._twoFingerPan && event.touches && event.touches.length === 1) this._showMapHint('Use two fingers to move the map');
+        }, { passive: true });
+    },
+
+    // Which gestures d3.zoom handles (d3's default, plus the two options above).
+    wheelZoom: true,
+    _zoomFilter(event) {
+        if (event.type === 'wheel') return this.wheelZoom !== false;
+        if (event.type.startsWith('touch')) return !this._twoFingerPan || (event.touches && event.touches.length >= 2);
+        return !event.ctrlKey && !event.button;
+    },
+
+    _showMapHint(text) {
+        const area = document.querySelector('.map-area');
+        if (!area) return;
+        let hint = document.getElementById('map-hint');
+        if (!hint) {
+            hint = document.createElement('div');
+            hint.id = 'map-hint';
+            hint.setAttribute('role', 'status');
+            area.appendChild(hint);
+        }
+        hint.textContent = text;
+        hint.classList.add('show');
+        clearTimeout(this._hintTimer);
+        this._hintTimer = setTimeout(() => hint.classList.remove('show'), 1400);
     },
 
     updateDimensions() {
@@ -211,10 +244,19 @@ export const TradeMap = {
         const config = RegionConfig.regions[regionName];
         if (!config) return;
 
+        // World: fit the inhabited land (no Antarctica) to the map area
+        if (regionName === 'Global') {
+            const fit = this._worldFitTransform();
+            if (fit) {
+                this.svg.transition().duration(md(1200)).call(this.zoomBehavior.transform, fit);
+                return;
+            }
+        }
+
         const [targetLon, targetLat] = config.center;
         let targetScale = config.scale;
 
-        // Global表示かつスマホ（縦長画面）の場合、地図が横幅にすっぽり収まるまで縮小(k < 1)する
+        // World view on a portrait screen: zoom out (k < 1) until the map fits the width
         if (regionName === "Global" && this.height > this.width) {
             const baseScaleX = this.width / 6.28;
             const currentBaseScale = this.projection.scale();
@@ -224,7 +266,7 @@ export const TradeMap = {
         const projectedPoint = this.projection([targetLon, targetLat]);
         if (!projectedPoint) return;
 
-        const k = Math.max(0.2, targetScale); // 下限を0.2に制限
+        const k = Math.max(0.2, targetScale); // never below the zoom floor
         const tx = (this.width / 2) - (projectedPoint[0] * k);
         const ty = (this.height / 2) - (projectedPoint[1] * k);
 
@@ -235,6 +277,32 @@ export const TradeMap = {
             .call(this.zoomBehavior.transform, transform);
     },
 
+    _worldFitTransform() {
+        if (!STATE.geoData?.features || !this.path) return null;
+        if (!this._worldLand) {
+            this._worldLand = {
+                type: 'FeatureCollection',
+                features: STATE.geoData.features.filter(f => !['10', '010', 'ATA'].includes(String(f.properties?.code))),
+            };
+        }
+        const [[x0, y0], [x1, y1]] = this.path.bounds(this._worldLand);
+        const bw = x1 - x0, bh = y1 - y0;
+        if (!(bw > 0 && bh > 0)) return null;
+        const k = Math.max(0.2, Math.min(8, Math.min(this.width * 0.97 / bw, this.height * 0.92 / bh)));
+        // "Zoom out" must never zoom in: let the minimum zoom reach the world view
+        const [lo, hi] = this.zoomBehavior.scaleExtent();
+        if (k < lo) this.zoomBehavior.scaleExtent([k, hi]);
+        return d3.zoomIdentity
+            .translate(this.width / 2 - (x0 + bw / 2) * k, this.height / 2 - (y0 + bh / 2) * k)
+            .scale(k);
+    },
+
+    // Zoom in or out around the centre of the map (+ / − buttons).
+    zoomBy(factor) {
+        if (!this.svg || !this.zoomBehavior) return;
+        this.svg.transition().duration(md(350)).call(this.zoomBehavior.scaleBy, factor);
+    },
+
     // Zoom to a single country's centroid. `scale` plays the same role as RegionConfig.scale.
     zoomToCountry(iso, scale = 3.5, duration = 1200) {
         if (!this.zoomBehavior) return;
@@ -243,7 +311,9 @@ export const TradeMap = {
         const p = this.projection(coords);
         if (!p) return;
         const k = Math.max(0.2, scale);
-        const tx = (this.width / 2) - (p[0] * k);
+        const panel = document.getElementById('insight-panel');
+        const offset = panel?.classList.contains('open') && !isCompact() ? panel.getBoundingClientRect().width / 2 : 0;
+        const tx = (this.width / 2 - offset) - (p[0] * k);
         const ty = (this.height / 2) - (p[1] * k);
         this.svg.transition()
             .duration(md(duration))
@@ -300,10 +370,18 @@ export const TradeMap = {
                     .attr("fill", ld => this._specialFill(ld, focusGroup.has(String(ld.properties.code)) ? "#EAF4FB" : "#DED9D5"));
             })
             .on("click", (event, d) => {
-                // Only active in line-filter mode — otherwise land is just the backdrop.
-                if (!this.lineFilterMode || !d || !d.properties) return;
-                event.stopPropagation();
-                this._handleCountryPick(this._codeToIso(d.properties.code));
+                if (!d || !d.properties) return;
+                const iso = this._codeToIso(d.properties.code);
+                if (this.lineFilterMode) {
+                    event.stopPropagation();
+                    this._handleCountryPick(iso);
+                    return;
+                }
+                // Explore: a country shape opens its panel, like its circle does
+                if (iso && STATE.trendSummary?.[iso]) {
+                    event.stopPropagation();
+                    document.dispatchEvent(new CustomEvent('shc:country-click', { detail: iso }));
+                }
             });
 
         landsEnter.merge(lands)
@@ -477,6 +555,7 @@ export const TradeMap = {
 
         if (!netFlows || netFlows.length === 0) {
             this.g.selectAll(".trade-arc, .country-node, .map-label-unified")
+                .classed("is-exiting", true)
                 .transition().duration(md(500)).style("opacity", 0).remove();
             if (this.renderLegend) this.renderLegend();
             return;
@@ -489,7 +568,10 @@ export const TradeMap = {
 
         // Projection cache: each ISO is projected at most once per render call
         const _projCache = {};
-        const projOf = (iso) => _projCache[iso] || (_projCache[iso] = this.getProjectedPoint(iso));
+        const projOf = (iso) => {
+            if (!_projCache[iso]) _projCache[iso] = this.getProjectedPoint(iso);
+            return _projCache[iso];
+        };
 
         const nodeStatsArr  = Object.values(nodeStats);
         const isFocused = STATE.selectedExporters.size > 0 || STATE.selectedImporters.size > 0;
@@ -556,14 +638,18 @@ export const TradeMap = {
         const arcs = flowLayer.selectAll(".trade-arc")
             .data(visibleFlows, d => `${d.exporter}|${d.importer}`);
 
+        // Leaving elements are marked so focus changes (setFocus / clearFocus)
+        // never start a transition on them: that would cancel their removal.
         arcs.exit()
+            .classed("is-exiting", true)
             .transition().duration(md(500))
             .style("opacity", 0)
             .remove();
+        arcs.classed("is-exiting", false);
 
         const focusedIso = this.focusedIso;
 
-        // パートナーセットを一度だけ構築してO(n×m)→O(n+m)にする
+        // Build the partner set once: O(n+m) instead of O(n×m)
         const focusedPartnerSet = new Set();
         if (focusedIso) {
             visibleFlows.forEach(f => {
@@ -583,7 +669,6 @@ export const TradeMap = {
             .attr("class", "trade-arc")
             .attr("id", d => `arc-${d.exporter}-${d.importer}`)
             .style("fill", "none")
-            .style("mix-blend-mode", "multiply")
             .style("opacity", 0)
             .attr("stroke", d => CONFIG.flowColors[d.flowCategory])
             .on("click", (event, d) => { event.stopPropagation(); document.dispatchEvent(new CustomEvent('shc:arc-click', { detail: { exporter: d.exporter, importer: d.importer } })); });
@@ -622,10 +707,12 @@ export const TradeMap = {
             .data(activeNodes, d => d);
 
         nodes.exit()
+            .classed("is-exiting", true)
             .transition().duration(md(500))
             .attr("r", 0)
             .style("opacity", 0)
             .remove();
+        nodes.classed("is-exiting", false);
 
         const nodesEnter = nodes.enter()
             .append("circle")
@@ -685,9 +772,11 @@ export const TradeMap = {
             .data(visibleLabels, d => d);
 
         labels.exit()
+            .classed("is-exiting", true)
             .transition().duration(md(300))
             .style("opacity", 0)
             .remove();
+        labels.classed("is-exiting", false);
 
         const labelsEnter = labels.enter()
             .append("text")
@@ -761,7 +850,7 @@ export const TradeMap = {
 
         // Update path shapes immediately (before opacity fade) to avoid D3 path interpolation glitch.
         // Cache the selection to avoid traversing the DOM twice.
-        const focusArcs = this.g.selectAll(".trade-arc");
+        const focusArcs = this.g.selectAll(".trade-arc:not(.is-exiting)");
         focusArcs.attr("d", function(d) {
                 if (d.exporter !== focusedIso && d.importer !== focusedIso) return this.getAttribute("d");
                 if (self.searouteMode) {
@@ -787,14 +876,14 @@ export const TradeMap = {
                 return 0;
             });
 
-        this.g.selectAll(".country-node")
+        this.g.selectAll(".country-node:not(.is-exiting)")
             .transition().duration(md(450))
             .style("opacity", function(d) {
                 if (d === focusedIso) return 1;
                 return partners.has(d) ? 0.95 : 0.18;
             });
 
-        this.g.selectAll(".map-label-unified")
+        this.g.selectAll(".map-label-unified:not(.is-exiting)")
             .transition().duration(md(450))
             .style("opacity", function(d) {
                 if (d === focusedIso) return 1;
@@ -810,13 +899,20 @@ export const TradeMap = {
         const aliasCodes  = this._territoryAliases[iso] || [];
         const highlightCodes = new Set([focusedCode, ...aliasCodes].filter(Boolean));
 
+        // Dimming uses the colour a 35 % land fill has over the sea (#ECEDEF, stroke #E4E5E6)
+        // rather than opacity: per-shape opacity makes every repaint of the map far more costly.
+        // Only the hatched polygon, which has no plain colour, still fades by opacity.
         this.g.selectAll(".land")
             .transition().duration(md(450))
             .style("opacity", function(d) {
-                return (d && highlightCodes.has(String(d.properties.code))) ? 1 : 0.35;
+                const on = d && highlightCodes.has(String(d.properties.code));
+                return (on || self._specialFill(d, null) === null) ? 1 : 0.35;
+            })
+            .attr("stroke", function(d) {
+                return (d && highlightCodes.has(String(d.properties.code))) ? "#C8C2BB" : "#E4E5E6";
             })
             .attr("fill", function(d) {
-                const base = (d && highlightCodes.has(String(d.properties.code))) ? "#EAF4FB" : "#DED9D5";
+                const base = (d && highlightCodes.has(String(d.properties.code))) ? "#EAF4FB" : "#ECEDEF";
                 return self._specialFill(d, base);
             });
 
@@ -858,7 +954,7 @@ export const TradeMap = {
 
         // Snap path shapes back to circular arcs immediately, before opacity animates in.
         // Cache selection to avoid traversing the DOM twice.
-        const clearArcs = this.g.selectAll(".trade-arc");
+        const clearArcs = this.g.selectAll(".trade-arc:not(.is-exiting)");
         clearArcs.attr("d", function(d) {
                 const s = STATE.countryCoords[d.exporter];
                 const t = STATE.countryCoords[d.importer];
@@ -877,12 +973,13 @@ export const TradeMap = {
                 return +this.getAttribute("data-base-opacity") || 0.5;
             });
 
-        this.g.selectAll(".country-node")
+        this.g.selectAll(".country-node:not(.is-exiting)")
             .transition().duration(md(400)).style("opacity", 1);
 
-        this.g.selectAll(".map-label-unified")
+        this.g.selectAll(".map-label-unified:not(.is-exiting)")
             .transition().duration(md(400)).style("opacity", 1);
 
+        this.g.selectAll(".land").transition("land-stroke").duration(md(400)).attr("stroke", "#C8C2BB");
         this.g.selectAll(".land")
             .transition().duration(md(400))
             .style("opacity", 1)
@@ -936,6 +1033,18 @@ export const TradeMap = {
 
         const layer = this.g.append("g").attr("class", "particle-layer").style("pointer-events", "none");
 
+        // The soft white glow is a radial gradient (drawn like any fill), not a CSS
+        // drop-shadow filter: a filter on every moving particle forced the whole map
+        // to be repainted on every frame while a country was selected.
+        let defs = this.svg.select("defs");
+        if (defs.empty()) defs = this.svg.insert("defs", ":first-child");
+        if (defs.select("#particle-glow").empty()) {
+            const grad = defs.append("radialGradient").attr("id", "particle-glow");
+            grad.append("stop").attr("offset", "0.45").attr("stop-color", "#fff").attr("stop-opacity", 0.9);
+            grad.append("stop").attr("offset", "0.75").attr("stop-color", "#fff").attr("stop-opacity", 0.35);
+            grad.append("stop").attr("offset", "1").attr("stop-color", "#fff").attr("stop-opacity", 0);
+        }
+
         focusedFlows.forEach(d => {
             const arcId = `arc-${d.exporter}-${d.importer}`;
             const intensity = Math.min(1, d.netValue / maxVal);
@@ -945,8 +1054,10 @@ export const TradeMap = {
 
             for (let i = 0; i < count; i++) {
                 const offset = i / count;
-                const particle = layer.append("circle")
-                    .attr("class", "trade-particle")
+                const particle = layer.append("g").attr("class", "trade-particle");
+                particle.append("circle").attr("class", "trade-particle-glow")
+                    .attr("r", 3.4).attr("fill", "url(#particle-glow)");
+                particle.append("circle").attr("class", "trade-particle-dot")
                     .attr("r", 1.6).attr("fill", color)
                     .attr("stroke", "#ffffff").attr("stroke-width", 0.4).attr("opacity", 0.95);
 
@@ -1105,18 +1216,20 @@ export const TradeMap = {
 
         const netFlows = STATE.filteredData || [];
 
-        const _legendKey = `${STATE.metric}_${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.topNMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}_${this.lineFilterMode}_${(STATE.bilateralPairs || []).length}`;
+        const _legendKey = `${isCompact() ? 'c' : 'w'}_${STATE.metric}_${netFlows.length}_${STATE.totalBilateral}_${STATE.thresholdMode}_${STATE.topNMode}_${STATE.effectiveThreshold}_${[...STATE.flowFilters].sort().join(',')}_${this.lineFilterMode}_${(STATE.bilateralPairs || []).length}`;
         if (this._lastLegendKey === _legendKey) return;
         this._lastLegendKey = _legendKey;
 
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
 
-        // Flow categories
+        // Flow categories. Phones show the legend in two narrow columns, so they
+        // get the short labels the filter chips use.
+        const short = isCompact();
         const categories = [
-            { key: 'north-south', label: 'N→S' },
-            { key: 'south-north', label: 'S→N' },
-            { key: 'south-south', label: 'S→S' },
-            { key: 'north-north', label: 'N→N' },
+            { key: 'north-south', label: short ? 'N → S' : 'North → South' },
+            { key: 'south-north', label: short ? 'S → N' : 'South → North' },
+            { key: 'south-south', label: short ? 'S → S' : 'South → South' },
+            { key: 'north-north', label: short ? 'N → N' : 'North → North' },
         ];
 
         const catStats = {};
@@ -1129,18 +1242,18 @@ export const TradeMap = {
         });
 
         const flowItems = categories.map(c => {
-            const active   = STATE.flowFilters.has(c.key);
-            const stat     = catStats[c.key];
-            const valStr   = stat.count > 0 ? mf.fmt(stat.total) : '—';
-            const cntStr   = stat.count > 0 ? `${stat.count}` : '0';
-            return `<div class="legend-flow-item" style="opacity:${active ? 1 : 0.3}">
-                <span class="legend-flow-dot" style="background:${CONFIG.flowColors[c.key]}"></span>
-                <span class="legend-flow-label">${c.label}</span>
-                <span class="legend-flow-stat">${cntStr} · ${valStr}</span>
+            const active = STATE.flowFilters.has(c.key);
+            const stat   = catStats[c.key];
+            const valStr = stat.count > 0 ? mf.fmt(stat.total) : '—';
+            const title  = active ? `${stat.count} line${stat.count === 1 ? '' : 's'} drawn` : 'Hidden by the flow-direction filter';
+            return `<div class="lg-flow${active ? '' : ' is-off'}" title="${title}">
+                <span class="lg-swatch" style="background:${CONFIG.flowColors[c.key]}"></span>
+                <span class="lg-name">${c.label}</span>
+                <span class="lg-stat">${active ? `${stat.count} · ${valStr}` : 'off'}</span>
             </div>`;
         }).join('');
 
-        // Threshold — say what actually limits the lines on the map.
+        // What limits the lines on the map
         const isManual   = STATE.thresholdMode !== 'auto';
         const isConnect  = this.lineFilterMode || (STATE.bilateralPairs && STATE.bilateralPairs.length > 0);
         const topN       = STATE.topNMode;
@@ -1154,39 +1267,41 @@ export const TradeMap = {
         } else if (!isManual) {
             badge = 'AUTO'; badgeCls = ''; valText = `≥ ${mf.fmt(STATE.effectiveThreshold ?? 10000000)}`;
         } else {
-            badge = topN ? `MANUAL · TOP ${topN}` : 'MANUAL'; badgeCls = ' manual';
+            badge = topN ? `FIXED · TOP ${topN}` : 'FIXED'; badgeCls = ' manual';
             valText = `≥ ${mf.fmt(STATE.thresholdMode)}`;
         }
 
         // Nodes: colour = net balance (all flows in the current region or
         // selection); size = total of the lines drawn for the economy.
         const swatch = (bg, title, extra = '') =>
-            `<span class="legend-node" style="width:10px;height:10px;background:${bg};${extra}" title="${title}"></span>`;
+            `<span class="lg-node" style="background:${bg};${extra}" title="${title}"></span>`;
 
         container.innerHTML = `
-            <div class="legend-section">
-                <span class="legend-section-label">Flows</span>
-                <div class="legend-flows">${flowItems}</div>
+            <div class="lg-sec">
+                <div class="lg-title">Lines · net flows${STATE.metric === 'weight' ? ' (weight)' : ' (value)'}</div>
+                <div class="lg-flows">${flowItems}</div>
+                <div class="lg-note">North (N) = developed, South (S) = developing economies. Line width = size of the net flow.</div>
             </div>
-            <span class="legend-bar-divider"></span>
-            <div class="legend-section" title="Circle colour: net balance (exports minus imports) over all flows in the current region or selection. Circle size: total of the lines drawn for the economy.">
-                <span class="legend-section-label">Circles</span>
-                <div class="legend-nodes">
-                    <span class="legend-nodes-hint">Net imp.</span>
+            <div class="lg-sec" title="Circle colour: net balance (exports minus imports) over all flows in the current region or selection. Circle size: total of the lines drawn for the economy.">
+                <div class="lg-title">Circles · economies</div>
+                <div class="lg-nodes">
+                    <span class="lg-nodes-end">Net importer</span>
                     ${swatch('#ED1847', 'Large net importer')}
                     ${swatch('#F9C0C5', 'Net importer')}
                     ${swatch('#ffffff', 'Balanced', 'border:1px solid #AEA29A')}
                     ${swatch('#C5DFEF', 'Net exporter')}
                     ${swatch('#009EDB', 'Large net exporter')}
-                    <span class="legend-nodes-hint">Net exp. · size = lines drawn</span>
+                    <span class="lg-nodes-end">Net exporter</span>
                 </div>
+                <div class="lg-note">Colour = net balance in this view; size = total of the lines drawn.</div>
             </div>
-            <span class="legend-bar-divider"></span>
-            <div class="legend-section">
-                <span class="legend-section-label">Shown</span>
-                <span class="legend-threshold-badge${badgeCls}">${badge}</span>
-                <span class="legend-threshold-val">${valText}</span>
-                <span class="legend-arc-count">${linesLabel}</span>
+            <div class="lg-sec">
+                <div class="lg-title">Drawn</div>
+                <div class="lg-shown">
+                    <span class="legend-threshold-badge${badgeCls}">${badge}</span>
+                    <span class="legend-threshold-val">${valText}</span>
+                    <span class="legend-arc-count">${linesLabel}</span>
+                </div>
             </div>
         `;
 
@@ -1199,7 +1314,7 @@ export const TradeMap = {
         const bilatEl   = document.getElementById('stat-bilateral');
         const coverageEl = document.getElementById('stat-coverage');
         if (statEl)    statEl.innerText    = mf.fmt(shownTotal);
-        if (bilatEl)   bilatEl.innerText   = mf.fmt(bilateralTotal);
-        if (coverageEl) coverageEl.innerText = `${coverage.toFixed(1)}% shown`;
+        if (bilatEl)   bilatEl.innerText   = bilateralTotal > 0 ? mf.fmt(bilateralTotal) : '—';
+        if (coverageEl) coverageEl.innerText = bilateralTotal > 0 ? `${coverage.toFixed(1)}%` : '—';
     }
 };

@@ -7,7 +7,7 @@
 // its action live; the user advances manually (Next / Back / dots / arrow keys).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { STATE } from '../config.js';
+import { STATE, isCompact } from '../config.js';
 import { DataLoader } from '../dataLoader.js';
 import { TradeMap } from '../map.js';
 import { startAnimation, stopAnimation, isAnimating } from '../sns/animationMode.js';
@@ -50,7 +50,17 @@ export const Tour = {
         let seen = false;
         try { seen = !!localStorage.getItem(SEEN_KEY); } catch { /* private mode */ }
         if (!seen && opts.autoLaunch !== false) {
-            setTimeout(() => { if (!this.active) this.start(); }, 900);
+            // Wait until the monitor is mostly on screen (it may sit lower in a page)
+            const target = document.getElementById('map-container');
+            const launch = () => setTimeout(() => { if (!this.active) this.start(); }, 900);
+            if (target && 'IntersectionObserver' in window) {
+                const io = new IntersectionObserver((entries) => {
+                    if (entries.some(en => en.intersectionRatio >= 0.6)) { io.disconnect(); launch(); }
+                }, { threshold: [0.6] });
+                io.observe(target);
+            } else {
+                launch();
+            }
         }
     },
 
@@ -242,8 +252,9 @@ export const Tour = {
     // (panel slide ~300ms, map zoom) without any auto-advance.
     _scheduleSettle() {
         this._clearSettle();
-        [140, 360, 680].forEach(d =>
-            this._settleTimers.push(setTimeout(() => { if (this.active) this._reanchor(); }, d)));
+        [140, 360, 680].forEach(d => {
+            this._settleTimers.push(setTimeout(() => { if (this.active) this._reanchor(); }, d));
+        });
     },
     _clearSettle() {
         this._settleTimers.forEach(clearTimeout);
@@ -262,28 +273,30 @@ export const Tour = {
     _renderCard(step) {
         if (!this._els) return;
         const card = this._els.card;
-        const n = String(this.index + 1).padStart(2, '0');
-        const total = String(this.steps.length).padStart(2, '0');
-        const isLast = this.index === this.steps.length - 1;
+        const total = this.steps.length;
+        const isLast = this.index === total - 1;
 
-        const dots = this.steps.map((_, i) =>
-            `<span class="tour-card__dot ${i === this.index ? 'is-active' : i < this.index ? 'is-done' : ''}" data-i="${i}"></span>`
+        // One segment per chapter: done, current, to come. Each jumps to its chapter.
+        const segs = this.steps.map((_, i) =>
+            `<button type="button" class="tour-card__dot ${i === this.index ? 'is-active' : i < this.index ? 'is-done' : ''}" data-i="${i}" aria-label="Chapter ${i + 1} of ${total}"></button>`
         ).join('');
 
         const title = typeof step.title === 'function' ? step.title(this._ctx) : step.title;
         const body  = typeof step.body  === 'function' ? step.body(this._ctx)  : step.body;
 
         card.innerHTML = `
+            <div class="tour-card__progress">${segs}</div>
             <div class="tour-card__top">
-                <span class="tour-card__chapter">${n} / ${total}</span>
-                <span class="tour-card__title">${title}</span>
-                <button class="tour-card__close" title="End tour (Esc)" data-act="end">×</button>
+                <div class="tour-card__heading">
+                    <span class="tour-card__chapter">Guided tour · ${this.index + 1} of ${total}</span>
+                    <span class="tour-card__title">${title}</span>
+                </div>
+                <button class="tour-card__close" title="End tour (Esc)" aria-label="End tour" data-act="end">×</button>
             </div>
             <div class="tour-card__body">${body}</div>
             <div class="tour-card__foot">
-                <div class="tour-card__dots">${dots}</div>
                 <button class="tour-card__btn tour-card__btn--ghost" data-act="prev" ${this.index === 0 ? 'disabled' : ''}>Back</button>
-                <button class="tour-card__btn tour-card__btn--primary" data-act="next">${isLast ? 'Done' : 'Next →'}</button>
+                <button class="tour-card__btn tour-card__btn--primary" data-act="next">${isLast ? 'Finish' : 'Next'}</button>
             </div>`;
 
         card.querySelectorAll('[data-act]').forEach(el => {
@@ -294,8 +307,9 @@ export const Tour = {
                 else if (act === 'prev') this.prev();
             });
         });
-        card.querySelectorAll('.tour-card__dot').forEach(d =>
-            d.addEventListener('click', () => this.goTo(+d.dataset.i)));
+        card.querySelectorAll('.tour-card__dot').forEach(d => {
+            d.addEventListener('click', () => this.goTo(+d.dataset.i));
+        });
     },
 
     _updateProgress() {
@@ -328,12 +342,29 @@ export const Tour = {
         }
 
         spot.classList.remove('is-center', 'is-clear');
+        {
+            const r0 = targetEl.getBoundingClientRect();
+            const margin = isCompact() ? 60 : 8;
+            if (r0.top < margin || r0.bottom > window.innerHeight - margin) targetEl.scrollIntoView({ block: 'center', behavior: 'instant' });
+        }
         const r = targetEl.getBoundingClientRect();
         const pad = SPOT_PAD;
         spot.style.top = (r.top - pad) + 'px';
         spot.style.left = (r.left - pad) + 'px';
         spot.style.width = (r.width + pad * 2) + 'px';
         spot.style.height = (r.height + pad * 2) + 'px';
+
+        // Phones: the card is pinned to the bottom (tour.less); move it to the top
+        // when the target sits in the lower half of the screen.
+        if (isCompact()) {
+            const landscape = window.innerWidth > window.innerHeight;
+            const cx = r.left + r.width / 2;
+            // Landscape: beside the target (left or right half); portrait: above or below it
+            card.classList.toggle('is-left', landscape && cx > window.innerWidth / 2);
+            card.classList.toggle('is-right', landscape && cx <= window.innerWidth / 2);
+            card.classList.toggle('is-top', !landscape && r.top + r.height / 2 > window.innerHeight / 2);
+            return;
+        }
 
         // Prefer docking the card to a fixed corner (keeps the map visible);
         // fall back to placing it adjacent to the target.
@@ -350,9 +381,11 @@ export const Tour = {
         const vw = window.innerWidth, vh = window.innerHeight;
         const cw = card.offsetWidth, ch = card.offsetHeight;
         const headerH = document.querySelector('header')?.getBoundingClientRect().height || 56;
-        const kpiH = document.getElementById('kpi-bar')?.getBoundingClientRect().height || 0;
+        // Keep clear of the phone bottom bar when it is shown
+        const nav = document.getElementById('mobile-nav');
+        const navH = nav && nav.getClientRects().length ? nav.getBoundingClientRect().height : 0;
         const topY = headerH + m;
-        const botY = vh - kpiH - m - ch;
+        const botY = vh - navH - m - ch;
         const leftX = m;
         const rightX = vw - cw - m;
 
@@ -422,6 +455,7 @@ export const Tour = {
             // The hand-back at the end turns it on again if the user had it on.
             if (TradeMap.lineFilterMode) TradeMap.disableLineFilter?.();
             app.closeConnectionsPanel?.();
+            app._setDisplayMenu?.(false);
             app.closeInsightPanel?.();
             TradeMap.clearFocus?.();
 
@@ -485,6 +519,6 @@ Tour._onResize = () => {
 Tour._onKey = (e) => {
     if (!Tour.active) return;
     if (e.key === 'Escape') { e.preventDefault(); Tour.end(); }
-    else if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); Tour.next(); }
+    else if (e.key === 'ArrowRight' || (e.key === ' ' && !e.target?.closest?.('button, a, input, select, textarea, summary'))) { e.preventDefault(); Tour.next(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); Tour.prev(); }
 };

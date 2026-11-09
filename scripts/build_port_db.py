@@ -122,9 +122,13 @@ DIRECTIONAL_PORTS: dict[str, dict] = {
         "atlantic": [-74.0431,  40.6892],   # New York/Newark
         "pacific":  [-118.2167, 33.7167],   # Los Angeles
     },
+    # AUS: "pacific" = Sydney (Pacific side, partners reached eastwards: Asia-Pacific
+    # and the Americas); "atlantic" = Fremantle (Indian Ocean side, partners in
+    # Europe / Africa / Middle East). The key name "atlantic" is kept for schema
+    # compatibility. The selection rule lives in generate_routes.get_port_coords.
     "AUS": {
-        "atlantic": [151.1917, -33.8731],   # Sydney
-        "pacific":  [115.8614, -31.9500],   # Fremantle
+        "atlantic": [115.8614, -31.9500],   # Fremantle (Indian Ocean side)
+        "pacific":  [151.1917, -33.8731],   # Sydney (Pacific side)
     },
     "CAN": {
         "atlantic": [-63.5698, 44.6488],    # Halifax
@@ -140,11 +144,13 @@ LANDLOCKED_GATEWAY: dict[str, tuple] = {
     "NER": (  2.4228,   6.3536, "Port of Cotonou, Benin"),
     "TCD": (  9.7085,   4.0592, "Port of Douala, Cameroon"),
     "CAF": (  9.7085,   4.0592, "Port of Douala, Cameroon"),
-    "RWA": ( 39.6682,  -4.0435, "Port of Dar es Salaam, Tanzania"),
-    "BDI": ( 39.6682,  -4.0435, "Port of Dar es Salaam, Tanzania"),
+    # RWA/BDI/ZWE/LAO and Central Asia: coordinates corrected to match their labels
+    # (values from the same WPI shapefile used above).
+    "RWA": ( 39.3000,  -6.8167, "Port of Dar es Salaam, Tanzania"),
+    "BDI": ( 39.3000,  -6.8167, "Port of Dar es Salaam, Tanzania"),
     "UGA": ( 39.6682,  -4.0435, "Port of Mombasa, Kenya"),
     "ZMB": ( 32.6167, -25.9667, "Port of Maputo, Mozambique"),
-    "ZWE": ( 32.6167, -25.9667, "Port of Beira, Mozambique"),
+    "ZWE": ( 34.8333, -19.8333, "Port of Beira, Mozambique"),
     "MWI": ( 36.8167, -17.8667, "Port of Beira, Mozambique"),
     "LSO": ( 31.0292, -29.8579, "Port of Durban, South Africa"),
     "SWZ": ( 31.0292, -29.8579, "Port of Durban, South Africa"),
@@ -155,12 +161,12 @@ LANDLOCKED_GATEWAY: dict[str, tuple] = {
     "AFG": ( 67.0000,  25.0000, "Port of Karachi, Pakistan"),
     "NPL": ( 88.3639,  22.5726, "Port of Kolkata, India"),
     "BTN": ( 88.3639,  22.5726, "Port of Kolkata, India"),
-    "KAZ": ( 53.0000,  36.8000, "Port of Bandar Abbas, Iran"),
-    "UZB": ( 53.0000,  36.8000, "Port of Bandar Abbas, Iran"),
-    "TJK": ( 53.0000,  36.8000, "Port of Bandar Abbas, Iran"),
-    "KGZ": ( 53.0000,  36.8000, "Port of Bandar Abbas, Iran"),
-    "TKM": ( 53.0000,  36.8000, "Port of Bandar Abbas, Iran"),
-    "LAO": (103.8167,  10.2167, "Port of Ho Chi Minh City, Viet Nam"),
+    "KAZ": ( 56.2000,  27.1500, "Port of Bandar Abbas, Iran"),
+    "UZB": ( 56.2000,  27.1500, "Port of Bandar Abbas, Iran"),
+    "TJK": ( 56.2000,  27.1500, "Port of Bandar Abbas, Iran"),
+    "KGZ": ( 56.2000,  27.1500, "Port of Bandar Abbas, Iran"),
+    "TKM": ( 56.2000,  27.1500, "Port of Bandar Abbas, Iran"),
+    "LAO": (100.8833,  13.0833, "Port of Laem Chabang, Thailand"),
     # 南米
     "BOL": (-77.1211, -12.0464, "Port of Callao, Peru"),
     "PRY": (-58.3731, -34.1500, "Port of Buenos Aires, Argentina"),

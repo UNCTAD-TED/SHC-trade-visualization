@@ -72,12 +72,12 @@
     "source": "PLSCI+WPI",
     "directional": {
       "atlantic": [
-        151.1917,
-        -33.8731
-      ],
-      "pacific": [
         115.8614,
         -31.95
+      ],
+      "pacific": [
+        151.1917,
+        -33.8731
       ]
     }
   },
@@ -1804,16 +1804,16 @@
   "RWA": {
     "name": "Port of Dar es Salaam, Tanzania",
     "coords": [
-      39.6682,
-      -4.0435
+      39.3,
+      -6.8167
     ],
     "source": "landlocked-gateway"
   },
   "BDI": {
     "name": "Port of Dar es Salaam, Tanzania",
     "coords": [
-      39.6682,
-      -4.0435
+      39.3,
+      -6.8167
     ],
     "source": "landlocked-gateway"
   },
@@ -1836,8 +1836,8 @@
   "ZWE": {
     "name": "Port of Beira, Mozambique",
     "coords": [
-      32.6167,
-      -25.9667
+      34.8333,
+      -19.8333
     ],
     "source": "landlocked-gateway"
   },
@@ -1916,48 +1916,48 @@
   "KAZ": {
     "name": "Port of Bandar Abbas, Iran",
     "coords": [
-      53.0,
-      36.8
+      56.2,
+      27.15
     ],
     "source": "landlocked-gateway"
   },
   "UZB": {
     "name": "Port of Bandar Abbas, Iran",
     "coords": [
-      53.0,
-      36.8
+      56.2,
+      27.15
     ],
     "source": "landlocked-gateway"
   },
   "TJK": {
     "name": "Port of Bandar Abbas, Iran",
     "coords": [
-      53.0,
-      36.8
+      56.2,
+      27.15
     ],
     "source": "landlocked-gateway"
   },
   "KGZ": {
     "name": "Port of Bandar Abbas, Iran",
     "coords": [
-      53.0,
-      36.8
+      56.2,
+      27.15
     ],
     "source": "landlocked-gateway"
   },
   "TKM": {
     "name": "Port of Bandar Abbas, Iran",
     "coords": [
-      53.0,
-      36.8
+      56.2,
+      27.15
     ],
     "source": "landlocked-gateway"
   },
   "LAO": {
-    "name": "Port of Ho Chi Minh City, Viet Nam",
+    "name": "Port of Laem Chabang, Thailand",
     "coords": [
-      103.8167,
-      10.2167
+      100.8833,
+      13.0833
     ],
     "source": "landlocked-gateway"
   },

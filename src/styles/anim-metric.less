@@ -1,4 +1,4 @@
-// ── Animation mode: active-metric badge ───────────────────────
+// ── Animation mode: active-metric label ───────────────────────
 // Two small labels added so the bar-chart-race panel and the map legend state
 // which metric is on screen (Value (USD) / Weight (tonnes)).
 //
@@ -8,30 +8,21 @@
 // variables.less — no new tokens.
 @import 'variables.less';
 
-// Panel header badge, sitting next to #ap-year / .ap-range
+// Panel header label, sitting next to #ap-year / .ap-range
 .ap-metric {
     margin-left: auto;
     flex-shrink: 0;
-    padding: 2px @space-2;
-    border: 1px solid @unblue;
-    border-radius: @radius-sm;
-    background: @unblue-bg;
-    color: @unblue-text;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    color: @ungrey-text;
+    font-size: 11px;
+    font-weight: 600;
     white-space: nowrap;
 }
 
-// Map legend badge, same vocabulary at legend scale
+// Map legend label, same wording at legend scale
 .al-metric {
     display: inline-block;
-    padding: 1px @space-1;
-    border: 1px solid @unblue;
-    border-radius: @radius-sm;
-    background: @unblue-bg;
-    color: @unblue-text;
-    font-size: 10px;
-    font-weight: 700;
+    color: @ungrey-dark;
+    font-size: 11px;
+    font-weight: 600;
     white-space: nowrap;
 }

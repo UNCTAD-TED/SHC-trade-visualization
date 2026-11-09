@@ -16,15 +16,26 @@
 @space-3: 12px;
 @space-4: 16px;
 
-// Border radius
-@radius-sm: 4px;
-@radius-md: 6px;
-@radius-lg: 8px;
-@radius-xl: 12px;
+// Border radius — unctad.org is near-square (most of its rules use 0)
+@radius-sm: 2px;
+@radius-md: 2px;
+@radius-lg: 3px;
+@radius-xl: 4px;
 
 // Breakpoints
 @bp-md: 768px;
 @bp-xl: 1280px;
+
+// Layout modes (keep in sync with COMPACT_MQ in src/config.js)
+//   @compact        phones in any orientation: bottom navigation, filter sheet
+//   @compact-tall   portrait phones: map, legend and figures stacked
+//   @compact-short  landscape phones: map fills the screen, legend collapsed
+//   @narrow         small laptops / tablets: icon-only header buttons
+@compact:       ~"(max-width: 767px), (max-height: 500px) and (max-width: 1024px)";
+@compact-tall:  ~"(max-width: 767px) and (min-height: 501px)";
+@compact-short: ~"(max-height: 500px) and (max-width: 1024px)";
+@desktop:       ~"(min-width: 768px) and (min-height: 501px), (min-width: 1025px)";
+@narrow:        ~"(max-width: 1279px)";
 
 // Shadows
 @shadow-sm:  0 1px 3px rgba(0,0,0,0.08);

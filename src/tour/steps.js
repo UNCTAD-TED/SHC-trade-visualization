@@ -14,13 +14,18 @@
 //              (or moved on). An async onEnter must check it after every await
 //              and stop, so it never acts on the view the tour handed back.
 //
-// When the tour ends (Done, × or Esc) the dashboard is returned to the view the
+// When the tour ends (Finish, × or Esc) the dashboard is returned to the view the
 // user had when the tour started (Tour._handBack), so chapters may change any
 // setting freely.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const name = (ctx, iso) => (iso && (ctx.STATE.countryNames[iso] || iso)) || '—';
 const always = () => true;
+
+// First of the selectors whose element is on screen. The filter bar is hidden
+// on phones, where the same controls sit behind the Filters button.
+const visible = (...selectors) => () =>
+    selectors.find(sel => document.querySelector(sel)?.getClientRects().length) || null;
 
 // Restore all four flow filters (used by several onExit hooks)
 function allFlows(ctx) {
@@ -47,9 +52,9 @@ export const TOUR_STEPS = [
     {
         id: 'welcome',
         title: 'The global second-hand clothing trade',
-        body: `This map visualises the worldwide flow of <b>second-hand clothing&nbsp;(SHC)</b>.
-               <br><br>We'll walk through its filters and analytics in <b>10 short chapters</b>,
-               driving the map live as we go. Click <b>Next</b> (or press the <b>&rarr;</b> key)
+        body: `This map shows the worldwide flow of second-hand clothing&nbsp;(SHC).
+               <br><br>We'll walk through its filters and analytics in 10 short chapters,
+               driving the map live as we go. Click <b>Next</b> (or press the &rarr; key)
                to advance at your own pace.`,
         placement: 'center',
         async onEnter(ctx, alive) { await ctx.resetView(alive); },
@@ -59,15 +64,15 @@ export const TOUR_STEPS = [
     {
         id: 'legend',
         title: 'Reading the map',
-        body: `<b>Arc</b> colour encodes the direction of trade —
-               <span style="color:#009EDB">■</span> North→South,
-               <span style="color:#72BF44">■</span> South→North,
-               <span style="color:#FBAF17">■</span> South→South,
-               <span style="color:#A066AA">■</span> North→North.
-               <br><br><b>Circles (nodes)</b> are countries:
-               <span style="color:#009EDB">blue</span> = net exporter,
-               <span style="color:#ED1847">red</span> = net importer. The larger the circle, the more of its trade is drawn on the map.`,
-        target: '#legend-content',
+        body: `Line colour shows the direction of trade:
+               <i class="tour-key" style="background:#009EDB"></i>North→South,
+               <i class="tour-key" style="background:#72BF44"></i>South→North,
+               <i class="tour-key" style="background:#FBAF17"></i>South→South and
+               <i class="tour-key" style="background:#A066AA"></i>North→North.
+               <br><br>Circles are economies: <i class="tour-key tour-key--node" style="background:#009EDB"></i>blue circles are net exporters and
+               <i class="tour-key tour-key--node" style="background:#ED1847"></i>red circles net importers. The larger the circle, the more of its trade is drawn on the map.
+               <br><br>The <b>Legend</b> card keeps this key on the map; click its title to fold it away.`,
+        target: '#legend-panel',
         placement: 'auto',
         dock: 'br',
         dwell: 8000,
@@ -77,10 +82,10 @@ export const TOUR_STEPS = [
     {
         id: 'kpi',
         title: 'Who leads the trade',
-        body: `The bar below summarises the current view: the <b>#1&nbsp;Exporter / #1&nbsp;Importer</b>
-               (largest net traders), the number of <b>Corridors</b> on screen, and the <b>Shown</b> total of the lines drawn.
-               It refreshes instantly whenever you change the year or any filter.`,
-        target: '#kpi-bar',
+        body: `The key figures summarize the current view: the <b>top net exporter / importer</b>,
+               the number of <b>Lines</b> on the map, and the <b>On map</b> total of those lines with its share
+               of all flows in the view. They refresh instantly whenever you change the year or any filter.`,
+        target: visible('#kpi-bar'),
         placement: 'top',
         dock: 'br',
         dwell: 8000,
@@ -90,10 +95,10 @@ export const TOUR_STEPS = [
     {
         id: 'flows',
         title: 'The North–South story',
-        body: `Most used clothing flows from <b>developed (North) to developing (South)</b> economies.
-               For example, we've isolated <span class="tour-chip">N→S</span> flows only. Toggle these boxes to extract
-               any single direction of trade.`,
-        target: '#flow-filter-group',
+        body: `The largest share of second-hand clothing trade runs from developed (North) to developing (South) economies.
+               Here only <i class="tour-key" style="background:#009EDB"></i>N→S flows are shown. Tick or untick these boxes to show or
+               hide any direction of trade; their colours are the line colours on the map.`,
+        target: visible('#flow-filter-group', '#mobile-filter-btn'),
         placement: 'bottom',
         dock: 'br',
         onEnter(ctx) {
@@ -109,10 +114,10 @@ export const TOUR_STEPS = [
     {
         id: 'metric',
         title: 'Value or weight?',
-        body: `Switch between <b>Value (USD)</b> and <b>Weight (tonnes)</b>. We've switched to weight,
-               units become <span class="tour-chip">Mt / kt</span>, revealing the heavy textile streams that
-               are cheap by value but huge by mass. The threshold buttons relabel to match automatically.`,
-        target: '#metric-group',
+        body: `Switch between <b>Value (USD)</b> and <b>Weight (tonnes)</b>. We have switched to weight:
+               figures are now in Mt / kt, which brings out flows that are cheap
+               by value but large by mass. The minimum-flow options under <b>Lines</b> relabel to match automatically.`,
+        target: visible('#metric-group', '#mobile-filter-btn'),
         placement: 'bottom',
         dock: 'br',
         async onEnter(ctx, alive) { await setMetric(ctx, 'weight', alive); },
@@ -125,10 +130,10 @@ export const TOUR_STEPS = [
         id: 'deepdive',
         title: (ctx) => `Country deep-dive — ${name(ctx, ctx.deepIso)}`,
         body: (ctx) => `Click any country to open its detail panel. We've focused on
-               <b>${name(ctx, ctx.deepIso)}</b>, a major East African importer of used clothing —
+               ${name(ctx, ctx.deepIso)}, a major East African importer of second-hand clothing —
                the map now shows only its inbound corridors.
                <br><br>The panel reports its net trade balance, the year-by-year trend, and
-               <b>partner concentration (HHI)</b>. The buttons on each partner row open that
+               partner concentration (HHI). The buttons on each partner row open that
                relationship's history or compare two countries side by side.`,
         target: '#insight-panel',
         placement: 'left',
@@ -161,13 +166,13 @@ export const TOUR_STEPS = [
         title: 'Draw a bilateral link',
         body: (ctx) => {
             const f = ctx.pairFlow;
-            const pair = f ? `<b>${name(ctx, f.exporter)} → ${name(ctx, f.importer)}</b>` : 'a corridor';
-            return `<b>Connect</b> mode lets you link two countries on the map and isolate just that
+            const pair = f ? `${name(ctx, f.exporter)} → ${name(ctx, f.importer)}` : 'a corridor';
+            return `The <b>Connect</b> tab lets you link two countries on the map and isolate just that
                relationship. Here we've drawn the largest corridor, ${pair}.
-               <br><br>The panel below shows the <b>two-way annual flows</b>. You can also click an arc
-               directly to open its full bilateral history.`;
+               <br><br>The panel shows the two-way annual flows. You can also click an arc
+               directly to open its full bilateral history. <b>Explore</b> brings the full map back.`;
         },
-        target: '#linefilter-btn',
+        target: visible('#linefilter-btn', '#m-connect-btn'),
         placement: 'bottom',
         dock: 'bl',
         async onEnter(ctx) {
@@ -175,7 +180,7 @@ export const TOUR_STEPS = [
             ctx.pairFlow = f;
             if (f) { ctx.app.addBilateralPair(f.exporter, f.importer); await ctx.wait(450); }
         },
-        onExit(ctx) { ctx.app.clearBilateralFilter(); },
+        onExit(ctx) { ctx.app.clearBilateralFilter(); ctx.app.setMode?.('explore'); },
         dwell: 9000,
     },
 
@@ -183,10 +188,11 @@ export const TOUR_STEPS = [
     {
         id: 'region',
         title: 'Focus by region',
-        body: `The region buttons reframe the whole view. We've zoomed into <b>Africa</b>, only
-               intra-regional SHC trade is shown. Combine this with the <b>Exporter / Importer</b>
-               pickers to analyse any custom set of countries.`,
-        target: '#region-group',
+        body: `The <b>Region</b> menu reframes the whole view. We have zoomed into Africa: only
+               trade between African economies is shown. These flows are small, so only the few above the
+               automatic $1M minimum are drawn; choose a lower minimum under <b>Lines</b> to see more.
+               Combine this with the <b>From / To</b> country pickers to analyse any set of countries.`,
+        target: visible('#region-group', '#mobile-filter-btn'),
         placement: 'bottom',
         dock: 'br',
         onEnter(ctx) {
@@ -208,9 +214,9 @@ export const TOUR_STEPS = [
     {
         id: 'animate',
         title: 'Travel through time',
-        body: `<b>Animate</b> auto-plays 2015→2024 as a <b>bar-chart race</b>. Watch the rankings shuffle
-               and trade grows as motion rather than numbers.
-               <br><br>It's playing now, moving to the next chapter will stop it automatically.`,
+        body: `The <b>Animate</b> tab plays 2015→2024 as a bar-chart race, so you can watch the rankings
+               change and the trade grow year by year.
+               <br><br>It is playing now; moving to the next chapter stops it.`,
         placement: 'center',
         dim: false,            // keep the bar-chart race fully visible
         cardAnchor: 'bottom',
@@ -230,9 +236,9 @@ export const TOUR_STEPS = [
         id: 'finish',
         title: "Now it's your turn",
         body: `That completes the tour. Closing it returns the map to the view you had before it started.
-               <br><br>Mix year, region, <b>value / weight</b>, flow direction and thresholds freely,
+               <br><br>Mix year, region, value / weight, flow direction and the <b>Lines</b> settings freely,
                and click any country to dig deeper. You can replay this walkthrough anytime from the
-               <b>Tour</b> button in the header.`,
+               <b>Guided tour</b> button (?) at the top right.`,
         placement: 'center',
         advance: 'manual',
         async onEnter(ctx, alive) { await ctx.resetView(alive); },

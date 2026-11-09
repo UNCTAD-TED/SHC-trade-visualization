@@ -11,11 +11,17 @@ html, body {
 
 body {
   font-family: @font-family;
+  font-size: 16px;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
   background: @unblue-bg-alt;
   color: @ungrey-dark;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border-bottom: 4px solid @unblue;   // UNCTAD accent line under the app
+  @media @compact { border-bottom: none; }
 }
 
 // ── Utility ───────────────────────────────────────────────────
@@ -52,28 +58,40 @@ main {
   background: @unblue-bg-alt;
 }
 
-// ── Map footer (Source / Note) ────────────────────────────────
+// ── Map footer (source, notes, logos) ────────────────────────
 #map-footer {
   background: @unblue-bg;
   border-top: 1px solid @ungrey-border;
-  padding: 6px 16px 8px;
+  padding: 6px 16px;
   flex-shrink: 0;
 
+  .footer-row {
+    max-width: @content-max-width;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
   p {
-    font-size: 10px;
+    font-size: 10.5px;
     line-height: 1.5;
     color: @ungrey-text;
     margin: 0;
 
-    & + p { margin-top: 2px; }
-
-    strong {
-      color: @ungrey-dark;
-      font-weight: 700;
-    }
+    strong { color: @ungrey-dark; font-weight: 700; }
+    a { color: @unblue-dark; text-underline-offset: 2px; &:hover { color: @unblue; } }
   }
 
-  @media (max-width: (@bp-md - 1px)) { display: none; }
+  .footer-logos img {
+    height: 26px;
+    width: auto;
+    display: block;
+    opacity: 0.75;
+  }
+
+  @media @compact { display: none; }
 }
 
 // ── Tooltip ───────────────────────────────────────────────────
@@ -85,14 +103,81 @@ main {
   background: #fff;
   border: 1px solid @ungrey-border;
   border-radius: @radius-sm;
-  padding: 12px;
+  padding: 11px 13px 12px;
   color: @ungrey-dark;
-  font-size: 12.8px;
-  box-shadow: @shadow-md;
-  max-width: 320px;
-  min-width: 240px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  max-width: 300px;
+  min-width: 248px;
   line-height: 1.4;
   transition: opacity 0.15s ease;
+
+  .tt-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 7px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid @ungrey-dark;
+  }
+  .tt-name { font-size: 14px; font-weight: 700; line-height: 1.2; }
+  .tt-meta { font-size: 10.5px; color: @ungrey-text; white-space: nowrap; }
+
+  .tt-figs { display: grid; grid-template-columns: 1fr 1fr; }
+  .tt-fig { min-width: 0; padding-right: 10px; }
+  .tt-fig + .tt-fig { padding: 0 0 0 10px; border-left: 1px solid @ungrey-border; }
+  .tt-fig-l { font-size: 10.5px; color: @ungrey-text; }
+  .tt-fig-v { font-size: 16px; font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; }
+  .tt-role {
+    font-size: 10.5px;
+    font-weight: 600;
+    &::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; vertical-align: 0.05em; }
+    &.exp::before { background: @unblue; }
+    &.imp::before { background: @unred; }
+  }
+
+  .tt-sec { margin-top: 9px; padding-top: 8px; border-top: 1px solid @ungrey-border; }
+  .tt-title { display: block; font-size: 10.5px; font-weight: 700; margin-bottom: 5px; }
+
+  .tt-prow {
+    display: grid;
+    grid-template-columns: 10px 86px minmax(0, 1fr) 58px;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+  .tt-arrow { font-weight: 700; }
+  .tt-pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tt-pbar { height: 5px; background: @ungrey-bg; span { display: block; height: 100%; } }
+  .tt-pval { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .tt-compbar { display: flex; height: 6px; gap: 1px; span { height: 100%; } }
+  .tt-comp {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 5px;
+    margin-top: 5px;
+    font-size: 10.5px;
+    i { display: inline-block; width: 7px; height: 7px; margin-right: 4px; }
+    .tt-sep { color: @ungrey; }
+  }
+
+  .tt-trend-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .tt-trend-figs { display: flex; gap: 8px; font-size: 10.5px; color: @ungrey-text; font-variant-numeric: tabular-nums; }
+  .tt-trend { display: block; width: 100%; height: 28px; }
+  .tt-years { display: flex; justify-content: space-between; font-size: 10px; color: @ungrey-text; margin-top: 2px; }
+
+  .tt-rank {
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid @ungrey-border;
+    font-size: 10.5px;
+    color: @ungrey-text;
+    b { color: @ungrey-dark; font-size: 11.5px; }
+  }
 }
 
 // ── Loader overlay ────────────────────────────────────────────
@@ -168,7 +253,6 @@ main {
   fill: none;
   stroke-linecap: round;
   pointer-events: stroke;
-  mix-blend-mode: multiply;
   cursor: pointer;
   &:hover { filter: brightness(1.6); }
 }
@@ -184,7 +268,11 @@ main {
   100% { transform: scale(2.6); opacity: 0; stroke-width: 0.5; }
 }
 
-.trade-particle { pointer-events: none; filter: drop-shadow(0 0 1.5px rgba(255,255,255,0.9)); }
+.trade-particle { pointer-events: none; }
+
+// Lines darken where they cross (multiply). Applied once to the whole layer: on every
+// line it cost a separate compositing pass per line and made adding lines stutter.
+.flow-layer { mix-blend-mode: multiply; }
 
 // ── Interactive line filter ───────────────────────────────────
 // Cursor + pickable affordance while the draw mode is active.
@@ -214,11 +302,54 @@ main {
   animation: halo-pulse 2s ease-out infinite;
 }
 
-// Header pill buttons (Connect / Clear). They use the shared .btn-toggle base;
-// only the Clear accent + hidden state need overriding here.
-#linefilter-clear {
-  color: @unred-dark;
-  &:hover { color: @unred-dark; background: lighten(@unred, 38%); }
+// "Use two fingers" hint on portrait phones
+#map-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 17;
+  background: rgba(35, 31, 32, 0.82);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: @radius-sm;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  &.show { opacity: 1; }
+}
+
+// Empty result: message in the middle of the map
+#map-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 16;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid @ungrey-border;
+  border-radius: @radius-lg;
+  box-shadow: @shadow-md;
+  padding: 14px 18px;
+  text-align: center;
+  font-size: 13px;
+  color: @ungrey-dark;
+  max-width: calc(100% - 32px);
+  p { margin: 0 0 10px; }
+  button {
+    font-family: @font-family;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    background: @unblue-dark;
+    border: none;
+    border-radius: @radius-sm;
+    padding: 7px 14px;
+    cursor: pointer;
+    &:hover { background: @unblue-darker; }
+  }
   &.hidden { display: none; }
 }
 
@@ -229,11 +360,11 @@ main {
   left: 50%;
   transform: translateX(-50%);
   z-index: 25;
-  background: rgba(0, 73, 144, 0.94);
+  background: @unblue-dark;
   color: #fff;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
-  border-radius: @radius-xl;
+  border-radius: @radius-sm;
   padding: 6px 14px;
   box-shadow: @shadow-md;
   white-space: nowrap;
@@ -241,88 +372,87 @@ main {
   &.hidden { display: none; }
 }
 
-// ── Connections panel cards (simplified bilateral history, stacked) ──
+// ── Connections panel (drawn corridors, newest first) ─────────
 .conn-empty {
-  text-align: center;
-  color: @ungrey-text;
-  font-size: 12px;
-  padding: 28px 10px;
-  .conn-empty-icon { font-size: 30px; margin-bottom: 10px; opacity: 0.7; }
-  p { margin: 6px 0; line-height: 1.5; }
-  .conn-empty-sub { font-size: 11px; color: @ungrey; }
-  b { color: @unblue-dark; }
+  padding: 4px 0;
+  color: @ungrey-dark;
+  font-size: 13px;
+  line-height: 1.5;
+
+  .conn-steps {
+    margin: 0 0 12px;
+    padding-left: 20px;
+    li { margin: 0 0 6px; padding-left: 2px; }
+    li::marker { font-weight: 700; color: @unblue-dark; }
+  }
+  .conn-empty-sub { margin: 0; font-size: 11px; color: @ungrey-text; }
 }
+
 .conn-card {
   .conn-card-hdr {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 6px;
+    margin-bottom: 10px;
   }
   .conn-flow {
-    font-size: 12.5px;
+    font-size: 13px;
     color: @ungrey-dark;
-    b { color: @unblue-dark; }
-    .conn-arrow { color: @ungrey; margin: 0 2px; font-weight: 700; }
+    b { font-weight: 700; }
+    .conn-arrow { color: @ungrey-text; margin: 0 2px; }
   }
   .conn-remove {
     flex-shrink: 0;
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     line-height: 1;
-    border: none;
-    border-radius: 50%;
-    background: @ungrey-bg;
+    border: 1px solid @ungrey-border;
+    border-radius: @radius-sm;
+    background: #fff;
     color: @ungrey-text;
-    font-size: 14px;
+    font-size: 15px;
     cursor: pointer;
-    transition: background 0.12s, color 0.12s;
-    &:hover { background: lighten(@unred, 34%); color: @unred-dark; }
+    transition: border-color 0.12s, color 0.12s;
+    &:hover { border-color: @unred-dark-text; color: @unred-dark-text; }
+    &:focus-visible { outline: 2px solid @unblue; outline-offset: 1px; }
   }
   .conn-card-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-bottom: 6px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 10px;
+
     .conn-stat {
-      font-size: 11px;
-      color: @ungrey-text;
-      font-family: @font-mono;
-      .conn-stat-lbl { color: @ungrey; margin-right: 4px; }
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding-right: 8px;
+      & + .conn-stat { padding-left: 8px; border-left: 1px solid @ungrey-border; }
+      .conn-stat-lbl { font-size: 10.5px; color: @ungrey-text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      b { font-size: 14px; font-weight: 700; color: @ungrey-dark; font-variant-numeric: tabular-nums; line-height: 1.3; }
     }
   }
   .conn-nodata {
     font-size: 11px;
-    font-style: italic;
-    color: @ungrey;
+    color: @ungrey-text;
     padding: 8px 0;
   }
   .conn-card-foot {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-top: 4px;
-    .conn-chart-legend {
-      font-size: 8.5px;
-      color: @ungrey-text;
-      display: inline-flex;
-      align-items: center;
-      .cc-sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 3px; }
-    }
+    justify-content: flex-end;
+    margin-top: 8px;
+
     .conn-detail-btn {
-      flex-shrink: 0;
       border: 1px solid @ungrey-border;
       background: #fff;
       color: @unblue-text;
-      font-size: 10px;
-      font-weight: 700;
+      font: 600 11px/1 @font-family;
       border-radius: @radius-sm;
-      padding: 3px 8px;
+      padding: 6px 10px;
       cursor: pointer;
-      transition: background 0.12s;
-      &:hover { background: @unblue-bg; }
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      &:hover { background: @unblue-dark; border-color: @unblue-dark; color: #fff; }
+      &:focus-visible { outline: 2px solid @unblue; outline-offset: 1px; }
     }
   }
 }
@@ -354,7 +484,6 @@ main {
   stroke-dasharray: 6 18;
   stroke-linecap: round;
   animation: anim-particle-flow 1.5s linear infinite;
-  filter: drop-shadow(0 0 2px rgba(255,255,255,0.8));
   opacity: 0.7;
 }
 
@@ -373,7 +502,7 @@ main {
   border: 1px solid @ungrey-border;
   width: 1rem;
   height: 1rem;
-  border-radius: 4px;
+  border-radius: @radius-sm;
   display: grid;
   place-content: center;
   cursor: pointer;
@@ -395,13 +524,11 @@ main {
 // ── Country selector dropdown internals ──────────────────────
 
 .picker-section-header {
-  padding: 5px 8px;
-  font-size: 9px;
+  padding: 6px 8px;
+  font-size: 11px;
   font-weight: 700;
-  color: @ungrey-text;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: @unblue-bg;
+  color: @ungrey-dark;
+  background: @ungrey-light;
   border-bottom: 1px solid @ungrey-border;
   position: sticky;
   top: 0;
@@ -460,12 +587,9 @@ main {
 }
 
 .group-count {
-  font-size: 8px;
+  font-size: 10.5px;
   color: @ungrey-text;
-  font-family: @font-mono;
-  background: @ungrey-bg;
-  padding: 1px 5px;
-  border-radius: 99px;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
@@ -504,5 +628,7 @@ main {
 @import 'insight.less';
 @import 'mobile.less';
 @import 'tour.less';
+@import 'export.less';
+@import 'anim-mode.less';
 @import 'anim-metric.less';
 @import 'reduced-motion.less';

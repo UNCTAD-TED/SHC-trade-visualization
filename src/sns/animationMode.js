@@ -205,6 +205,10 @@ export async function startAnimation() {
   // Show animation UI
   _onScreen = true;
   document.body.classList.add('anim-mode');
+  document.dispatchEvent(new CustomEvent('shc:animation-started'));
+  const head = document.getElementById('main-header');
+  const top = head?.getBoundingClientRect().top ?? 0;
+  if (head && (top < -4 || top > window.innerHeight * 0.5)) head.scrollIntoView({ block: 'start', behavior: 'instant' });
   _injectOverlays();
 
   // Wait two rAF frames so the browser applies the flex layout (panel takes --anim-panel-w,
@@ -604,9 +608,7 @@ function _injectOverlays() {
   // Ranking basis (see startAnimation): each country pair is netted first, and a
   // bar sums the pairs in which the country is the net exporter (importer). The
   // sub-labels and tooltips state that, since it is neither gross trade nor the
-  // overall net balance. Role colours are set inline: index.html's .ap-import
-  // rule still carries the old green.
-  const subStyle = 'display:block;margin-top:1px;font-size:9px;font-weight:400;letter-spacing:0;color:#6e6259;';
+  // overall net balance. The small square before each label carries the role colour.
   const basisTip = (role) =>
     `Each country pair is netted first (exports minus imports between the two). ` +
     `The bar adds up the pairs in which the country is the net ${role}. ` +
@@ -617,19 +619,19 @@ function _injectOverlays() {
   panel.innerHTML = `
     <div class="ap-header">
       <span id="ap-year">2015</span>
-      <span class="ap-range">2015 – 2024</span>
+      <span class="ap-range">2015–2024</span>
       <span id="ap-metric-badge" class="ap-metric">${metricBadge()}</span>
     </div>
     <div class="ap-section">
-      <div class="ap-label ap-export" style="color:${EXPORTER_COLOR}" title="${basisTip('exporter')}">▲&nbsp;TOP EXPORTERS
-        <span class="ap-basis" style="${subStyle}">Sum of net bilateral flows out</span>
+      <div class="ap-label ap-export" title="${basisTip('exporter')}"><i class="ap-key" style="background:${EXPORTER_COLOR}"></i>Top exporters
+        <span class="ap-basis">Sum of net bilateral flows out</span>
       </div>
       <div id="ap-export" class="ap-chart"></div>
     </div>
     <div class="ap-sep"></div>
     <div class="ap-section">
-      <div class="ap-label ap-import" style="color:${IMPORTER_COLOR}" title="${basisTip('importer')}">▼&nbsp;TOP IMPORTERS
-        <span class="ap-basis" style="${subStyle}">Sum of net bilateral flows in</span>
+      <div class="ap-label ap-import" title="${basisTip('importer')}"><i class="ap-key" style="background:${IMPORTER_COLOR}"></i>Top importers
+        <span class="ap-basis">Sum of net bilateral flows in</span>
       </div>
       <div id="ap-import" class="ap-chart"></div>
     </div>
@@ -649,8 +651,8 @@ function _injectOverlays() {
         <div class="al-row"><span class="al-metric">${metricBadge()}</span></div>
       </div>
       <div class="al-divider"></div>
-      <div class="al-section">
-        <div class="al-section-title">Arc colours</div>
+      <div class="al-section al-keep">
+        <div class="al-section-title">Line colours</div>
         <div class="al-row">
           <span class="al-item"><span class="al-swatch" style="background:${CONFIG.flowColors['north-south']}"></span>N→S</span>
           <span class="al-item"><span class="al-swatch" style="background:${CONFIG.flowColors['south-north']}"></span>S→N</span>
@@ -671,9 +673,9 @@ function _injectOverlays() {
       <div class="al-section">
         <div class="al-section-title">Highlights</div>
         <div class="al-row">
-          <span class="al-item"><span class="al-dot" style="background:${EXPORTER_COLOR};box-shadow:0 0 4px ${EXPORTER_COLOR}"></span>Top 3 exporters</span>
-          <span class="al-item"><span class="al-dot" style="background:${IMPORTER_COLOR};box-shadow:0 0 4px ${IMPORTER_COLOR}"></span>Top 3 importers</span>
-          <span class="al-item"><span class="al-dash"></span>Their major corridors (≥10% of max)</span>
+          <span class="al-item"><span class="al-dot is-ring" style="background:${EXPORTER_COLOR};color:${EXPORTER_COLOR}"></span>Top 3 exporters</span>
+          <span class="al-item"><span class="al-dot is-ring" style="background:${IMPORTER_COLOR};color:${IMPORTER_COLOR}"></span>Top 3 importers</span>
+          <span class="al-item"><span class="al-dash"></span>Their major corridors (≥ 10% of the year's largest)</span>
         </div>
       </div>
       <div class="al-divider"></div>
@@ -708,7 +710,15 @@ function _renderRace(containerId, ranks, color) {
     ? Math.max(containerEl.offsetWidth - 66 - 56 - 33, 40)
     : BAR_MAX;
 
-  const top     = ranks.slice(0, 10);
+  // Row height follows the space the chart actually has (short screens and the
+  // 600 px embed box): 27 px down to 15 px, and fewer rows (at least 3) when
+  // even that does not fit — rows never spill into the next list.
+  const chartH = containerEl?.clientHeight || 0;
+  const nRows  = chartH > 0 ? Math.max(3, Math.min(10, Math.floor(chartH / 15))) : 10;
+  const rowH   = chartH > 0 ? Math.max(15, Math.min(ROW_H, Math.floor(chartH / nRows))) : ROW_H;
+  const barH   = Math.min(BAR_H, rowH - 5);   // keep a gap between bars when rows shrink
+
+  const top     = ranks.slice(0, nRows);
   const maxVal  = d3.max(top, d => d.value) || 1;
   const bw      = v => Math.max((v / maxVal) * barMax, 2);
   const rankMap = new Map(top.map((d, i) => [d.iso, i]));
@@ -722,7 +732,7 @@ function _renderRace(containerId, ranks, color) {
   // ENTER — created at final rank position to avoid wrong-position flash
   const entered = rows.enter().append('div').attr('class', 'ap-row')
     .style('opacity', '0')
-    .style('transform', d => `translateY(${rankMap.get(d.iso) * ROW_H}px)`);
+    .style('transform', d => `translateY(${rankMap.get(d.iso) * rowH}px)`);
 
   // Use flag-icons CSS (works on Windows Chrome, unlike Unicode flag emoji)
   entered.append('span').attr('class', 'ap-flag')
@@ -736,7 +746,7 @@ function _renderRace(containerId, ranks, color) {
   const bwrap = entered.append('div').attr('class', 'ap-bar-wrap');
   bwrap.append('div').attr('class', 'ap-bar')
     .style('background', color)
-    .style('height', `${BAR_H}px`)
+    .style('height', `${barH}px`)
     .style('width', d => `${bw(d.value)}px`);
   bwrap.append('span').attr('class', 'ap-val')
     .property('_prev', d => d.value)
@@ -745,10 +755,12 @@ function _renderRace(containerId, ranks, color) {
   // UPDATE + ENTER — opacity + rank position animate together.
   // Single transition on `all` prevents D3 preempting the enter opacity tween.
   const all = entered.merge(rows);
+  all.style('height', `${rowH}px`).select('.ap-flag').style('line-height', `${rowH}px`);
+  all.select('.ap-bar').style('height', `${barH}px`);
 
   all.transition().duration(md(750))
     .style('opacity', '1')
-    .style('transform', d => `translateY(${rankMap.get(d.iso) * ROW_H}px)`);
+    .style('transform', d => `translateY(${rankMap.get(d.iso) * rowH}px)`);
 
   all.select('.ap-bar').transition().duration(md(750))
     .style('width', d => `${bw(d.value)}px`);

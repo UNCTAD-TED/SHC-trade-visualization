@@ -1,6 +1,6 @@
 import './styles/styles.less';
 import * as d3 from 'd3';
-import { CONFIG, STATE, METRIC_FORMAT, fmtSigned } from './config.js';
+import { CONFIG, STATE, METRIC_FORMAT, fmtSigned, isCompact } from './config.js';
 import { startAnimation, stopAnimation, stopAnimationForMetricChange } from './sns/animationMode.js';
 import { RegionConfig } from './regions.js';
 import { CountrySelector } from './countrySelector.js';
@@ -12,6 +12,8 @@ import { DeepLink } from './deepLink.js';
 
 // "+5.2%" / "−3.7%" with a true minus sign (U+2212), like every net figure.
 const signedPct = (v, dp) => `${v >= 0 ? '+' : '\u2212'}${Math.abs(v).toFixed(dp)}%`;
+// 1 → 1st, 2 → 2nd, 11 → 11th, 23 → 23rd
+const ordinal = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
 
 const App = {
     exporterSelector: null,
@@ -22,6 +24,9 @@ const App = {
     _prevSelectionCount: 0,
     _yearReq: 0,      // latest year request; older ones may not apply
     _metricReq: 0,    // latest metric request
+    // Connections drawn in Connect mode, kept aside while the user is back in
+    // Explore so returning to Connect shows them again.
+    _stashedPairs: [],
 
     // Keep the loading overlay up, but say that loading failed instead of spinning forever.
     _showLoadError(message) {
@@ -73,6 +78,10 @@ const App = {
         TradeMap.init();
         this.setupEventListeners();
 
+        // Phones and portrait tablets: start with the legend folded (the map and
+        // key figures come first; the legend card would cover part of the world)
+        if (isCompact() || window.matchMedia?.('(orientation: portrait) and (max-width: 1023px)').matches) this.setLegendCollapsed(true);
+
         this.exporterSelector.updateSelection();
         this.updateDashboard();
         document.getElementById('loader').classList.add('hidden');
@@ -85,26 +94,45 @@ const App = {
     },
 
     setupEventListeners() {
-        // Region Buttons
+        // Region: a select in the filter bar, buttons in the phone sheet
         document.querySelectorAll('.region-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                STATE.region = e.currentTarget.dataset.region;
-                this.syncControlsFromState();   // desktop bar + mobile sheet
-
-                // The pickers list economies of every region, so a region change
-                // starts from an empty selection inside the new region — unless
-                // connections are drawn: they ignore the region and the pickers
-                // keep mirroring them.
-                if (STATE.bilateralPairs?.length) {
-                    this._syncBilateralSelectors();
-                } else {
-                    this.exporterSelector.setCountries([]);
-                    this.importerSelector.setCountries([]);
-                }
-
-                this.updateDashboard();
-            });
+            btn.addEventListener('click', (e) => this.setRegion(e.currentTarget.dataset.region));
         });
+        document.getElementById('region-select')?.addEventListener('change', (e) => this.setRegion(e.target.value));
+
+        // View modes: Explore / Connect / Animate (header tabs and phone bottom bar)
+        document.querySelectorAll('.js-mode').forEach(btn => {
+            btn.addEventListener('click', (e) => this.setMode(e.currentTarget.dataset.mode));
+        });
+
+        // "Lines" pop-over (minimum flow size + number of lines)
+        const displayBtn = document.getElementById('display-btn');
+        const displayMenu = document.getElementById('display-menu');
+        if (displayBtn && displayMenu) {
+            displayBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._setDisplayMenu(displayMenu.classList.contains('hidden'));
+            });
+            document.addEventListener('click', (e) => {
+                if (!displayMenu.classList.contains('hidden') &&
+                    !displayMenu.contains(e.target) && !displayBtn.contains(e.target)) this._setDisplayMenu(false);
+            });
+        }
+
+        // Reset filters (filter bar + phone sheet)
+        ['filters-reset', 'm-filters-reset'].forEach(id => {
+            document.getElementById(id)?.addEventListener('click', () => this.resetFilters());
+        });
+
+        // Legend card fold / unfold
+        document.getElementById('legend-toggle')?.addEventListener('click', () => {
+            const panel = document.getElementById('legend-panel');
+            this.setLegendCollapsed(!panel.classList.contains('collapsed'));
+        });
+
+        // Zoom buttons
+        document.getElementById('zoom-in-btn')?.addEventListener('click', () => TradeMap.zoomBy?.(1.6));
+        document.getElementById('zoom-out-btn')?.addEventListener('click', () => TradeMap.zoomBy?.(1 / 1.6));
 
         // Year. Only the latest choice may apply: a slow file for an earlier choice
         // must not overwrite the year the user picked last. The exporter/importer
@@ -220,36 +248,21 @@ const App = {
         const panelCloseBtn = document.getElementById('panel-close-btn');
         if (panelCloseBtn) panelCloseBtn.addEventListener('click', () => this.closeInsightPanel());
 
-        // Sea Route toggle button
+        // Sea routes toggle (on/off)
         const searouteBtn = document.getElementById('searoute-btn');
         if (searouteBtn) searouteBtn.addEventListener('click', () => {
             if (TradeMap && TradeMap.toggleSeaRoute) TradeMap.toggleSeaRoute();
         });
         document.addEventListener('shc:searoute-toggled', (e) => {
             const btn = document.getElementById('searoute-btn');
-            if (btn) btn.classList.toggle('active', e.detail.active);
+            if (btn) { btn.classList.toggle('active', e.detail.active); btn.setAttribute('aria-pressed', String(!!e.detail.active)); }
         });
 
-        // ── Interactive line filter (draw bilateral connections on the map) ──
-        document.getElementById('linefilter-btn')?.addEventListener('click', () => {
-            if (!TradeMap || !TradeMap.toggleLineFilter) return;
-            TradeMap.toggleLineFilter();
-            // Re-render: entering the mode blanks the map, leaving it restores the view.
-            this.updateDashboard(false);
-            if (TradeMap.lineFilterMode || STATE.bilateralPairs.length > 0) this.openConnectionsPanel();
-            else this.closeConnectionsPanel();
-        });
+        // ── Connect mode (draw bilateral connections on the map) ──
+        // The Connect tab itself goes through setMode (see .js-mode above).
         document.getElementById('linefilter-clear')?.addEventListener('click', () => this.clearBilateralFilter());
         document.addEventListener('shc:linefilter-toggled', (e) => this._updateLineFilterUI(e.detail));
         document.addEventListener('shc:bilateral-pair-added', (e) => this.addBilateralPair(e.detail.exporter, e.detail.importer));
-
-        // Mobile legend toggle
-        const mobileLegendBtn = document.getElementById('mobile-legend-btn');
-        if (mobileLegendBtn) mobileLegendBtn.addEventListener('click', () => this.toggleMobileLegend());
-        const mobileBackdrop = document.getElementById('mobile-legend-backdrop');
-        if (mobileBackdrop) mobileBackdrop.addEventListener('click', () => this.toggleMobileLegend());
-        const mobileLegendClose = document.getElementById('mobile-legend-close');
-        if (mobileLegendClose) mobileLegendClose.addEventListener('click', () => this.toggleMobileLegend());
 
         // Arc detail modal
         document.getElementById('arc-modal-close').addEventListener('click', () => this.closeArcModal());
@@ -260,20 +273,38 @@ const App = {
         document.getElementById('compare-modal-backdrop').addEventListener('click', () => this.closeCompareModal());
 
         // Methodology modal
-        document.getElementById('methodology-btn')?.addEventListener('click', () => this.openMethodologyModal());
+        document.querySelectorAll('.js-open-methodology').forEach(el => {
+            el.addEventListener('click', () => this.openMethodologyModal());
+        });
         document.getElementById('methodology-modal-close')?.addEventListener('click', () => this.closeMethodologyModal());
         document.getElementById('methodology-modal-backdrop')?.addEventListener('click', () => this.closeMethodologyModal());
 
         // Escape key cancels an in-progress connection, then closes any open modal
         document.addEventListener('keydown', (e) => {
-            if (e.key !== 'Escape') return;
+            if (e.key !== 'Escape' || e.defaultPrevented) return;
+            const isOpen = id => { const el = document.getElementById(id); return !!el && !el.classList.contains('hidden'); };
+            if (isOpen('display-menu')) { this._setDisplayMenu(false); document.getElementById('display-btn')?.focus(); return; }
+            if (isOpen('export-menu')) { this._closeMenus(); document.getElementById('export-btn')?.focus(); return; }
+            for (const p of ['exp', 'imp']) {
+                if (isOpen(`${p}-menu`)) { this._closePicker(p); document.getElementById(`${p}-btn`)?.focus(); return; }
+            }
             if (TradeMap.lineFilterMode && TradeMap._pendingExporter) { TradeMap.cancelLineDraw(); return; }
-            if (!document.getElementById('arc-modal').classList.contains('hidden')) this.closeArcModal();
-            if (!document.getElementById('compare-modal').classList.contains('hidden')) this.closeCompareModal();
-            if (!document.getElementById('methodology-modal').classList.contains('hidden')) this.closeMethodologyModal();
+            if (isOpen('methodology-modal')) { this.closeMethodologyModal(); return; }
+            if (isOpen('compare-modal')) { this.closeCompareModal(); return; }
+            if (isOpen('arc-modal')) { this.closeArcModal(); return; }
+            if (document.getElementById('mobile-filter-panel')?.classList.contains('open')) { this.toggleMobileFilter(); return; }
+            if (document.getElementById('insight-panel')?.classList.contains('open')) {
+                if (this._connectionsPanelOpen) this.closeConnectionsPanel();
+                else this.closeInsightPanel();
+            }
         });
 
-        // モバイルブラウザのUIバーによる高さのズレを修正するためのCSS変数をセット
+        // Empty result: reset from the map; connections: clear from the panel
+        document.getElementById('map-empty-reset')?.addEventListener('click', () => this.resetFilters());
+        document.getElementById('panel-clear-btn')?.addEventListener('click', () => this.clearBilateralFilter());
+        document.addEventListener('shc:animation-started', () => this._applyModeUI());
+
+        // Phone browsers resize their toolbars: keep a --vh unit in step
         const setMobileHeight = () => {
             const vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
@@ -283,7 +314,7 @@ const App = {
         window.addEventListener('resize', () => {
             setMobileHeight();
             // flex-wrap may have moved the picker to a different row
-            ['exp', 'imp'].forEach(pfx => this._clampPickerMenu(document.getElementById(`${pfx}-menu`)));
+            ['exp', 'imp'].forEach(pfx => { this._clampPickerMenu(document.getElementById(`${pfx}-menu`)); });
             clearTimeout(this._resizeTimer);
             this._resizeTimer = setTimeout(() => {
                 TradeMap.init();
@@ -294,11 +325,12 @@ const App = {
         // ── Mobile Filter Panel ───────────────────────────────
         document.getElementById('mobile-filter-btn')?.addEventListener('click', () => this.toggleMobileFilter());
         document.getElementById('mobile-filter-close')?.addEventListener('click', () => this.toggleMobileFilter());
+        document.getElementById('mobile-filter-done')?.addEventListener('click', () => this.toggleMobileFilter());
         document.getElementById('mobile-filter-backdrop')?.addEventListener('click', () => this.toggleMobileFilter());
 
-        // Mobile fit to screen button
+        // Reset the map view (to the selected region)
         document.getElementById('fit-screen-btn')?.addEventListener('click', () => {
-            TradeMap.zoomToRegion("Global");
+            TradeMap.zoomToRegion(STATE.region || 'Global');
         });
 
         // Mobile country backdrop closes any open country menu
@@ -312,7 +344,7 @@ const App = {
                 if (menu.parentElement !== btn.parentElement) {
                     btn.parentElement.appendChild(menu);
                 }
-                btn.parentElement.style.zIndex = '50'; // リセット
+                btn.parentElement.style.zIndex = '50';
             });
             document.getElementById('mobile-country-backdrop').classList.add('hidden');
         });
@@ -330,8 +362,7 @@ const App = {
         // ── CSV export (flows + country summary) ──────────────
         CsvExport.init();
 
-        // ── Animation mode ────────────────────────────────────
-        document.getElementById('anim-btn')?.addEventListener('click', startAnimation);
+        // ── Animation mode (started from the Animate tab, see .js-mode) ──
         document.getElementById('anim-stop-btn')?.addEventListener('click', stopAnimation);
 
         document.addEventListener('shc:bilateral-loaded', (e) => {
@@ -365,25 +396,34 @@ const App = {
             if (otherMenu.parentElement !== otherBtn.parentElement) {
                 otherBtn.parentElement.appendChild(otherMenu);
             }
-            otherBtn.parentElement.style.zIndex = '50'; // 閉じた方はリセット
+            otherBtn.parentElement.style.zIndex = '50';
+            otherBtn.setAttribute('aria-expanded', 'false');
         };
+
+        // Phones: "Done" in the picker sheet
+        menu.querySelector('.picker-done')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._closePicker(prefix);
+        });
 
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             closeOtherMenu();
             
-            // PC版（横長）で開くときは、必ずモバイル用の固定設定を外す
+            // Desktop: the menu drops down under its button, never as the phone sheet
             menu.classList.remove('mobile-menu-fixed');
             if (menu.parentElement !== originalParent) {
                 originalParent.appendChild(menu);
             }
             menu.classList.toggle('hidden');
+            btn.setAttribute('aria-expanded', String(!menu.classList.contains('hidden')));
+            if (!menu.classList.contains('hidden')) this._setDisplayMenu(false);
 
             // Re-anchor once visible so the menu never hangs off the screen edge
             if (menu.classList.contains('hidden')) this._resetPickerMenu(menu);
             else this._clampPickerMenu(menu);
 
-            // 開いたメニューが他のボタン（下の要素）に隠れないように z-index を高くする
+            // Lift the open menu above the neighbouring controls
             originalParent.style.zIndex = menu.classList.contains('hidden') ? '50' : '60';
         });
 
@@ -392,7 +432,7 @@ const App = {
                 e.stopPropagation();
                 closeOtherMenu();
                 
-                // モバイル表示用に body 直下に移動 (親要素の hidden の影響を避ける)
+                // Phones: move the menu to <body> so the hidden filter bar does not hide it
                 document.body.appendChild(menu);
                 
                 menu.classList.remove('hidden');
@@ -406,12 +446,13 @@ const App = {
             const isOutside = !menu.contains(e.target) && !btn.contains(e.target) && (!mBtn || !mBtn.contains(e.target));
             if (isOutside) {
                 menu.classList.add('hidden');
+                btn.setAttribute('aria-expanded', 'false');
                 menu.classList.remove('mobile-menu-fixed');
                 this._resetPickerMenu(menu);
                 if (menu.parentElement !== originalParent) {
                     originalParent.appendChild(menu);
                 }
-                originalParent.style.zIndex = '50'; // 画面外クリックで閉じた時にリセット
+                originalParent.style.zIndex = '50';
             }
         });
 
@@ -420,7 +461,7 @@ const App = {
             if (!term) {
                 // Restore default: show group rows, collapse all children
                 menu.querySelectorAll('.picker-section-header, .group-option, .country-option')
-                    .forEach(el => el.style.display = '');
+                    .forEach(el => { el.style.display = ''; });
                 menu.querySelectorAll('.group-children').forEach(c => {
                     c.classList.add('hidden');
                     c.style.display = '';
@@ -431,7 +472,7 @@ const App = {
             } else {
                 // Search mode: hide group rows/headers, expand all children, filter countries
                 menu.querySelectorAll('.picker-section-header, .group-option')
-                    .forEach(el => el.style.display = 'none');
+                    .forEach(el => { el.style.display = 'none'; });
                 menu.querySelectorAll('.group-children').forEach(c => {
                     c.classList.remove('hidden');
                     c.style.display = 'block';
@@ -449,12 +490,9 @@ const App = {
     },
 
     // ── Country picker dropdown: keep it inside the viewport ──────────
-    // The menu is 256px wide but its button is only 144px, and header.less
-    // anchors it with `right: 0`, so it extends ~112px to the LEFT of the button.
-    // .header-controls uses flex-wrap, so at some viewport widths a picker ends
-    // up first on a wrapped row (x ≈ 16px) and that overhang falls off the left
-    // edge of the screen — clipped and unreachable (measured: up to 96px lost at
-    // 860 / 1440 / 1600 / 1700px wide).
+    // The menu (280px) is wider than its button and the filter bar wraps on
+    // narrow screens, so depending on where the row breaks the menu can hang
+    // off the right edge of the screen.
     //
     // CSS cannot fix this on its own: how far the button sits from the edge
     // depends on where flex-wrap happened to break the row. So keep the CSS
@@ -489,37 +527,58 @@ const App = {
         menu.style.left  = `${Math.round(wanted - w.left)}px`;
     },
 
+    // Close one country picker (desktop drop-down or phone sheet).
+    _closePicker(prefix) {
+        const menu = document.getElementById(`${prefix}-menu`);
+        const btn = document.getElementById(`${prefix}-btn`);
+        if (!menu || !btn) return;
+        menu.classList.add('hidden');
+        menu.classList.remove('mobile-menu-fixed');
+        this._resetPickerMenu(menu);
+        if (menu.parentElement !== btn.parentElement) btn.parentElement.appendChild(menu);
+        btn.parentElement.style.zIndex = '50';
+        btn.setAttribute('aria-expanded', 'false');
+        document.getElementById('mobile-country-backdrop')?.classList.add('hidden');
+    },
+
+    // Close every drop-down (Lines, Download, pickers) before a panel or pop-up opens.
+    _closeMenus() {
+        this._setDisplayMenu(false);
+        ['exp', 'imp'].forEach(p => { this._closePicker(p); });
+        const em = document.getElementById('export-menu');
+        if (em && !em.classList.contains('hidden')) {
+            em.classList.add('hidden');
+            document.getElementById('export-btn')?.setAttribute('aria-expanded', 'false');
+        }
+    },
+
     _resetPickerMenu(menu) {
         if (!menu) return;
         menu.style.left  = '';
         menu.style.right = '';
     },
 
-    updateUIClasses(selector, activeEl) {
-        document.querySelectorAll(selector).forEach(b => b.classList.remove('active'));
-        activeEl.classList.add('active');
-    },
-
     // Metric buttons span the desktop bar and the mobile sheet, so toggle every
     // matching button rather than a single clicked element.
     _setActiveMetricButtons(metric) {
-        document.querySelectorAll('.metric-btn').forEach(b =>
-            b.classList.toggle('active', b.dataset.metric === metric));
+        document.querySelectorAll('.metric-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.metric === metric);
+        });
     },
 
-    // Top-N buttons span the desktop bar and the mobile sheet, so toggle every
-    // matching button rather than a single clicked element (updateUIClasses would
-    // leave the other surface stale).
+    // Top-N buttons span the Lines pop-over and the phone sheet, so toggle every
+    // matching button rather than a single clicked element.
     _setActiveTopNButtons(val) {
-        document.querySelectorAll('.topn-btn').forEach(b =>
-            b.classList.toggle('active', b.dataset.topn === val));
+        document.querySelectorAll('.topn-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.topn === val);
+        });
     },
 
     // Threshold buttons keep the same numeric data-threshold across metrics; only
     // their unit-bearing labels change ($ for value, t for weight).
     THRESHOLD_LABELS: {
-        value:  { auto: 'Auto', '10000000': '$10M', '1000000': '$1M', '500000': '$500k', '100000': '$100k', '10000': '$10k' },
-        weight: { auto: 'Auto', '10000000': '10kt', '1000000': '1kt',  '500000': '500t',  '100000': '100t',  '10000': '10t'  },
+        value:  { auto: 'Auto', '10000000': '$10M',  '1000000': '$1M',  '500000': '$500K', '100000': '$100K', '10000': '$10K' },
+        weight: { auto: 'Auto', '10000000': '10 kt', '1000000': '1 kt', '500000': '500 t', '100000': '100 t', '10000': '10 t' },
     },
 
     updateThresholdLabels(metric = STATE.metric) {
@@ -547,7 +606,9 @@ const App = {
 
         const total = d3.sum(flows, d => d.netValue);
         const totalEl = document.getElementById('kpi-total');
-        if (totalEl) totalEl.textContent = mf.fmt(total);
+        // Connect mode before anything is drawn: nothing to sum yet
+        const nothingDrawn = TradeMap.lineFilterMode && !STATE.bilateralPairs?.length;
+        if (totalEl) totalEl.textContent = nothingDrawn ? '—' : mf.fmt(total);
 
         const flowsEl = document.getElementById('kpi-flows');
         if (flowsEl) flowsEl.textContent = d3.format(',')(flows.length);
@@ -605,21 +666,23 @@ const App = {
         const region = STATE.region && STATE.region !== 'Global' ? STATE.region : null;
         const nExp = STATE.selectedExporters?.size || 0;
         const nImp = STATE.selectedImporters?.size || 0;
-        if (!region && nExp === 0 && nImp === 0) return 'Global';
+        if (!region && nExp === 0 && nImp === 0) return 'World';
         const parts = [];
         if (region) {
             parts.push(region);
-            if (nExp === 0 && nImp === 0) parts.push('Intra');
+            if (nExp === 0 && nImp === 0) { parts.pop(); parts.push(`Within ${region}`); }
         }
-        if (nExp > 0 && nImp > 0) parts.push(`${nExp} Exp · ${nImp} Imp`);
-        else if (nExp > 0) parts.push(`${nExp} Exporters`);
-        else if (nImp > 0) parts.push(`${nImp} Importers`);
+        const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+        if (nExp > 0 && nImp > 0) parts.push(`${plural(nExp, 'exporter')} · ${plural(nImp, 'importer')}`);
+        else if (nExp > 0) parts.push(plural(nExp, 'exporter'));
+        else if (nImp > 0) parts.push(plural(nImp, 'importer'));
         return parts.join(' · ');
     },
 
     // ── P1: Insight Side Panel ──────────────────────────────────────
 
     openInsightPanel(iso) {
+        this._closeMenus();
         if (document.getElementById('mobile-filter-panel')?.classList.contains('open')) {
             this.toggleMobileFilter();
         }
@@ -628,8 +691,8 @@ const App = {
         document.getElementById('insight-panel').classList.add('open');
         document.body.classList.add('insight-open');
 
-        // モバイルでヘッダーが消えて地図が広がるため、D3マップのサイズ再計算をトリガー
-        if (window.innerWidth <= 767) {
+        // Phones: the header steps aside while the panel is open, so the map resizes
+        if (isCompact()) {
             setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
         }
 
@@ -643,6 +706,8 @@ const App = {
         if (searouteBtn) {
             searouteBtn.disabled = false;
             searouteBtn.classList.remove('active');
+            searouteBtn.setAttribute('aria-pressed', 'false');
+            searouteBtn.style.display = '';
         }
         if (TradeMap) TradeMap.searouteMode = false;
 
@@ -667,6 +732,7 @@ const App = {
         const region = RegionConfig.getRegion(iso) || 'Unknown';
         const devStatus = CONFIG.development[iso] === 'north' ? 'Developed' : 'Developing';
 
+        document.getElementById('panel-clear-btn')?.classList.add('hidden');
         document.getElementById('panel-country-name').textContent = name;
         document.getElementById('panel-country-meta').textContent = `${region} · ${devStatus} · ${STATE.year}`;
         document.getElementById('panel-body').innerHTML = this._buildPanelContent(iso, stats, mf);
@@ -698,8 +764,8 @@ const App = {
         const searouteBtn = document.getElementById('searoute-btn');
         if (searouteBtn) { searouteBtn.disabled = true; searouteBtn.classList.remove('active'); }
 
-        // モバイルでヘッダーが再表示されて地図が縮むため、D3マップのサイズ再計算をトリガー
-        if (window.innerWidth <= 767) {
+        // Phones: the header comes back, so the map resizes
+        if (isCompact()) {
             setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
         }
 
@@ -719,8 +785,11 @@ const App = {
         this._arcPair = { expIso, impIso };   // consumed by the corridor CSV export button
         this._renderArcModal();
 
+        this._closeMenus();
         const modal = document.getElementById('arc-modal');
+        if (modal.classList.contains('hidden')) this._returnFocus = document.activeElement;
         modal.classList.remove('hidden');
+        document.getElementById('arc-modal-close')?.focus({ preventScroll: true });
         this.hideTooltip();
     },
 
@@ -748,11 +817,20 @@ const App = {
 
     closeArcModal() {
         document.getElementById('arc-modal').classList.add('hidden');
+        this._restoreFocus();
+    },
+
+    // Give focus back to whatever opened a pop-up
+    _restoreFocus() {
+        const el = this._returnFocus;
+        this._returnFocus = null;
+        if (el && document.contains(el) && typeof el.focus === 'function') el.focus({ preventScroll: true });
     },
 
     _buildArcDetailContent(expIso, impIso, mf) {
         const expName = STATE.countryNames[expIso] || expIso;
         const impName = STATE.countryNames[impIso] || impIso;
+        const EXP_C = '#009EDB', IMP_C = '#ED1847';
 
         const yearData = {};
         for (let y = 2015; y <= 2024; y++) yearData[y] = { aToB: 0, bToA: 0 };
@@ -782,84 +860,82 @@ const App = {
         const curAtoB = yearData[cy] ? yearData[cy].aToB : 0;
         const curBtoA = yearData[cy] ? yearData[cy].bToA : 0;
         const curNet  = curAtoB - curBtoA;
-        const netCol  = curNet >= 0 ? '#009EDB' : '#ED1847';
         const fc = STATE.filteredData.find(d =>
             (d.exporter === expIso && d.importer === impIso) ||
             (d.exporter === impIso && d.importer === expIso)
         );
         const flowCat = fc ? fc.flowCategory : null;
-        const catLabels = { 'north-south': 'North→South', 'south-north': 'South→North', 'south-south': 'South→South', 'north-north': 'North→North' };
-        const catBadge = flowCat
-            ? `<span class="si-badge" style="color:${CONFIG.flowColors[flowCat]};border-color:${CONFIG.flowColors[flowCat]}55">${catLabels[flowCat]}</span>`
+        const catLabels = { 'north-south': 'North → South', 'south-north': 'South → North', 'south-south': 'South → South', 'north-north': 'North → North' };
+        const flowType = flowCat
+            ? `<div class="si-flowtype">Flow type on the map: <span class="si-badge"><i class="si-key" style="background:${CONFIG.flowColors[flowCat]}"></i>${catLabels[flowCat]}</span></div>`
             : '';
 
         let html = `
-        <div class="si-kpi-grid cols-3">
-            <div class="si-kpi-card exp">
-                <div class="si-kpi-label">${expName} →</div>
-                <div class="si-kpi-value">${mf.fmt(curAtoB)}</div>
+        <div class="si-section">
+            <div class="si-kpi-grid cols-3">
+                <div class="si-kpi-card">
+                    <div class="si-kpi-label" title="${expName} exports to ${impName}">${expName} →</div>
+                    <div class="si-kpi-value">${mf.fmt(curAtoB)}</div>
+                </div>
+                <div class="si-kpi-card" title="${expName} → ${impName} minus ${impName} → ${expName}">
+                    <div class="si-kpi-label">Net (${cy})</div>
+                    <div class="si-kpi-value">${fmtSigned(curNet)}</div>
+                </div>
+                <div class="si-kpi-card">
+                    <div class="si-kpi-label" title="${impName} exports to ${expName}">← ${impName}</div>
+                    <div class="si-kpi-value">${mf.fmt(curBtoA)}</div>
+                </div>
             </div>
-            <div class="si-kpi-card net" title="${expName} → ${impName} minus ${impName} → ${expName}">
-                <div class="si-kpi-label">Net (${cy})</div>
-                <div class="si-kpi-value" style="color:${netCol}">${fmtSigned(curNet)}</div>
-            </div>
-            <div class="si-kpi-card imp">
-                <div class="si-kpi-label">← ${impName}</div>
-                <div class="si-kpi-value">${mf.fmt(curBtoA)}</div>
-            </div>
-        </div>
-        ${catBadge ? `<div style="text-align:center;margin-bottom:12px">${catBadge}</div>` : ''}`;
+            ${flowType}
+        </div>`;
 
-        const W = 440, H = 36, barH = 14, gap = 3;
+        // Mirrored columns: exports of the first economy above the axis, of the second below
+        const W = 440, H = 48, half = 22, gap = 4;
         const bw = (W - gap * (years.length - 1)) / years.length;
         const bars = years.map((y, i) => {
-            const aH = Math.max(0, (atoBs[i] / maxAbs) * barH);
-            const bH = Math.max(0, (bToAs[i] / maxAbs) * barH);
+            const aH = Math.max(0, (atoBs[i] / maxAbs) * half);
+            const bH = Math.max(0, (bToAs[i] / maxAbs) * half);
             const x  = i * (bw + gap);
             const isCur = y === cy;
-            const yr = String(y).slice(2);
             return `
-                <rect x="${x}" y="${H/2 - aH}" width="${bw}" height="${aH}" rx="1" fill="#009EDB" opacity="${isCur ? 1 : 0.45}"/>
-                <rect x="${x}" y="${H/2}" width="${bw}" height="${bH}" rx="1" fill="#ED1847" opacity="${isCur ? 1 : 0.45}"/>
-                ${isCur ? `<rect x="${x - 0.5}" y="2" width="${bw + 1}" height="${H - 4}" rx="2" fill="none" stroke="#0077B8" stroke-width="1"/>` : ''}
-                <text x="${x + bw/2}" y="${H + 11}" text-anchor="middle" font-size="7" fill="${isCur ? '#0077B8' : '#AEA29A'}" font-family="Inter,monospace">${yr}</text>`;
+                <rect x="${x}" y="${H / 2 - aH}" width="${bw}" height="${aH}" fill="${EXP_C}" opacity="${isCur ? 1 : 0.4}"/>
+                <rect x="${x}" y="${H / 2}" width="${bw}" height="${bH}" fill="${IMP_C}" opacity="${isCur ? 1 : 0.4}"/>
+                <text x="${x + bw / 2}" y="${H + 13}" text-anchor="middle" font-size="9.5" font-weight="${isCur ? 700 : 400}" fill="${isCur ? '#231F20' : '#6E6259'}">${y}</text>`;
         }).join('');
 
         html += `
         <div class="si-section">
-            <div class="si-label">Bilateral Trade History</div>
+            <div class="si-label">Bilateral trade, ${years[0]}–${years[years.length - 1]}</div>
             <div class="si-chart-legend">
-                <div class="si-legend-item"><div class="si-legend-swatch" style="background:#009EDB"></div><span>${expName} exports</span></div>
-                <div class="si-legend-item"><div class="si-legend-swatch" style="background:#ED1847"></div><span>${impName} exports</span></div>
+                <div class="si-legend-item"><div class="si-legend-swatch" style="background:${EXP_C}"></div><span>${expName} → ${impName}</span></div>
+                <div class="si-legend-item"><div class="si-legend-swatch" style="background:${IMP_C}"></div><span>${impName} → ${expName}</span></div>
             </div>
-            <svg viewBox="0 0 ${W} ${H + 14}" width="${W}" height="${H + 14}" style="width:100%;height:auto;overflow:visible">
-                <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#DED9D5" stroke-width="0.5"/>
+            <svg class="si-chart" viewBox="0 0 ${W} ${H + 16}" role="img" aria-label="Exports in each direction, ${years[0]} to ${years[years.length - 1]}">
                 ${bars}
+                <line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#231F20" stroke-width="0.7"/>
             </svg>
         </div>`;
 
         const tableRows = years.filter(y => atoBs[years.indexOf(y)] > 0 || bToAs[years.indexOf(y)] > 0).map(y => {
             const idx = years.indexOf(y);
-            const net = nets[idx];
-            const nCol = net >= 0 ? '#009EDB' : '#ED1847';
             const isCur = y === cy;
             return `<tr${isCur ? ' class="row-cur"' : ''}>
-                <td class="al${isCur ? ' cur' : ' muted'}">${y}</td>
-                <td class="ar" style="color:#0077B8">${mf.fmt(atoBs[idx])}</td>
-                <td class="ar" style="color:#ED1847">${mf.fmt(bToAs[idx])}</td>
-                <td class="ar bold" style="color:${nCol}">${fmtSigned(net)}</td>
+                <td class="al">${y}</td>
+                <td class="ar">${mf.fmt(atoBs[idx])}</td>
+                <td class="ar">${mf.fmt(bToAs[idx])}</td>
+                <td class="ar bold">${fmtSigned(nets[idx])}</td>
             </tr>`;
         }).join('');
 
         html += `
         <div class="si-section">
-            <div class="si-label">Year-by-Year Table</div>
+            <div class="si-label">Year by year</div>
             <table class="si-table">
                 <thead>
                     <tr>
                         <th class="al">Year</th>
-                        <th class="ar" style="color:#0077B8">${expName} →</th>
-                        <th class="ar" style="color:#ED1847">← ${impName}</th>
+                        <th class="ar"><i class="si-key-sq" style="background:${EXP_C}"></i>${expName} →</th>
+                        <th class="ar"><i class="si-key-sq" style="background:${IMP_C}"></i>← ${impName}</th>
                         <th class="ar">Net</th>
                     </tr>
                 </thead>
@@ -881,7 +957,11 @@ const App = {
         document.getElementById('compare-modal-body').innerHTML = this._buildCompareContent(isoA, isoB, mf);
         this._comparePair = { isoA, isoB };
 
-        document.getElementById('compare-modal').classList.remove('hidden');
+        this._closeMenus();
+        const modal = document.getElementById('compare-modal');
+        if (modal.classList.contains('hidden')) this._returnFocus = document.activeElement;
+        modal.classList.remove('hidden');
+        document.getElementById('compare-modal-close')?.focus({ preventScroll: true });
         this.hideTooltip();
     },
 
@@ -889,19 +969,27 @@ const App = {
         document.getElementById('compare-modal').classList.add('hidden');
         this._compareIso = null;
         this._comparePair = null;
+        this._restoreFocus();
     },
 
     openMethodologyModal() {
+        this._closeMenus();
+        this._returnFocus = document.activeElement;
+        document.documentElement.style.overflow = 'hidden';
         document.getElementById('methodology-modal').classList.remove('hidden');
+        document.getElementById('methodology-modal-close')?.focus({ preventScroll: true });
     },
 
     closeMethodologyModal() {
+        document.documentElement.style.overflow = '';
         document.getElementById('methodology-modal').classList.add('hidden');
+        this._restoreFocus();
     },
 
     _buildCompareContent(isoA, isoB, mf) {
         const nameA = STATE.countryNames[isoA] || isoA;
         const nameB = STATE.countryNames[isoB] || isoB;
+        const A_C = '#009EDB', B_C = '#6E6259';
         // Same country-level figures as the insight panel: all partners, before
         // display filters — so "Gross trade" equals the table's current-year row.
         const statsA = DataLoader.countryTotals(isoA);
@@ -911,6 +999,7 @@ const App = {
         const devB = CONFIG.development[isoB] === 'north' ? 'Developed' : 'Developing';
         const regA = RegionConfig.getRegion(isoA) || '—';
         const regB = RegionConfig.getRegion(isoB) || '—';
+        const role = s => s ? (s.net >= 0 ? 'Net exporter' : 'Net importer') : '—';
 
         const getYearlyTotals = (iso) => {
             const isoData = STATE.trendSummary[iso] || {};
@@ -924,98 +1013,71 @@ const App = {
         const maxV  = Math.max(...years.map(y => Math.max(totA[y], totB[y])), 1);
 
         const metricRows = [
-            { label: 'Region', vA: regA, vB: regB, raw: false },
-            { label: 'Status', vA: devA, vB: devB, raw: false },
-            { label: `Gross trade ${STATE.year}`, vA: statsA ? mf.fmt(statsA.gross) : '—', vB: statsB ? mf.fmt(statsB.gross) : '—', raw: false,
-              winA: statsA && statsB ? statsA.gross > statsB.gross : null },
-            { label: `Net balance ${STATE.year}`, vA: statsA ? fmtSigned(statsA.net) : '—', vB: statsB ? fmtSigned(statsB.net) : '—', raw: false },
-            { label: 'Role', vA: statsA ? (statsA.net >= 0 ? 'Net Exporter' : 'Net Importer') : '—',
-                           vB: statsB ? (statsB.net >= 0 ? 'Net Exporter' : 'Net Importer') : '—', raw: false },
+            { label: 'Region', vA: regA, vB: regB },
+            { label: 'Status', vA: devA, vB: devB },
+            { label: `Gross trade ${STATE.year}`, vA: statsA ? mf.fmt(statsA.gross) : '—', vB: statsB ? mf.fmt(statsB.gross) : '—' },
+            { label: `Net balance ${STATE.year}`, vA: statsA ? fmtSigned(statsA.net) : '—', vB: statsB ? fmtSigned(statsB.net) : '—' },
+            { label: 'Role', vA: role(statsA), vB: role(statsB) },
         ];
-
-        const headerRows = metricRows.map(r => {
-            const hlA = r.winA === true  ? 'color:#72BF44' : r.winA === false ? 'color:#ED1847' : '';
-            const hlB = r.winA === false ? 'color:#72BF44' : r.winA === true  ? 'color:#ED1847' : '';
-            return `<tr>
-                <td class="ar" style="${hlA}">${r.vA}</td>
-                <td class="ac muted bold" style="font-size:9px;text-transform:uppercase;letter-spacing:0.04em">${r.label}</td>
-                <td style="${hlB}">${r.vB}</td>
-            </tr>`;
-        }).join('');
+        const metricTable = metricRows.map(r => `<tr>
+                <td class="ar">${r.vA}</td>
+                <th scope="row" class="ac si-row-label">${r.label}</th>
+                <td class="al">${r.vB}</td>
+            </tr>`).join('');
 
         let html = `
-        <div class="si-kpi-grid cols-3" style="margin-bottom:12px">
-            <div class="si-kpi-card exp" style="border-radius:8px 0 0 8px;border-right:none">
-                <div class="si-kpi-value" style="font-size:11px">${nameA}</div>
+        <div class="si-section">
+            <div class="si-compare-head">
+                <div class="si-compare-name is-a"><i class="si-key-sq" style="background:${A_C}"></i>${nameA}</div>
+                <div class="si-compare-name is-b"><i class="si-key-sq" style="background:${B_C}"></i>${nameB}</div>
             </div>
-            <div class="si-kpi-card net" style="border-radius:0;display:flex;align-items:center;justify-content:center">
-                <span style="color:#AEA29A;font-weight:700;font-size:14px">vs</span>
-            </div>
-            <div class="si-kpi-card" style="border-radius:0 8px 8px 0;border-left:none;background:rgba(251,175,23,0.1);border:1px solid rgba(251,175,23,0.3)">
-                <div class="si-kpi-value" style="font-size:11px;color:#b45309">${nameB}</div>
-            </div>
-        </div>
-        <table class="si-table" style="margin-bottom:14px">${headerRows}</table>`;
+            <table class="si-table si-compare-table">${metricTable}</table>
+        </div>`;
 
-        const W = 580, H = 60, gap = 4;
-        const bw = (W - gap * (years.length - 1)) / years.length;
-        const points = (arr) => years.map((y, i) => {
-            const x = i * (bw + gap) + bw / 2;
-            const yp = H - (arr[y] / maxV) * H;
-            return `${x},${yp}`;
-        }).join(' ');
-
-        const dotsA = years.map((y, i) => {
-            const x = i * (bw + gap) + bw / 2;
-            const yp = H - (totA[y] / maxV) * H;
-            const isCur = y === STATE.year;
-            return `<circle cx="${x}" cy="${yp}" r="${isCur ? 4 : 2}" fill="${isCur ? '#009EDB' : '#009EDB'}" opacity="${isCur ? 1 : 0.7}"/>`;
-        }).join('');
-        const dotsB = years.map((y, i) => {
-            const x = i * (bw + gap) + bw / 2;
-            const yp = H - (totB[y] / maxV) * H;
-            const isCur = y === STATE.year;
-            return `<circle cx="${x}" cy="${yp}" r="${isCur ? 4 : 2}" fill="${isCur ? '#FBAF17' : '#B06E2A'}" opacity="${isCur ? 1 : 0.7}"/>`;
-        }).join('');
-        const xLabels = years.filter((_, i) => i % 2 === 0).map(y => {
-            const idx = years.indexOf(y);
-            const x = idx * (bw + gap) + bw / 2;
-            return `<text x="${x}" y="${H + 12}" text-anchor="middle" font-size="7" fill="#6E6259" font-family="Inter,monospace">${String(y).slice(2)}</text>`;
-        }).join('');
+        const W = 580, H = 72, padX = 18;
+        const step = (W - padX * 2) / Math.max(1, years.length - 1);
+        const xAt = i => padX + i * step;
+        const yAt = v => H - (v / maxV) * H;
+        const line = (tot, col) => `<polyline points="${years.map((y, i) => `${xAt(i)},${yAt(tot[y])}`).join(' ')}" fill="none" stroke="${col}" stroke-width="2"/>`;
+        const cur = years.indexOf(STATE.year);
+        const marks = cur >= 0
+            ? `<line x1="${xAt(cur)}" y1="0" x2="${xAt(cur)}" y2="${H}" stroke="#DED9D5" stroke-width="1"/>
+               <rect x="${xAt(cur) - 3.5}" y="${yAt(totA[STATE.year]) - 3.5}" width="7" height="7" fill="${A_C}"/>
+               <rect x="${xAt(cur) - 3.5}" y="${yAt(totB[STATE.year]) - 3.5}" width="7" height="7" fill="${B_C}"/>`
+            : '';
+        const xLabels = years.map((y, i) => `<text x="${xAt(i)}" y="${H + 15}" text-anchor="middle" font-size="10" font-weight="${y === STATE.year ? 700 : 400}" fill="${y === STATE.year ? '#231F20' : '#6E6259'}">${y}</text>`).join('');
 
         html += `
         <div class="si-section">
-            <div class="si-label">Gross Trade Trend (exports + imports)</div>
+            <div class="si-label">Gross trade, ${years[0]}–${years[years.length - 1]} (exports + imports)</div>
             <div class="si-chart-legend">
-                <div class="si-legend-item"><div class="si-legend-swatch" style="background:#009EDB;height:2px"></div><span>${nameA}</span></div>
-                <div class="si-legend-item"><div class="si-legend-swatch" style="background:#FBAF17;height:2px"></div><span>${nameB}</span></div>
+                <div class="si-legend-item"><div class="si-legend-swatch" style="background:${A_C}"></div><span>${nameA}</span></div>
+                <div class="si-legend-item"><div class="si-legend-swatch" style="background:${B_C}"></div><span>${nameB}</span></div>
             </div>
-            <svg viewBox="0 0 ${W} ${H + 16}" width="${W}" height="${H + 16}" style="width:100%;height:auto;overflow:visible">
-                <polyline points="${points(totA)}" fill="none" stroke="#009EDB" stroke-width="1.5" opacity="0.8"/>
-                <polyline points="${points(totB)}" fill="none" stroke="#B06E2A" stroke-width="1.5" opacity="0.8"/>
-                ${dotsA}${dotsB}${xLabels}
+            <svg class="si-chart" viewBox="0 0 ${W} ${H + 20}" role="img" aria-label="Gross trade of ${nameA} and ${nameB}, ${years[0]} to ${years[years.length - 1]}">
+                <line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="#231F20" stroke-width="0.7"/>
+                ${marks}${line(totA, A_C)}${line(totB, B_C)}${xLabels}
             </svg>
         </div>`;
 
         const tableRows = years.filter(y => totA[y] > 0 || totB[y] > 0).reverse().map(y => {
             const isCur = y === STATE.year;
-            const winA = totA[y] > totB[y];
             return `<tr${isCur ? ' class="row-cur"' : ''}>
-                <td class="ar" style="color:${winA ? '#72BF44' : '#AEA29A'}">${mf.fmt(totA[y])}</td>
-                <td class="ac${isCur ? ' cur' : ' muted'}">${y}</td>
-                <td style="color:${!winA ? '#72BF44' : '#AEA29A'}">${mf.fmt(totB[y])}</td>
+                <td class="ar">${mf.fmt(totA[y])}</td>
+                <td class="ac">${y}</td>
+                <td class="al">${mf.fmt(totB[y])}</td>
             </tr>`;
         }).join('');
 
         html += `
         <div class="si-section">
-            <div class="si-label">Year-by-Year Comparison</div>
-            <table class="si-table">
+            <div class="si-label">Year by year</div>
+            <table class="si-table si-compare-table">
                 <thead>
                     <tr>
-                        <th class="ar" style="color:#0077B8">${nameA}</th>
+                        <th class="ar">${nameA}</th>
                         <th class="ac">Year</th>
-                        <th style="color:#B06E2A">${nameB}</th>
+                        <th class="al">${nameB}</th>
                     </tr>
                 </thead>
                 <tbody>${tableRows}</tbody>
@@ -1037,32 +1099,30 @@ const App = {
         const isoTrend = STATE.trendSummary[iso] || {};
         for (let y = 2015; y <= 2024; y++) yearlyTotals[y] = isoTrend[String(y)] || 0;
 
-        let html = '';
-
-        html += `<div class="si-narrative-box">
-            <div class="si-narrative-title">Auto Insights</div>
-            ${this._generateNarrative(iso, stats, partnerExports, partnerImports, yearlyTotals, mf, panelFlows)}
+        let html = `<div class="si-section">
+            <div class="si-label">In brief</div>
+            <div class="si-narrative-box">
+                ${this._generateNarrative(iso, stats, partnerExports, partnerImports, yearlyTotals, mf, panelFlows)}
+            </div>
         </div>`;
 
         if (!stats) return html;
 
         const isExp = stats.net >= 0;
-        const balColor = isExp ? '#009EDB' : '#ED1847';
         html += `<div class="si-section">
-            <div class="si-label">Key Metrics (${STATE.year})</div>
+            <div class="si-label">Key figures, ${STATE.year}</div>
             <div class="si-sublabel">All partners · exports and imports, before display filters</div>
             <div class="si-kpi-grid cols-2">
-                <div class="si-kpi-card net" title="Exports plus imports with all partners">
-                    <div class="si-kpi-label">${mf.grossLabel.replace(':','')}</div>
+                <div class="si-kpi-card" title="Exports plus imports with all partners">
+                    <div class="si-kpi-label">${mf.grossLabel.replace(':', '')}</div>
                     <div class="si-kpi-value">${mf.fmt(stats.gross)}</div>
+                    <div class="si-kpi-note">Exports + imports</div>
                 </div>
-                <div class="si-kpi-card ${isExp ? 'exp' : 'imp'}" title="Exports minus imports with all partners">
-                    <div class="si-kpi-label">${mf.netLabel.replace(':','')}</div>
-                    <div class="si-kpi-value" style="color:${balColor}">${fmtSigned(stats.net)}</div>
+                <div class="si-kpi-card" title="Exports minus imports with all partners">
+                    <div class="si-kpi-label">${mf.netLabel.replace(':', '')}</div>
+                    <div class="si-kpi-value">${fmtSigned(stats.net)}</div>
+                    <div class="si-kpi-note"><span class="si-role-badge ${isExp ? 'exp' : 'imp'}">${isExp ? 'Net exporter' : 'Net importer'}</span></div>
                 </div>
-            </div>
-            <div class="si-role-wrap">
-                <span class="si-role-badge ${isExp ? 'exp' : 'imp'}">${isExp ? 'Net Exporter' : 'Net Importer'}</span>
             </div>
         </div>`;
 
@@ -1098,9 +1158,10 @@ const App = {
                 return rank;
             };
 
+            const isoName = STATE.countryNames[iso] || iso;
+            const rankScope = isRegionalRank ? ` within ${STATE.region}` : '';
             const rows = sortedPartners.map(([pIso, val], idx) => {
                 const pName = STATE.countryNames[pIso] || pIso;
-                const isoName = STATE.countryNames[iso] || iso;
                 const barPct = Math.round((val / maxPVal) * 100);
                 const isExportTo = !!partnerExports[pIso];
                 const arrow = isExportTo ? '→' : '←';
@@ -1110,12 +1171,9 @@ const App = {
 
                 // Rank asymmetry: where does iso rank in pIso's own partner list? (pre-threshold)
                 const theirRank = getPartnerRank(iso, pIso);
-                const rankCol = theirRank <= 3 ? '#72BF44' : theirRank <= 10 ? '#FBAF17' : '#AEA29A';
-                const rankScope = isRegionalRank ? ` within ${STATE.region}` : '';
-                const rankTip = theirRank > 0 ? `${pName} ranks ${isoName} as their #${theirRank} trading partner${rankScope} (all net flows, before display filters)` : '';
-                const rankDisplay = theirRank > 0
-                    ? `<span title="${rankTip}" style="font-size:9px;font-family:monospace;color:#AEA29A">${idx + 1}·<span style="color:${rankCol};font-weight:700">#${theirRank}</span></span>`
-                    : `<span style="font-size:9px;font-family:monospace;color:#AEA29A">${idx + 1}</span>`;
+                const theirCell = theirRank > 0
+                    ? `<span class="si-their${theirRank <= 3 ? ' is-top' : ''}" title="${pName} ranks ${isoName} as their #${theirRank} trading partner${rankScope} (all net flows, before display filters)">${theirRank}</span>`
+                    : '<span class="si-their">–</span>';
 
                 // Bilateral flow split: share flowing in the dominant direction. (pre-threshold gross flows)
                 let splitBadge = '';
@@ -1131,35 +1189,42 @@ const App = {
                         if (tot > 0) {
                             const domPct = Math.round(Math.max(isoOut, isoIn) / tot * 100);
                             const expDom = isoOut >= isoIn;
-                            const badgeCol = domPct >= 75 ? (expDom ? '#009EDB' : '#ED1847') : '#AEA29A';
                             const tip = expDom
                                 ? `${domPct}% of gross bilateral trade flows from ${isoName}`
                                 : `${domPct}% of gross bilateral trade flows from ${pName}`;
-                            splitBadge = `<span style="color:${badgeCol};font-size:9px;font-family:monospace;font-weight:700" title="${tip}">${expDom ? '→' : '←'}${domPct}%</span>`;
+                            splitBadge = `<span class="${domPct >= 75 ? 'is-strong' : ''}" title="${tip}">${expDom ? '→' : '←'}${domPct}%</span>`;
                         }
                     }
                 }
 
                 return `<div class="si-partner-row">
-                    <span class="si-rank">${rankDisplay}</span>
-                    <span class="si-arrow" style="color:${aColor}">${arrow}</span>
-                    <span class="si-name">${pName}</span>
+                    <span class="si-rank">${idx + 1}</span>
+                    <span class="si-arrow" style="color:${aColor}" title="${isExportTo ? 'Net exports to' : 'Net imports from'} ${pName}">${arrow}</span>
+                    <span class="si-name" title="${pName}">${pName}</span>
                     <div class="si-bar-wrap"><div class="si-bar-fill" style="width:${barPct}%;background:${aColor}"></div></div>
-                    <span class="si-split">${splitBadge}</span>
                     <span class="si-val">${mf.fmt(val)}</span>
+                    <span class="si-split">${splitBadge}</span>
+                    ${theirCell}
                     <div class="si-actions">
-                        <button onclick="App.openArcModal('${arcExpIso}','${arcImpIso}')" class="si-btn" title="Bilateral history">↗</button>
-                        <button onclick="App.openCompareModal('${iso}','${pIso}')" class="si-btn cmp" title="Compare">⇄</button>
+                        <button onclick="App.openArcModal('${arcExpIso}','${arcImpIso}')" class="si-btn" title="Bilateral history with ${pName}" aria-label="Bilateral history with ${pName}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true"><path d="M3 21h18M6 17V11M11 17V5M16 17v-8M21 17v-4"/></svg></button>
+                        <button onclick="App.openCompareModal('${iso}','${pIso}')" class="si-btn cmp" title="Compare with ${pName}" aria-label="Compare with ${pName}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true"><path d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4"/></svg></button>
                     </div>
                 </div>`;
             }).join('');
             html += `<div class="si-section">
-                <div class="si-partners-hdr">
-                    <div class="si-label" style="margin-bottom:0">Trading Partners · net flow</div>
-                    <span class="si-partners-hint">rank you · them · split</span>
-                </div>
+                <div class="si-label">Trading partners, by net flow</div>
                 <div class="si-sublabel">${this._panelScopeNote()}</div>
-                <div class="si-partners">${rows}</div>
+                <div class="si-partners">
+                    <div class="si-partner-head" aria-hidden="true">
+                        <span class="h-rank">Rank</span>
+                        <span class="h-name">Partner</span>
+                        <span class="h-val">Net flow</span>
+                        <span class="h-split" title="Share of the two-way trade that flows in the main direction">One-way</span>
+                        <span class="h-their" title="Where this economy ranks among the partner's own partners">Their rank</span>
+                    </div>
+                    ${rows}
+                </div>
+                <div class="si-note"><b>One-way</b>: share of the two-way trade flowing in the main direction. <b>Their rank</b>: this economy's place among the partner's own partners. Point at a row for its history or a comparison.</div>
             </div>`;
         }
 
@@ -1171,19 +1236,21 @@ const App = {
         const yVals = years.map(y => yearlyTotals[y]);
         const maxYV = Math.max(...yVals);
         if (maxYV > 0) {
-            const W = 284, H = 48, gap = 2;
+            const W = 300, H = 56, gap = 3, top = 14;
             const barW = (W - gap * (years.length - 1)) / years.length;
             const bars = yVals.map((v, i) => {
-                const h = Math.max(2, (v / maxYV) * H);
+                const h = Math.max(1, (v / maxYV) * H);
                 const x = i * (barW + gap);
                 const isCur = years[i] === STATE.year;
-                const yLabel = String(years[i]).slice(2);
-                return `<rect x="${x}" y="${H - h}" width="${barW}" height="${h}" rx="2" fill="${isCur ? '#004990' : '#DED9D5'}" ${isCur ? 'stroke="#0077B8" stroke-width="1"' : ''}/><text x="${x + barW / 2}" y="${H + 11}" text-anchor="middle" font-size="7" fill="${isCur ? '#0077B8' : '#AEA29A'}" font-family="Inter,monospace">${yLabel}</text>`;
+                const valLabel = isCur
+                    ? `<text x="${i === years.length - 1 ? x + barW : x + barW / 2}" y="${top + H - h - 4}" text-anchor="${i === years.length - 1 ? 'end' : 'middle'}" font-size="10" font-weight="700" fill="#231F20">${mf.fmt(v)}</text>`
+                    : '';
+                return `<rect x="${x}" y="${top + H - h}" width="${barW}" height="${h}" fill="${isCur ? '#004987' : '#C9C2BB'}"/>${valLabel}<text x="${x + barW / 2}" y="${top + H + 13}" text-anchor="middle" font-size="9.5" font-weight="${isCur ? 700 : 400}" fill="${isCur ? '#231F20' : '#6E6259'}">${years[i]}</text>`;
             }).join('');
             html += `<div class="si-section">
-                <div class="si-label">Gross Trade, ${years[0]}–${years[years.length - 1]}</div>
-                <div class="si-sublabel">Exports + imports with all partners · ${STATE.year} highlighted</div>
-                <svg viewBox="0 0 ${W} ${H + 14}" width="${W}" height="${H + 14}" style="width:100%;height:auto;overflow:visible">${bars}</svg>
+                <div class="si-label">Gross trade, ${years[0]}–${years[years.length - 1]}</div>
+                <div class="si-sublabel">Exports + imports with all partners · ${STATE.year} in dark blue</div>
+                <svg class="si-chart" viewBox="0 0 ${W} ${top + H + 17}" role="img" aria-label="Gross trade by year, ${years[0]} to ${years[years.length - 1]}">${bars}<line x1="0" y1="${top + H}" x2="${W}" y2="${top + H}" stroke="#231F20" stroke-width="0.7"/></svg>
             </div>`;
         }
 
@@ -1200,10 +1267,10 @@ const App = {
             const compRows = segments.map(s => `<div class="si-comp-row">
                 <div class="si-comp-dot" style="background:${CONFIG.flowColors[s.cat]}"></div>
                 <span class="si-comp-label">${catFull[s.cat]}</span>
-                <span class="si-comp-pct" style="color:${CONFIG.flowColors[s.cat]}">${Math.round(s.pct)}%</span>
+                <span class="si-comp-pct">${Math.round(s.pct)}%</span>
             </div>`).join('');
             html += `<div class="si-section">
-                <div class="si-label">Flow Composition</div>
+                <div class="si-label">Flow composition</div>
                 <div class="si-sublabel">Share of net flows · ${this._panelScopeNote()}</div>
                 <div class="si-flow-bar">${barSegs}</div>
                 <div class="si-comp-rows">${compRows}</div>
@@ -1234,54 +1301,35 @@ const App = {
         const top1Name = sorted[0] ? (STATE.countryNames[sorted[0][0]] || sorted[0][0]) : '—';
 
         // Thresholds calibrated for trade (not market-competition DOJ levels).
-        let label, badge;
-        if (hhi < 0.20)      { label = 'Diversified';        badge = '#72BF44'; }
-        else if (hhi < 0.40) { label = 'Moderate';           badge = '#FBAF17'; }
-        else                  { label = 'Highly concentrated'; badge = '#ef4444'; }
-
-        const W = 240, H = 110, cx = W / 2, cy = H - 12, r = 84;
-        const startA = Math.PI, endA = 2 * Math.PI;
-        const valA = startA + (endA - startA) * Math.min(hhi, 1);
-
-        const arcPath = (a1, a2) => {
-            const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
-            const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
-            return `M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${a2 - a1 > Math.PI ? 1 : 0},1 ${x2.toFixed(2)},${y2.toFixed(2)}`;
-        };
-        const tick = (v) => {
-            const a = startA + (endA - startA) * v;
-            const x1 = cx + (r + 3) * Math.cos(a), y1 = cy + (r + 3) * Math.sin(a);
-            const x2 = cx + (r - 7) * Math.cos(a), y2 = cy + (r - 7) * Math.sin(a);
-            return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#AEA29A" stroke-width="1"/>`;
-        };
-        const mx1 = cx + (r - 14) * Math.cos(valA), my1 = cy + (r - 14) * Math.sin(valA);
-        const mx2 = cx + (r + 6)  * Math.cos(valA), my2 = cy + (r + 6)  * Math.sin(valA);
+        const label = hhi < 0.20 ? 'Diversified' : hhi < 0.40 ? 'Moderate' : 'Highly concentrated';
+        const score = (hhi * 10000).toFixed(0);
+        const pos = Math.min(hhi, 1) * 100;
 
         return `<div class="si-section">
-            <div class="si-label">Partner Concentration (HHI)</div>
+            <div class="si-label">Partner concentration (HHI)</div>
             <div class="si-sublabel">${scopeNote}</div>
-            <div class="si-card">
-                <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-height:130px" preserveAspectRatio="xMidYMid meet">
-                    <path d="${arcPath(startA, endA)}" stroke="#DED9D5" stroke-width="9" fill="none" stroke-linecap="round"/>
-                    <path d="${arcPath(startA, valA)}" stroke="${badge}" stroke-width="9" fill="none" stroke-linecap="round"/>
-                    ${tick(0.20)}${tick(0.40)}
-                    <line x1="${mx1.toFixed(2)}" y1="${my1.toFixed(2)}" x2="${mx2.toFixed(2)}" y2="${my2.toFixed(2)}" stroke="#231F20" stroke-width="2.5" stroke-linecap="round"/>
-                    <text x="${cx}" y="${cy - 36}" text-anchor="middle" font-size="22" font-weight="700" fill="#231F20" font-family="Inter,monospace">${(hhi * 10000).toFixed(0)}</text>
-                    <text x="${cx}" y="${cy - 20}" text-anchor="middle" font-size="9" fill="#6E6259" font-family="Inter,sans-serif">HHI score (0–10000)</text>
-                </svg>
-                <div style="text-align:center;margin-top:-4px">
-                    <span class="si-badge" style="background:${badge}22;color:${badge};border-color:${badge}44">${label}</span>
+            <div class="si-hhi">
+                <div class="si-hhi-head">
+                    <span class="hhi-score">${score}</span>
+                    <span class="si-badge">${label}</span>
+                    <span class="hhi-of">on a scale of 0 to 10,000</span>
                 </div>
+                <div class="si-hhi-scale" role="img" aria-label="HHI ${score} on a scale of 0 to 10,000: ${label}">
+                    <span class="hhi-band hhi-band-1"></span><span class="hhi-band hhi-band-2"></span><span class="hhi-band hhi-band-3"></span>
+                    <span class="hhi-marker" style="left:${pos.toFixed(2)}%"></span>
+                </div>
+                <div class="si-hhi-axis" aria-hidden="true"><span style="left:0">0</span><span style="left:20%">2,000</span><span style="left:40%">4,000</span><span style="left:100%">10,000</span></div>
+                <div class="si-hhi-bands" aria-hidden="true"><span>Diversified</span><span>Moderate</span><span>Highly concentrated</span></div>
                 <div class="si-hhi-stats">
-                    <div><div class="hhi-l">Top 1</div><div class="hhi-v">${top1Pct.toFixed(0)}%</div><div class="hhi-s" title="${top1Name}">${top1Name}</div></div>
-                    <div><div class="hhi-l">Top 3</div><div class="hhi-v">${top3Pct.toFixed(0)}%</div><div class="hhi-s">share</div></div>
-                    <div><div class="hhi-l">Top 5</div><div class="hhi-v">${top5Pct.toFixed(0)}%</div><div class="hhi-s">share</div></div>
+                    <div><div class="hhi-l">Top partner</div><div class="hhi-v">${top1Pct.toFixed(0)}%</div><div class="hhi-s" title="${top1Name}">${top1Name}</div></div>
+                    <div><div class="hhi-l">Top 3</div><div class="hhi-v">${top3Pct.toFixed(0)}%</div><div class="hhi-s">of net flows</div></div>
+                    <div><div class="hhi-l">Top 5</div><div class="hhi-v">${top5Pct.toFixed(0)}%</div><div class="hhi-s">of net flows</div></div>
                 </div>
             </div>
         </div>`;
     },
 
-    // Polar Fingerprint: geographic bearing computed via great-circle formula.
+    // Partners by compass direction: geographic bearing computed via great-circle formula.
     // Uses pre-threshold raw data so small-country partners are included.
     _buildPolarFingerprint(iso) {
         const myCoords = STATE.countryCoords[iso];
@@ -1314,51 +1362,50 @@ const App = {
         if (!anyData) return '';
 
         const maxVal = Math.max(...sectorExp, ...sectorImp, 1);
-        const W = 220, H = 220, cx = W / 2, cy = H / 2, innerR = 16, maxBarLen = 78;
+        const W = 220, H = 220, cx = W / 2, cy = H / 2, innerR = 14, maxBarLen = 80;
         const labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
         const parts = [];
 
-        [0.25, 0.5, 1].forEach(p => {
-            const rr = innerR + maxBarLen * p;
-            parts.push(`<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="#E2E8F0" stroke-width="0.6" ${p < 1 ? 'stroke-dasharray="2 3"' : ''}/>`);
+        [0.5, 1].forEach(p => {
+            parts.push(`<circle cx="${cx}" cy="${cy}" r="${innerR + maxBarLen * p}" fill="none" stroke="#DED9D5" stroke-width="0.8"/>`);
         });
-        parts.push(`<line x1="${cx}" y1="${cy - innerR - maxBarLen}" x2="${cx}" y2="${cy + innerR + maxBarLen}" stroke="#E2E8F0" stroke-width="0.5"/>`);
-        parts.push(`<line x1="${cx - innerR - maxBarLen}" y1="${cy}" x2="${cx + innerR + maxBarLen}" y2="${cy}" stroke="#E2E8F0" stroke-width="0.5"/>`);
+        for (let i = 0; i < SECTORS; i++) {
+            const a = (i * SECTOR_WIDTH - 90) * Math.PI / 180;
+            parts.push(`<line x1="${(cx + innerR * Math.cos(a)).toFixed(2)}" y1="${(cy + innerR * Math.sin(a)).toFixed(2)}" x2="${(cx + (innerR + maxBarLen) * Math.cos(a)).toFixed(2)}" y2="${(cy + (innerR + maxBarLen) * Math.sin(a)).toFixed(2)}" stroke="#EBEAE6" stroke-width="0.8"/>`);
+        }
 
         for (let i = 0; i < SECTORS; i++) {
             const centerRad = (i * SECTOR_WIDTH - 90) * Math.PI / 180;
-            const offsetRad = 9 * Math.PI / 180;
+            const offsetRad = 8 * Math.PI / 180;
             const expLen = (sectorExp[i] / maxVal) * maxBarLen;
             const impLen = (sectorImp[i] / maxVal) * maxBarLen;
             const drawBar = (len, angleRad, color) => {
                 if (len < 0.5) return;
                 const x1 = cx + innerR * Math.cos(angleRad), y1 = cy + innerR * Math.sin(angleRad);
                 const x2 = cx + (innerR + len) * Math.cos(angleRad), y2 = cy + (innerR + len) * Math.sin(angleRad);
-                parts.push(`<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${color}" stroke-width="6" stroke-linecap="round" opacity="0.88"/>`);
+                parts.push(`<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${color}" stroke-width="6"/>`);
             };
             drawBar(expLen, centerRad + offsetRad, '#009EDB');
             drawBar(impLen, centerRad - offsetRad, '#ED1847');
 
-            const labelR = innerR + maxBarLen + 14;
-            parts.push(`<text x="${(cx + labelR * Math.cos(centerRad)).toFixed(2)}" y="${(cy + labelR * Math.sin(centerRad) + 3).toFixed(2)}" text-anchor="middle" font-size="10" font-weight="700" fill="#AEA29A" font-family="Inter,sans-serif">${labels[i]}</text>`);
+            const labelR = innerR + maxBarLen + 13;
+            parts.push(`<text x="${(cx + labelR * Math.cos(centerRad)).toFixed(2)}" y="${(cy + labelR * Math.sin(centerRad) + 3.5).toFixed(2)}" text-anchor="middle" font-size="10" font-weight="600" fill="#6E6259">${labels[i]}</text>`);
         }
-        parts.push(`<circle cx="${cx}" cy="${cy}" r="3.2" fill="#231F20"/>`);
+        parts.push(`<rect x="${cx - 3}" y="${cy - 3}" width="6" height="6" fill="#231F20"/>`);
 
         const scopeNote = `Net flows by direction of the partner · ${this._panelScopeNote()}`;
         // 16px margin on every side: the compass letters sit outside the bars.
         return `<div class="si-section">
-            <div class="si-label">Trade Fingerprint</div>
+            <div class="si-label">Partners by compass direction</div>
             <div class="si-sublabel">${scopeNote}</div>
-            <div class="si-card" style="display:flex;flex-direction:column;align-items:center">
-                <svg viewBox="-16 -16 ${W + 32} ${H + 32}" style="width:100%;max-width:240px" preserveAspectRatio="xMidYMid meet">
-                    ${parts.join('')}
-                </svg>
-                <div class="si-chart-footer">
-                    <div class="si-legend-item"><div class="si-legend-swatch" style="background:#009EDB"></div><span>Exports</span></div>
-                    <div class="si-legend-item"><div class="si-legend-swatch" style="background:#ED1847"></div><span>Imports</span></div>
-                </div>
-                <div style="font-size:8px;color:#6E6259;font-style:italic;margin-top:4px;text-align:center">Bar direction = geographic bearing from this country</div>
+            <svg class="si-chart" viewBox="-16 -16 ${W + 32} ${H + 32}" style="max-width:250px;margin:0 auto" role="img" aria-label="Net exports and imports by compass direction of the partner">
+                ${parts.join('')}
+            </svg>
+            <div class="si-chart-footer">
+                <div class="si-legend-item"><div class="si-legend-swatch" style="background:#009EDB"></div><span>Exports</span></div>
+                <div class="si-legend-item"><div class="si-legend-swatch" style="background:#ED1847"></div><span>Imports</span></div>
             </div>
+            <div class="si-note">Each bar points from this economy towards its partners (great-circle bearing); its length is the net flow.</div>
         </div>`;
     },
 
@@ -1409,50 +1456,48 @@ const App = {
 
         const maxVal = Math.max(...partnerData.map(d => Math.max(d.expVal, d.impVal)), 1);
 
-        // Layout: name zone in center, bars diverge left (imports) and right (exports)
-        const W = 280, nameW = 72;
+        // Layout: name zone in the centre, bars diverge left (imports) and right (exports)
+        const W = 300, nameW = 88;
         const cx = W / 2, leftEdge = cx - nameW / 2, rightEdge = cx + nameW / 2;
-        const barMaxLen = 92, barH = 9, rowGap = 16;
+        const barMaxLen = 100, barH = 11, rowGap = 19;
 
         const rows = partnerData.map((d, i) => {
             const y = i * rowGap;
             const expLen = d.expVal > 0 ? Math.max(1.5, (d.expVal / maxVal) * barMaxLen) : 0;
             const impLen = d.impVal > 0 ? Math.max(1.5, (d.impVal / maxVal) * barMaxLen) : 0;
             const name = STATE.countryNames[d.pIso] || d.pIso;
-            const shortName = name.length > 12 ? name.slice(0, 11) + '…' : name;
+            const shortName = name.length > 14 ? name.slice(0, 13) + '…' : name;
 
             const impBar = impLen > 0
-                ? `<rect x="${(leftEdge - impLen).toFixed(1)}" y="${y}" width="${impLen.toFixed(1)}" height="${barH}" rx="2" fill="#ED1847" opacity="0.78"/>`
+                ? `<rect x="${(leftEdge - 4 - impLen).toFixed(1)}" y="${y}" width="${impLen.toFixed(1)}" height="${barH}" fill="#ED1847"/>`
                 : '';
             const expBar = expLen > 0
-                ? `<rect x="${rightEdge}" y="${y}" width="${expLen.toFixed(1)}" height="${barH}" rx="2" fill="#009EDB" opacity="0.78"/>`
+                ? `<rect x="${rightEdge + 4}" y="${y}" width="${expLen.toFixed(1)}" height="${barH}" fill="#009EDB"/>`
                 : '';
-            const nameEl = `<text x="${cx}" y="${y + barH - 1}" text-anchor="middle" font-size="7.5" fill="#231F20" font-family="Inter,sans-serif">${shortName}</text>`;
+            const nameEl = `<text x="${cx}" y="${y + barH - 2}" text-anchor="middle" font-size="9.5" fill="#231F20">${shortName}</text>`;
 
             return `${impBar}${expBar}${nameEl}`;
         }).join('');
 
-        const totalH = topPartners.length * rowGap + barH;
+        const totalH = topPartners.length * rowGap - (rowGap - barH);
 
-        const grid = `
-            <text x="${(leftEdge - barMaxLen / 2).toFixed(0)}" y="-4" text-anchor="middle" font-size="7" font-weight="700" fill="#ED1847" font-family="Inter,sans-serif">← Imports</text>
-            <text x="${(rightEdge + barMaxLen / 2).toFixed(0)}" y="-4" text-anchor="middle" font-size="7" font-weight="700" fill="#009EDB" font-family="Inter,sans-serif">Exports →</text>
-            <line x1="${leftEdge}" y1="0" x2="${leftEdge}" y2="${totalH}" stroke="#E2E8F0" stroke-width="0.6" stroke-dasharray="2,2"/>
-            <line x1="${rightEdge}" y1="0" x2="${rightEdge}" y2="${totalH}" stroke="#E2E8F0" stroke-width="0.6" stroke-dasharray="2,2"/>`;
+        const axes = `
+            <text x="${leftEdge - 4}" y="-6" text-anchor="end" font-size="9.5" font-weight="600" fill="#6E6259">Imports</text>
+            <text x="${rightEdge + 4}" y="-6" text-anchor="start" font-size="9.5" font-weight="600" fill="#6E6259">Exports</text>
+            <line x1="${leftEdge - 4}" y1="-2" x2="${leftEdge - 4}" y2="${totalH + 2}" stroke="#231F20" stroke-width="0.7"/>
+            <line x1="${rightEdge + 4}" y1="-2" x2="${rightEdge + 4}" y2="${totalH + 2}" stroke="#231F20" stroke-width="0.7"/>`;
 
         const scopeNote = isRegional
             ? `Top 7 partners by net flow · exports and imports in each direction · ${STATE.region} intra-regional`
             : 'Top 7 partners by net flow · exports and imports in each direction · all partners';
 
         return `<div class="si-section">
-            <div class="si-label">Bilateral Trade Split</div>
+            <div class="si-label">Exports and imports by partner</div>
             <div class="si-sublabel">${scopeNote}</div>
-            <div class="si-card">
-                <svg viewBox="0 -10 ${W} ${totalH + 12}" style="width:100%;overflow:visible" preserveAspectRatio="xMidYMid meet">
-                    ${grid}
-                    ${rows}
-                </svg>
-            </div>
+            <svg class="si-chart" viewBox="0 -16 ${W} ${totalH + 20}" role="img" aria-label="Exports and imports with the top 7 partners">
+                ${axes}
+                ${rows}
+            </svg>
         </div>`;
     },
 
@@ -1476,9 +1521,9 @@ const App = {
             const sortedGlobal = this._globalRankCache[_yearStr];
             const globalRank = sortedGlobal.findIndex(([k]) => k === iso) + 1;
             const totalCountries = sortedGlobal.length;
-            const rankStr = globalRank > 0 ? `ranked <strong>#${globalRank} of ${totalCountries}</strong> economies` : 'active';
+            const rankStr = globalRank > 0 ? `ranked ${ordinal(globalRank)} of ${totalCountries} economies worldwide` : 'active';
             const measure = STATE.metric === 'weight' ? 'gross trade by weight' : 'gross trade';
-            sentences.push(`<strong>${name}</strong> is a <strong>${role}</strong> of used clothing, ${rankStr} by ${measure} (exports + imports) in ${STATE.year}: ${mf.fmt(stats.gross)}.`);
+            sentences.push(`${name} is a ${role} of used clothing, ${rankStr} by ${measure} (exports + imports) in ${STATE.year}: ${mf.fmt(stats.gross)}.`);
         }
 
         const years = Object.keys(yearlyTotals).map(Number).sort();
@@ -1489,16 +1534,15 @@ const App = {
             if (prevVal > 0 && curVal > 0) {
                 const yoy = ((curVal - prevVal) / prevVal) * 100;
                 const dir = yoy >= 0 ? 'grew' : 'declined';
-                const col = yoy >= 0 ? '#72BF44' : '#ED1847';
                 const firstNZ = years.findIndex(y => yearlyTotals[y] > 0);
                 let cagrStr = '';
                 if (firstNZ >= 0 && curIdx > firstNZ && yearlyTotals[years[firstNZ]] > 0) {
                     const n = curIdx - firstNZ;
                     const cagr = (Math.pow(curVal / yearlyTotals[years[firstNZ]], 1 / n) - 1) * 100;
-                    if (isFinite(cagr)) cagrStr = ` (CAGR ${signedPct(cagr, 1)} since ${years[firstNZ]})`;
+                    if (isFinite(cagr)) cagrStr = ` (average annual growth ${signedPct(cagr, 1)} since ${years[firstNZ]})`;
                 }
                 const what = STATE.metric === 'weight' ? 'Gross trade by weight' : 'Gross trade';
-                sentences.push(`${what} <strong style="color:${col}">${dir} ${Math.abs(yoy).toFixed(1)}%</strong> from ${years[curIdx - 1]} to ${STATE.year}${cagrStr}.`);
+                sentences.push(`${what} ${dir} ${Math.abs(yoy).toFixed(1)}% from ${years[curIdx - 1]} to ${STATE.year}${cagrStr}.`);
             }
         }
 
@@ -1521,17 +1565,16 @@ const App = {
             let s = '';
             if (topEntry) {
                 const tpName = STATE.countryNames[topEntry[0]] || topEntry[0];
-                s += `Largest partner by net flow${within} is <strong>${tpName}</strong>.`;
+                s += `Largest partner by net flow${within} is ${tpName}.`;
             }
             if (domCat && countryTotal > 0) {
                 const domPct = Math.round((domCat[1] / countryTotal) * 100);
-                const catCol = CONFIG.flowColors[domCat[0]];
-                s += ` <strong style="color:${catCol}">${catFull[domCat[0]]}</strong> flows are the largest share of its net flows${within} (${domPct}%).`;
+                s += ` ${catFull[domCat[0]]} flows are the largest share of its net flows${within} (${domPct}%).`;
             }
             if (s) sentences.push(s);
         }
 
-        if (sentences.length === 0) return `<p style="font-size:11px;color:#AEA29A;font-style:italic">No trade data available for this country in the current view.</p>`;
+        if (sentences.length === 0) return '<p class="si-empty">No trade data available for this country in the current view.</p>';
         return sentences.map(s => `<p>${s}</p>`).join('');
     },
 
@@ -1550,6 +1593,10 @@ const App = {
         DataLoader.filterData();
         TradeMap.renderFlows();
         this.updateKPIBar();
+        this._applyModeUI();
+        this._updateFilterIndicators();
+        const empty = this.currentMode() === 'explore' && !!STATE.yearCache[STATE.year] && !(STATE.filteredData || []).length;
+        document.getElementById('map-empty')?.classList.toggle('hidden', !empty);
 
         // Single choke point for the URL: every filter change routes through
         // updateDashboard(), so the hash always describes what is on screen.
@@ -1584,7 +1631,10 @@ const App = {
         const key = [exporter, importer].sort().join('|');
         const exists = STATE.bilateralPairs.some(p => [p.exporter, p.importer].sort().join('|') === key);
         if (!exists) STATE.bilateralPairs.push({ exporter, importer });
-        this._syncBilateralSelectors();
+        this._stashedPairs = [];
+        // A connection added from outside the Connect tab (e.g. the guided tour)
+        // puts the dashboard in Connect mode.
+        if (TradeMap.svg && !TradeMap.lineFilterMode) TradeMap.enableLineFilter();
         this.updateDashboard(false);
         this.openConnectionsPanel();
     },
@@ -1593,58 +1643,50 @@ const App = {
     removeBilateralPair(exporter, importer) {
         const key = [exporter, importer].sort().join('|');
         STATE.bilateralPairs = STATE.bilateralPairs.filter(p => [p.exporter, p.importer].sort().join('|') !== key);
-        this._syncBilateralSelectors();
-        // The pickers only mirrored the pairs: emptying them must not trigger the
-        // "selection cleared → threshold back to Auto" rule in updateDashboard.
-        this._prevSelectionCount = 0;
         this.updateDashboard(false);
         this._updateLineFilterUI({ active: TradeMap.lineFilterMode, stage: TradeMap._pendingExporter ? 'import' : 'export' });
-        if (STATE.bilateralPairs.length > 0 || TradeMap.lineFilterMode) this.openConnectionsPanel();
+        if (STATE.bilateralPairs.length > 0 || (TradeMap.lineFilterMode && !isCompact())) this.openConnectionsPanel();
         else this.closeConnectionsPanel();
     },
 
-    // Remove every drawn connection and reset the synced pickers.
+    // Remove every drawn connection. The Explore filters (region, pickers…) are
+    // separate and stay as they were.
     clearBilateralFilter() {
         STATE.bilateralPairs = [];
+        this._stashedPairs = [];
         if (TradeMap.cancelLineDraw) TradeMap.cancelLineDraw();
-        // setCountries syncs the checkbox UI without dispatching (avoids a double render)
-        this.exporterSelector.setCountries([]);
-        this.importerSelector.setCountries([]);
-        this._prevSelectionCount = 0;   // see removeBilateralPair
         this.updateDashboard(false);
         this._updateLineFilterUI({ active: TradeMap.lineFilterMode, stage: 'export' });
-        if (TradeMap.lineFilterMode) this.openConnectionsPanel();
+        if (TradeMap.lineFilterMode && !isCompact()) this.openConnectionsPanel();
         else this.closeConnectionsPanel();
-    },
-
-    // Reflect the drawn pairs in the existing checkbox pickers (visual sync only —
-    // the actual filtering is driven by STATE.bilateralPairs in DataLoader.filterData).
-    _syncBilateralSelectors() {
-        const froms = new Set(), tos = new Set();
-        STATE.bilateralPairs.forEach(p => { froms.add(p.exporter); tos.add(p.importer); });
-        this.exporterSelector.setCountries([...froms]);
-        this.importerSelector.setCountries([...tos]);
     },
 
     _updateLineFilterUI(detail = {}) {
-        const btn      = document.getElementById('linefilter-btn');
         const clearBtn = document.getElementById('linefilter-clear');
         const status   = document.getElementById('linefilter-status');
+        const hint     = document.getElementById('connect-hint');
         const count    = STATE.bilateralPairs.length;
         const active   = !!detail.active;
 
-        if (btn)      btn.classList.toggle('active', active);
+        this._applyModeUI();
         if (clearBtn) clearBtn.classList.toggle('hidden', count === 0);
+        if (hint) {
+            const n = count > 0 ? ` <span class="connect-count">${count} connection${count > 1 ? 's' : ''} drawn.</span>` : '';
+            hint.innerHTML = (active && detail.stage === 'import')
+                ? `Now click the <b>importer</b> for ${STATE.countryNames[detail.exporter] || detail.exporter || 'this exporter'}. <kbd>Esc</kbd> cancels.`
+                : `Click an <b>exporter</b> on the map, then an <b>importer</b>.${n}`;
+        }
         if (!status) return;
 
         // The on-map status only guides the live drawing; the connection list/count
         // lives in the side panel, so nothing is shown once the mode is off.
+        const verb = window.matchMedia?.('(pointer: coarse)').matches ? 'Tap' : 'Click';
         let text = '';
         if (active && detail.stage === 'import') {
             const expName = STATE.countryNames[detail.exporter] || detail.exporter || '';
-            text = `${expName} → ?  ·  Click an importer`;
+            text = `${expName} → ?  ·  ${verb} an importer`;
         } else if (active) {
-            text = count > 0 ? `${count} connection${count > 1 ? 's' : ''} · Click an exporter` : 'Click an exporter to start';
+            text = count > 0 ? `${count} connection${count > 1 ? 's' : ''} · ${verb} an exporter` : `${verb} an exporter to start`;
         }
         status.textContent = text;
         status.classList.toggle('hidden', text === '');
@@ -1654,6 +1696,7 @@ const App = {
     // Mirrors the single-country Data Insight box, but stacks one simplified
     // bilateral-history card per drawn connection.
     async openConnectionsPanel() {
+        this._closeMenus();
         // The connections panel replaces a single-country panel: drop that
         // country's focus, which would otherwise hide the drawn lines.
         if (this._currentPanelIso || TradeMap.focusedIso) {
@@ -1667,14 +1710,15 @@ const App = {
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
         const n = STATE.bilateralPairs.length;
 
-        document.getElementById('panel-country-name').textContent = 'Drawn Connections';
+        document.getElementById('panel-clear-btn')?.classList.toggle('hidden', n === 0);
+        document.getElementById('panel-country-name').textContent = 'Drawn connections';
         document.getElementById('panel-country-meta').textContent =
             n > 0 ? `${n} connection${n > 1 ? 's' : ''} · ${STATE.year}` : `Draw mode · ${STATE.year}`;
         document.getElementById('panel-body').innerHTML = this._buildConnectionsContent(mf);
 
         // The Sea Route button and country CSV export belong to single-country focus.
         const searouteBtn = document.getElementById('searoute-btn');
-        if (searouteBtn) { searouteBtn.disabled = true; searouteBtn.classList.remove('active'); }
+        if (searouteBtn) { searouteBtn.disabled = true; searouteBtn.classList.remove('active'); searouteBtn.style.display = 'none'; }
         const exportBtn = document.getElementById('panel-export-btn');
         if (exportBtn) exportBtn.style.display = 'none';
 
@@ -1683,7 +1727,7 @@ const App = {
         this._currentPanelIso = null;
         this._connectionsPanelOpen = true;
         this.hideTooltip();
-        if (window.innerWidth <= 767) setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
+        if (isCompact()) setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
     },
 
     closeConnectionsPanel() {
@@ -1691,15 +1735,17 @@ const App = {
         this._connectionsPanelOpen = false;
         document.getElementById('insight-panel').classList.remove('open');
         document.body.classList.remove('insight-open');
-        if (window.innerWidth <= 767) setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
+        if (isCompact()) setTimeout(() => window.dispatchEvent(new Event('resize')), 10);
     },
 
     _buildConnectionsContent(mf) {
         if (STATE.bilateralPairs.length === 0) {
             return `<div class="conn-empty">
-                <div class="conn-empty-icon">🔗</div>
-                <p>Click a country to set the <b>exporter</b>, then click another to set the <b>importer</b>.</p>
-                <p class="conn-empty-sub">Every connection you draw is listed here with its trade history.</p>
+                <ol class="conn-steps">
+                    <li><b>Click an exporter</b> on the map.</li>
+                    <li><b>Click an importer.</b> The line is drawn and listed here with its trade history.</li>
+                </ol>
+                <p class="conn-empty-sub">Draw as many connections as needed. Remove one with its × button, or all of them with Clear all.</p>
             </div>`;
         }
         // Newest connection on top
@@ -1712,6 +1758,7 @@ const App = {
     _buildConnectionCard(expIso, impIso, mf) {
         const expName = STATE.countryNames[expIso] || expIso;
         const impName = STATE.countryNames[impIso] || impIso;
+        const EXP_C = '#009EDB', IMP_C = '#ED1847';
 
         const yearData = {};
         for (let y = 2015; y <= 2024; y++) yearData[y] = { aToB: 0, bToA: 0 };
@@ -1736,42 +1783,39 @@ const App = {
         const curAtoB = yearData[cy] ? yearData[cy].aToB : 0;
         const curBtoA = yearData[cy] ? yearData[cy].bToA : 0;
         const curNet  = curAtoB - curBtoA;
-        const netCol  = curNet >= 0 ? '#009EDB' : '#ED1847';
         const hasData = atoBs.some(v => v > 0) || bToAs.some(v => v > 0);
 
-        const W = 248, H = 30, barH = 12, gap = 2;
+        const W = 260, H = 34, half = 15, gap = 3;
         const bw = (W - gap * (years.length - 1)) / years.length;
         const bars = years.map((y, i) => {
-            const aH = Math.max(0, (atoBs[i] / maxAbs) * barH);
-            const bH = Math.max(0, (bToAs[i] / maxAbs) * barH);
+            const aH = Math.max(0, (atoBs[i] / maxAbs) * half);
+            const bH = Math.max(0, (bToAs[i] / maxAbs) * half);
             const x  = i * (bw + gap);
             const isCur = y === cy;
-            const yr = String(y).slice(2);
-            return `<rect x="${x}" y="${H/2 - aH}" width="${bw}" height="${aH}" rx="1" fill="#009EDB" opacity="${isCur ? 1 : 0.4}"/>
-                    <rect x="${x}" y="${H/2}" width="${bw}" height="${bH}" rx="1" fill="#ED1847" opacity="${isCur ? 1 : 0.4}"/>
-                    <text x="${x + bw/2}" y="${H + 8}" text-anchor="middle" font-size="6" fill="${isCur ? '#0077B8' : '#AEA29A'}" font-family="Inter,monospace">${yr}</text>`;
+            return `<rect x="${x}" y="${H / 2 - aH}" width="${bw}" height="${aH}" fill="${EXP_C}" opacity="${isCur ? 1 : 0.4}"/>
+                    <rect x="${x}" y="${H / 2}" width="${bw}" height="${bH}" fill="${IMP_C}" opacity="${isCur ? 1 : 0.4}"/>
+                    <text x="${x + bw / 2}" y="${H + 10}" text-anchor="middle" font-size="7.5" font-weight="${isCur ? 700 : 400}" fill="${isCur ? '#231F20' : '#6E6259'}">${y}</text>`;
         }).join('');
 
         const chart = hasData
-            ? `<svg viewBox="0 0 ${W} ${H + 10}" width="${W}" height="${H + 10}" style="width:100%;height:auto;overflow:visible">
-                   <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#DED9D5" stroke-width="0.5"/>${bars}
+            ? `<svg class="si-chart" viewBox="0 0 ${W} ${H + 12}" role="img" aria-label="Exports in each direction, ${years[0]} to ${years[years.length - 1]}">
+                   ${bars}<line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#231F20" stroke-width="0.6"/>
                </svg>`
             : `<div class="conn-nodata">No recorded bilateral trade</div>`;
 
         return `<div class="si-section conn-card">
             <div class="conn-card-hdr">
                 <span class="conn-flow"><b>${expName}</b> <span class="conn-arrow">→</span> <b>${impName}</b></span>
-                <button class="conn-remove" title="Remove this connection" onclick="App.removeBilateralPair('${expIso}','${impIso}')">×</button>
+                <button class="conn-remove" title="Remove this connection" aria-label="Remove ${expName} to ${impName}" onclick="App.removeBilateralPair('${expIso}','${impIso}')">×</button>
             </div>
             <div class="conn-card-stats">
-                <span class="conn-stat"><span class="conn-stat-lbl">${expName} →</span><b style="color:#0077B8">${mf.fmt(curAtoB)}</b></span>
-                <span class="conn-stat"><span class="conn-stat-lbl">← ${impName}</span><b style="color:#ED1847">${mf.fmt(curBtoA)}</b></span>
-                <span class="conn-stat" title="${expName} → ${impName} minus ${impName} → ${expName}"><span class="conn-stat-lbl">Net ${cy}</span><b style="color:${netCol}">${fmtSigned(curNet)}</b></span>
+                <span class="conn-stat"><span class="conn-stat-lbl"><i class="si-key-sq" style="background:${EXP_C}"></i>${expName} →</span><b>${mf.fmt(curAtoB)}</b></span>
+                <span class="conn-stat"><span class="conn-stat-lbl"><i class="si-key-sq" style="background:${IMP_C}"></i>← ${impName}</span><b>${mf.fmt(curBtoA)}</b></span>
+                <span class="conn-stat" title="${expName} → ${impName} minus ${impName} → ${expName}"><span class="conn-stat-lbl">Net ${cy}</span><b>${fmtSigned(curNet)}</b></span>
             </div>
             ${chart}
             <div class="conn-card-foot">
-                <span class="conn-chart-legend"><i class="cc-sw" style="background:#009EDB"></i>${expName} exports<i class="cc-sw" style="background:#ED1847;margin-left:8px"></i>${impName} exports</span>
-                <button class="conn-detail-btn" onclick="App.openArcModal('${expIso}','${impIso}')">Full history ↗</button>
+                <button class="conn-detail-btn" onclick="App.openArcModal('${expIso}','${impIso}')">Full history and table</button>
             </div>
         </div>`;
     },
@@ -1784,13 +1828,12 @@ const App = {
 
         const region = RegionConfig.getRegion(iso);
         const devStatus = CONFIG.development[iso] === 'north' ? 'Developed' : 'Developing';
-        const regionTag = region && region !== 'Other'
-            ? `<span style="font-size:9px;color:#6E6259">${region} · ${devStatus}</span>` : '';
+        const within = STATE.region && STATE.region !== 'Global' ? ` · within ${STATE.region}` : '';
 
         let content = `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
-            <div style="font-weight:700;color:#004990;font-size:13px;line-height:1.2">${name}</div>
-            ${regionTag}
+        <div class="tt-head">
+            <div class="tt-name">${name}</div>
+            ${region && region !== 'Other' ? `<div class="tt-meta">${region} · ${devStatus}</div>` : ''}
         </div>`;
 
         if (!stats) {
@@ -1800,23 +1843,17 @@ const App = {
         }
 
         const isNetExporter = stats.net >= 0;
-        const balanceColor = isNetExporter ? '#009EDB' : '#ED1847';
-        const roleLabel    = isNetExporter ? 'Net Exporter' : 'Net Importer';
-        const roleBg       = isNetExporter ? 'background:rgba(0,158,219,0.15);color:#009EDB' : 'background:rgba(237,24,71,0.15);color:#ED1847';
-
         content += `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-            <div style="background:#f2f8fc;border:1px solid #DED9D5;border-radius:6px;padding:6px 8px">
-                <div style="font-size:8px;color:#6E6259;text-transform:uppercase;font-weight:700;margin-bottom:2px">${mf.grossLabel.replace(':','')}</div>
-                <div style="font-size:12px;font-weight:700;color:#231F20;font-family:monospace">${mf.fmt(stats.gross)}</div>
+        <div class="tt-figs">
+            <div class="tt-fig">
+                <div class="tt-fig-l">${mf.grossLabel.replace(':', '')}</div>
+                <div class="tt-fig-v">${mf.fmt(stats.gross)}</div>
             </div>
-            <div style="background:#f2f8fc;border:1px solid #DED9D5;border-radius:6px;padding:6px 8px">
-                <div style="font-size:8px;color:#6E6259;text-transform:uppercase;font-weight:700;margin-bottom:2px">${mf.netLabel.replace(':','')}</div>
-                <div style="font-size:12px;font-weight:700;font-family:monospace;color:${balanceColor}">${fmtSigned(stats.net)}</div>
+            <div class="tt-fig">
+                <div class="tt-fig-l">${mf.netLabel.replace(':', '')}</div>
+                <div class="tt-fig-v">${fmtSigned(stats.net)}</div>
+                <div class="tt-role ${isNetExporter ? 'exp' : 'imp'}">${isNetExporter ? 'Net exporter' : 'Net importer'}</div>
             </div>
-        </div>
-        <div style="text-align:center;margin-bottom:8px">
-            <span style="font-size:9px;font-weight:700;padding:2px 10px;border-radius:99px;${roleBg}">${roleLabel}</span>
         </div>`;
 
         const panelFlows = this._panelFlows(iso);
@@ -1845,22 +1882,19 @@ const App = {
                 const shortName = pName.length > 14 ? pName.slice(0, 13) + '…' : pName;
                 const barPct = Math.round((val / maxPVal) * 100);
                 const isExportTo = !!partnerExports[pIso];
-                const arrow = isExportTo ? '→' : '←';
-                const arrowColor = isExportTo ? '#009EDB' : '#ED1847';
+                const color = isExportTo ? '#009EDB' : '#ED1847';
                 return `
-                <div style="display:flex;align-items:center;gap:6px;font-size:10px;margin-bottom:3px">
-                    <span style="color:${arrowColor};font-weight:700;flex-shrink:0">${arrow}</span>
-                    <span style="color:#231F20;width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">${shortName}</span>
-                    <div style="flex:1;height:5px;background:#EBEAE6;border-radius:99px;overflow:hidden">
-                        <div style="width:${barPct}%;height:100%;background:${arrowColor};opacity:0.7;border-radius:99px"></div>
-                    </div>
-                    <span style="color:#6E6259;font-family:monospace;font-size:9px;width:52px;text-align:right;flex-shrink:0">${mf.fmt(val)}</span>
+                <div class="tt-prow">
+                    <span class="tt-arrow" style="color:${color}">${isExportTo ? '→' : '←'}</span>
+                    <span class="tt-pname">${shortName}</span>
+                    <span class="tt-pbar"><span style="width:${barPct}%;background:${color}"></span></span>
+                    <span class="tt-pval">${mf.fmt(val)}</span>
                 </div>`;
             }).join('');
 
             content += `
-            <div style="padding-top:8px;border-top:1px solid #DED9D5;margin-top:2px">
-                <div style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Top Partners · net flow${STATE.region && STATE.region !== 'Global' ? ` · within ${STATE.region}` : ''}</div>
+            <div class="tt-sec">
+                <div class="tt-title">Top partners · net flow${within}</div>
                 ${partnerRows}
             </div>`;
         }
@@ -1879,17 +1913,17 @@ const App = {
                 .map(([cat, val]) => ({ cat, pct: (val / countryTotal) * 100 }));
 
             const barSegments = segments.map(s =>
-                `<div style="width:${s.pct}%;height:100%;background:${CONFIG.flowColors[s.cat]}"></div>`
+                `<span style="width:${s.pct}%;background:${CONFIG.flowColors[s.cat]}"></span>`
             ).join('');
             const labelSpans = segments.map(s =>
-                `<span style="color:${CONFIG.flowColors[s.cat]};font-size:9px;font-weight:700">${catLabels[s.cat]} ${Math.round(s.pct)}%</span>`
-            ).join('<span style="color:#DED9D5;font-size:9px;margin:0 2px">·</span>');
+                `<span class="tt-comp-item"><i style="background:${CONFIG.flowColors[s.cat]}"></i>${catLabels[s.cat]} ${Math.round(s.pct)}%</span>`
+            ).join('<span class="tt-sep">·</span>');
 
             content += `
-            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #DED9D5">
-                <div style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Flow Composition${STATE.region && STATE.region !== 'Global' ? ` · within ${STATE.region}` : ''}</div>
-                <div style="display:flex;height:4px;border-radius:99px;overflow:hidden;gap:1px">${barSegments}</div>
-                <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:5px;flex-wrap:wrap">${labelSpans}</div>
+            <div class="tt-sec">
+                <div class="tt-title">Flow composition${within}</div>
+                <div class="tt-compbar">${barSegments}</div>
+                <div class="tt-comp">${labelSpans}</div>
             </div>`;
         }
 
@@ -1902,21 +1936,20 @@ const App = {
         const maxYV = Math.max(...yVals);
 
         if (maxYV > 0) {
-            const W = 140, H = 28, gap = 1;
+            const W = 140, H = 28, gap = 1.5;
             const barW = (W - gap * (years.length - 1)) / years.length;
             const bars = yVals.map((v, i) => {
                 const h = Math.max(1, (v / maxYV) * H);
                 const x = i * (barW + gap);
                 const isCur = years[i] === STATE.year;
-                return `<rect x="${x}" y="${H - h}" width="${barW}" height="${h}" rx="1.5" fill="${isCur ? '#004990' : '#DED9D5'}" ${isCur ? 'stroke="#0077B8" stroke-width="0.5"' : ''}/>`;
+                return `<rect x="${x}" y="${H - h}" width="${barW}" height="${h}" fill="${isCur ? '#004987' : '#C9C2BB'}"/>`;
             }).join('');
 
             const curIdx = years.indexOf(STATE.year);
             let yoyHtml = '';
             if (curIdx > 0 && yVals[curIdx - 1] > 0) {
                 const yoy = ((yVals[curIdx] - yVals[curIdx - 1]) / yVals[curIdx - 1]) * 100;
-                const yoyCol = yoy >= 0 ? '#72BF44' : '#ED1847';
-                yoyHtml = `<span style="font-size:9px;font-family:monospace;font-weight:700;color:${yoyCol}">${signedPct(yoy, 0)} YoY</span>`;
+                yoyHtml = `<span>${signedPct(yoy, 0)} on prev. year</span>`;
             }
             let cagrHtml = '';
             const firstNonZeroIdx = yVals.findIndex(v => v > 0);
@@ -1924,21 +1957,18 @@ const App = {
                 const n = curIdx - firstNonZeroIdx;
                 const cagr = (Math.pow(yVals[curIdx] / yVals[firstNonZeroIdx], 1 / n) - 1) * 100;
                 if (isFinite(cagr)) {
-                    const cagrCol = cagr >= 0 ? '#72BF44' : '#ED1847';
-                    cagrHtml = `<span style="font-size:8px;font-family:monospace;color:${cagrCol}">CAGR ${signedPct(cagr, 1)}</span>`;
+                    cagrHtml = `<span title="Average annual growth since the first year with trade">${signedPct(cagr, 1)}/yr</span>`;
                 }
             }
 
             content += `
-            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #DED9D5">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-                    <span style="font-size:9px;color:#6E6259;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Gross trade trend</span>
-                    <div style="display:flex;align-items:center;gap:8px">${yoyHtml}${cagrHtml}</div>
+            <div class="tt-sec">
+                <div class="tt-trend-head">
+                    <span class="tt-title">Gross trade trend</span>
+                    <span class="tt-trend-figs">${yoyHtml}${cagrHtml}</span>
                 </div>
-                <svg width="${W}" height="${H}" style="width:100%">${bars}</svg>
-                <div style="display:flex;justify-content:space-between;font-size:8px;color:#AEA29A;font-family:monospace;margin-top:2px">
-                    <span>${years[0]}</span><span>${years[years.length - 1]}</span>
-                </div>
+                <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="tt-trend">${bars}</svg>
+                <div class="tt-years"><span>${years[0]}</span><span>${years[years.length - 1]}</span></div>
             </div>`;
         }
 
@@ -1953,11 +1983,7 @@ const App = {
             const total = regionCountries.length;
             if (rank > 0) {
                 content += `
-                <div style="margin-top:6px;padding-top:6px;border-top:1px solid #DED9D5;font-size:9px;color:#6E6259;display:flex;align-items:center;gap:4px">
-                    <span style="color:#004990;font-weight:700;font-size:10px">#${rank}</span>
-                    <span>of ${total} in ${region} by gross trade</span>
-                    <span style="margin-left:auto;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;${roleBg}">${roleLabel}</span>
-                </div>`;
+                <div class="tt-rank"><b>${ordinal(rank)}</b> <span>of ${total} in ${region} by gross trade</span></div>`;
             }
         }
 
@@ -1969,28 +1995,28 @@ const App = {
         tooltip.style.display = 'block';
         const pad = 15;
         
-        // ツールチップの親コンテナ（マップの枠）のサイズと位置を取得
+        // Size and position of the tooltip's parent (the map frame)
         const container = tooltip.parentElement;
         const rect = container.getBoundingClientRect();
         
-        // コンテナ内でのマウスの相対座標を計算
+        // Mouse position relative to the container
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
 
         const tw = tooltip.offsetWidth;
         const th = tooltip.offsetHeight;
         
-        // 基本はマウスカーソルの右下に配置
+        // Default: below and to the right of the cursor
         let x = mouseX + pad;
         let y = mouseY + pad;
 
-        // 右にはみ出る場合はマウスの左側に反転
+        // Flip to the left of the cursor if it would overflow on the right
         if (x + tw > rect.width - pad) x = mouseX - tw - pad;
         
-        // 下にはみ出る場合はマウスの上側に反転
+        // Flip above the cursor if it would overflow at the bottom
         if (y + th > rect.height - pad) y = mouseY - th - pad;
         
-        // コンテナの左や上にはみ出さないための最終安全措置
+        // Final guard: never past the left or top edge of the container
         if (x < pad) x = pad;
         if (y < pad) y = pad;
 
@@ -2002,17 +2028,12 @@ const App = {
         document.getElementById('tooltip').style.display = 'none';
     },
 
-    toggleMobileLegend() {
+    setLegendCollapsed(collapsed) {
         const panel = document.getElementById('legend-panel');
-        const backdrop = document.getElementById('mobile-legend-backdrop');
-        const isOpen = panel.classList.contains('mobile-open');
-        if (isOpen) {
-            panel.classList.remove('mobile-open');
-            backdrop.classList.add('hidden');
-        } else {
-            panel.classList.add('mobile-open');
-            backdrop.classList.remove('hidden');
-        }
+        const btn = document.getElementById('legend-toggle');
+        if (!panel) return;
+        panel.classList.toggle('collapsed', !!collapsed);
+        btn?.setAttribute('aria-expanded', String(!collapsed));
     },
 
     toggleMobileFilter() {
@@ -2038,11 +2059,18 @@ const App = {
     // node, so the two surfaces cannot drift apart.
     syncControlsFromState() {
         const region = STATE.region || 'Global';
-        document.querySelectorAll('.region-btn').forEach(b =>
-            b.classList.toggle('active', b.dataset.region === region));
+        document.querySelectorAll('.region-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.region === region);
+        });
+        const regionSelect = document.getElementById('region-select');
+        if (regionSelect) {
+            regionSelect.value = region;
+            regionSelect.classList.toggle('is-set', region !== 'Global');
+        }
         const thresh = (STATE.thresholdMode === 'auto' || STATE.thresholdMode == null) ? 'auto' : String(STATE.thresholdMode);
-        document.querySelectorAll('.threshold-btn').forEach(b =>
-            b.classList.toggle('active', b.dataset.threshold === thresh));
+        document.querySelectorAll('.threshold-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.threshold === thresh);
+        });
         this._setActiveTopNButtons(STATE.topNMode == null ? 'all' : String(STATE.topNMode));
         this._setActiveMetricButtons(STATE.metric || 'value');
         this.updateThresholdLabels(STATE.metric || 'value');
@@ -2051,6 +2079,140 @@ const App = {
             const el = document.getElementById(id);
             if (el) el.value = String(STATE.year);
         });
+        this._updateFilterIndicators();
+    },
+
+    // ── Region, view mode, Lines pop-over, reset ──────────────────────────
+
+    // Region change from the filter bar select or the phone sheet buttons. The
+    // pickers list economies of every region, so a region change starts from
+    // an empty selection inside the new region.
+    setRegion(region) {
+        STATE.region = region || 'Global';
+        this.syncControlsFromState();
+        this.exporterSelector.setCountries([]);
+        this.importerSelector.setCountries([]);
+        this.updateDashboard();
+    },
+
+    // The mode follows from the state, so every path that changes it (tabs,
+    // tour, animation hand-back, deep links) shows the right tab.
+    currentMode() {
+        return (TradeMap.lineFilterMode || STATE.bilateralPairs?.length) ? 'connect' : 'explore';
+    },
+
+    async setMode(mode) {
+        this._setDisplayMenu(false);
+        if (mode === 'animate') {
+            startAnimation();          // takes over the screen; Stop hands the view back
+            return;
+        }
+        // Leaving the animation from the tabs: stop it and wait for the hand-back
+        if (document.body.classList.contains('anim-mode')) await stopAnimation();
+        if (mode === 'connect') {
+            if (!STATE.bilateralPairs.length && this._stashedPairs.length) {
+                STATE.bilateralPairs = this._stashedPairs.map(p => ({ ...p }));
+            }
+            this._stashedPairs = [];
+            if (!TradeMap.lineFilterMode) TradeMap.enableLineFilter();
+            this.updateDashboard(false);
+            // Phones: the sheet would cover most of the map, so it opens with the
+            // first connection; until then the on-map hint guides the user.
+            if (STATE.bilateralPairs.length || !isCompact()) this.openConnectionsPanel();
+            else { this.closeInsightPanel(); this.closeConnectionsPanel(); }
+            return;
+        }
+        // Explore: drawn connections are kept aside, the Explore filters apply again
+        if (STATE.bilateralPairs.length) {
+            this._stashedPairs = STATE.bilateralPairs.map(p => ({ ...p }));
+            STATE.bilateralPairs = [];
+        }
+        if (TradeMap.lineFilterMode) TradeMap.disableLineFilter();
+        this.closeConnectionsPanel();
+        this.updateDashboard(false);
+    },
+
+    _applyModeUI() {
+        const mode = this.currentMode();
+        // Connections shown with drawing off (tour, older links): drawing goes on,
+        // so the Connect tab always behaves the same way.
+        if (mode === 'connect' && !TradeMap.lineFilterMode && TradeMap.svg) TradeMap.enableLineFilter();
+        document.body.classList.toggle('mode-connect', mode === 'connect');
+        document.body.classList.toggle('mode-explore', mode === 'explore');
+        const tab = document.body.classList.contains('anim-mode') ? 'animate' : mode;
+        document.querySelectorAll('.js-mode').forEach(b => {
+            const on = b.dataset.mode === tab;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', String(on));
+        });
+    },
+
+    _setDisplayMenu(open) {
+        const menu = document.getElementById('display-menu');
+        const btn = document.getElementById('display-btn');
+        if (!menu) return;
+        menu.classList.toggle('hidden', !open);
+        btn?.setAttribute('aria-expanded', String(!!open));
+        if (!open) return;
+        // Right-aligned by default; if that runs off the left edge (button at the
+        // start of a wrapped row), align it to the button's left instead.
+        menu.classList.add('align-right');
+        if (menu.getBoundingClientRect().left < 8) menu.classList.remove('align-right');
+    },
+
+    // Short text for the Lines button: what limits the lines on the map.
+    _displaySummary() {
+        const labels = this.THRESHOLD_LABELS[STATE.metric] || this.THRESHOLD_LABELS.value;
+        const auto = STATE.thresholdMode === 'auto' || STATE.thresholdMode == null;
+        const topN = STATE.topNMode;
+        if (auto) return topN ? `Top ${topN}` : 'Auto';
+        const floor = `≥ ${labels[String(STATE.thresholdMode)] || STATE.thresholdMode}`;
+        return topN ? `${floor} · top ${topN}` : floor;
+    },
+
+    // How many Explore filters differ from the default view.
+    _activeFilterCount() {
+        let n = 0;
+        if (STATE.region && STATE.region !== 'Global') n++;
+        if (this.exporterSelector?.getSelectedCountries().length) n++;
+        if (this.importerSelector?.getSelectedCountries().length) n++;
+        if ((STATE.flowFilters?.size ?? 4) !== 4) n++;
+        if (!(STATE.thresholdMode === 'auto' || STATE.thresholdMode == null) || STATE.topNMode) n++;
+        return n;
+    },
+
+    _updateFilterIndicators() {
+        const summary = this._displaySummary();
+        const isDefaultLines = summary === 'Auto';
+        const sumEl = document.getElementById('display-summary');
+        if (sumEl) sumEl.textContent = summary;
+        document.getElementById('display-btn')?.classList.toggle('is-set', !isDefaultLines);
+        const mSum = document.getElementById('m-display-summary');
+        if (mSum) mSum.textContent = summary;
+
+        const n = this._activeFilterCount();
+        ['filters-reset', 'm-filters-reset'].forEach(id => {
+            const b = document.getElementById(id);
+            if (b) b.disabled = n === 0;
+        });
+        const badge = document.getElementById('mobile-filter-badge');
+        if (badge) {
+            badge.textContent = n > 0 ? String(n) : '';
+            badge.classList.toggle('visible', n > 0);
+        }
+    },
+
+    // Back to the default Explore view (year and measure stay as chosen).
+    resetFilters() {
+        STATE.region = 'Global';
+        STATE.flowFilters = new Set(['north-south', 'south-north', 'south-south', 'north-north']);
+        STATE.thresholdMode = 'auto';
+        STATE.topNMode = null;
+        this.exporterSelector.setCountries([]);
+        this.importerSelector.setCountries([]);
+        this._prevSelectionCount = 0;
+        this.syncControlsFromState();
+        this.updateDashboard();
     },
 
     // Snapshot of everything the user can set, so a guided tour or the animation
@@ -2066,6 +2228,7 @@ const App = {
             exporters:      this.exporterSelector ? this.exporterSelector.getSelectedCountries() : [],
             importers:      this.importerSelector ? this.importerSelector.getSelectedCountries() : [],
             bilateralPairs: (STATE.bilateralPairs || []).map(p => ({ exporter: p.exporter, importer: p.importer })),
+            stashedPairs:   this._stashedPairs.map(p => ({ exporter: p.exporter, importer: p.importer })),
             lineFilterMode: !!TradeMap.lineFilterMode,
         };
     },
@@ -2093,6 +2256,7 @@ const App = {
         // The restored selection is not a "selection was just cleared" transition,
         // so the threshold auto-reset in updateDashboard must not fire.
         this._prevSelectionCount = s.exporters.length + s.importers.length;
+        if (Array.isArray(s.stashedPairs)) this._stashedPairs = s.stashedPairs.map(p => ({ ...p }));
         this.syncControlsFromState();
         this.updateDashboard(false);
         this._updateLineFilterUI({ active: TradeMap.lineFilterMode, stage: 'export' });

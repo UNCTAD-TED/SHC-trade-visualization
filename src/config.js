@@ -74,6 +74,16 @@ export const METRIC_FORMAT = {
 
 // Signed figure: "+$5.00M" / "−$5.00M" / "$0". Used wherever a net balance or a
 // net flow is shown, so direction never depends on colour alone.
+// Phone layout (bottom bar + filter sheet). Keep in sync with @compact in
+// src/styles/variables.less.
+export const COMPACT_MQ = '(max-width: 767px), (max-height: 500px) and (max-width: 1024px)';
+export const isCompact = () =>
+    typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(COMPACT_MQ).matches;
+export const isCompactTall = () =>
+    typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(max-width: 767px) and (min-height: 501px)').matches;
+export const isCompactShort = () =>
+    typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(max-height: 500px) and (max-width: 1024px)').matches;
+
 export function fmtSigned(v, metric = STATE.metric) {
     const mf = METRIC_FORMAT[metric] || METRIC_FORMAT.value;
     return (v > 0 ? '+' : '') + mf.fmt(v);

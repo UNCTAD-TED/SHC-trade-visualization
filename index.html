@@ -2,291 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Global Second-Hand Clothes Trade Monitor</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css">
-    <style>
-        /* 1. KPIバーの上の線を非表示にする */
-        #main-header { border-bottom: none !important; }
-        #kpi-bar { border-top: none !important; box-shadow: none !important; }
-
-        /* 2. 画面の一番下に水色の線を配置する */
-        body {
-            border-bottom: 4px solid #009edb !important;
-        }
-
-        /* 3. KPIバーとLegendの背景色を変更する */
-        #kpi-bar, #legend-panel {
-            background-color: #f2f8fc !important;
-        }
-
-        /* ── Animate button ── */
-        #anim-btn {
-            display: flex; align-items: center; gap: 5px;
-            padding: 3px 10px; font-size: 12px; font-family: Inter, Arial, sans-serif;
-            border: 1px solid #009edb; border-radius: 5px;
-            background: transparent; color: #009edb; cursor: pointer; white-space: nowrap;
-            transition: background 0.15s, color 0.15s;
-        }
-        #anim-btn:hover { background: #009edb; color: #fff; }
-
-        /* ── Fact Sheet page link ── */
-        #factsheet-link {
-            display: flex; align-items: center; gap: 5px;
-            padding: 3px 11px; font-size: 12px; font-weight: 600;
-            font-family: Inter, Arial, sans-serif; text-decoration: none;
-            border: 1px solid #b4501f; border-radius: 5px;
-            background: #b4501f; color: #fff; cursor: pointer; white-space: nowrap;
-            transition: background 0.15s, box-shadow 0.15s;
-        }
-        #factsheet-link:hover { background: #8c3c15; box-shadow: 0 2px 8px rgba(180,80,31,0.3); }
-        #factsheet-link svg { flex-shrink: 0; }
-
-        /* ── CSV export button + dropdown ── */
-        #export-wrapper { position: relative; }
-        #export-btn {
-            display: flex; align-items: center;
-            padding: 6px 12px; font-size: 12px; font-weight: 600;
-            font-family: Inter, Arial, sans-serif;
-            border: 1px solid #009edb; border-radius: 999px;
-            background: #fff; color: #0077B8; cursor: pointer; white-space: nowrap;
-            transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-        }
-        #export-btn:hover { background: #009edb; color: #fff; box-shadow: 0 2px 10px rgba(0,158,219,0.35); }
-        #export-btn[aria-expanded="true"] { background: #009edb; color: #fff; }
-
-        #export-menu {
-            position: absolute; top: calc(100% + 6px); right: 0;
-            width: 260px; background: #fff;
-            border: 1px solid #ded9d5; border-radius: 8px;
-            box-shadow: 0 6px 24px rgba(0,29,61,0.18);
-            z-index: 70; padding: 6px;
-            font-family: Inter, Arial, sans-serif;
-        }
-        #export-menu.hidden { display: none; }
-        .export-menu-hdr {
-            display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-            font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
-            text-transform: uppercase; color: #aea29a;
-            padding: 4px 8px 6px;
-        }
-        .export-scope {
-            font-size: 10px; font-weight: 700; letter-spacing: 0;
-            text-transform: none; color: #0077B8; text-align: right;
-        }
-
-        /* ── Focus-anchored CSV buttons (country panel + corridor modal) ── */
-        .focus-export-btn {
-            display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
-            margin-right: 8px;
-            padding: 4px 9px; font-size: 11px; font-weight: 700;
-            font-family: Inter, Arial, sans-serif;
-            border: 1px solid #009edb; border-radius: 6px;
-            background: #fff; color: #0077B8; cursor: pointer; white-space: nowrap;
-            transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-        }
-        .focus-export-btn:hover { background: #009edb; color: #fff; box-shadow: 0 2px 8px rgba(0,158,219,0.3); }
-        .focus-export-btn svg { flex-shrink: 0; }
-        .export-opt {
-            display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-            width: 100%; text-align: left; cursor: pointer;
-            padding: 8px; border: none; border-radius: 6px; background: transparent;
-            transition: background 0.12s;
-        }
-        .export-opt:hover { background: #f2f8fc; }
-        .export-opt-title { font-size: 12px; font-weight: 700; color: #004990; }
-        .export-opt-sub { font-size: 10px; color: #6e6259; }
-        .export-menu-foot {
-            font-size: 9px; color: #aea29a; font-style: italic;
-            padding: 6px 8px 2px; margin-top: 2px; border-top: 1px solid #ebeae6; line-height: 1.3;
-        }
-
-        /* ── Right-side anim controls (hidden normally) ── */
-        #anim-header-right {
-            display: none; align-items: center; gap: 16px; flex-shrink: 0;
-        }
-        #anim-smep-logo {
-            height: 28px; width: auto; opacity: 0.65;
-        }
-        #anim-stop-btn {
-            display: flex; align-items: center; gap: 5px;
-            padding: 3px 12px; font-size: 12px; font-family: Inter, Arial, sans-serif;
-            border: none; border-radius: 5px; background: #eb1f48;
-            color: #fff; cursor: pointer; white-space: nowrap;
-        }
-
-        /* ── Animation mode: hide controls ── */
-        body.anim-mode .header-controls,
-        body.anim-mode #legend-panel,
-        body.anim-mode #kpi-bar,
-        body.anim-mode #map-footer,
-        body.anim-mode #insight-panel,
-        body.anim-mode #arc-modal,
-        body.anim-mode #compare-modal,
-        body.anim-mode #mobile-legend-btn,
-        body.anim-mode #fit-screen-btn,
-        body.anim-mode #mobile-filter-btn { display: none !important; }
-
-        /* Switch header to single row and show right controls */
-        body.anim-mode #main-header  { border-bottom: 1px solid #ded9d5 !important; }
-        body.anim-mode .header-inner {
-            flex-direction: row !important;
-            align-items: center !important;
-        }
-        body.anim-mode .header-title {
-            padding: 6px 0 !important;  /* ギャップを詰める */
-            flex: 1;
-        }
-        body.anim-mode #anim-header-right { display: flex !important; }
-
-        /* ── Panel / map split ratio ───────────────────────────────
-           25% = 1:3  |  30% = 3:7  |  35% = 1:2                 */
-        body.anim-mode { --anim-panel-w: 30%; }
-
-        body.anim-mode .map-area {
-            display: flex !important;
-            flex-direction: row !important;
-        }
-        body.anim-mode #map-container {
-            position: relative !important;
-            inset: auto !important;
-            width: auto !important;
-            height: 100% !important;
-            flex: 1;
-            min-width: 0;
-            order: 1;
-        }
-        body.anim-mode #anim-panel {
-            position: relative !important;
-            left: auto !important; top: auto !important; bottom: auto !important;
-            width: var(--anim-panel-w) !important;
-            height: 100% !important;
-            flex-shrink: 0;
-            border-radius: 0 !important;
-            order: 2;
-        }
-
-        /* ── Bar chart race panel (base styles) ── */
-        #anim-panel {
-            position: absolute;
-            left: 0; top: 0; bottom: 0;
-            width: 272px;
-            background: #fff;
-            border-right: 1px solid #ded9d5;
-            border-radius: 0;
-            box-shadow: 2px 0 8px rgba(0,0,0,0.07);
-            z-index: 20;
-            font-family: Inter, "Helvetica Neue", Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* Panel header — year display */
-        .ap-header {
-            display: flex; align-items: baseline; gap: 8px;
-            padding: 10px 14px 8px;
-            border-bottom: 1px solid #ebeae6;
-            flex-shrink: 0;
-        }
-        #ap-year { font-size: 28px; font-weight: 700; color: #004990; line-height: 1; }
-        .ap-range { font-size: 11px; color: #aea29a; }
-
-        /* Each section — fixed height, no flex growth */
-        .ap-section {
-            display: flex; flex-direction: column;
-            flex-shrink: 0;
-            padding: 7px 12px 4px;
-        }
-        .ap-label {
-            font-size: 10px; font-weight: 600; letter-spacing: 1px;
-            margin-bottom: 4px; flex-shrink: 0;
-        }
-        .ap-export { color: #009edb; }
-        .ap-import { color: #ed1847; }
-
-        /* Chart area: exactly 10 rows tall — no empty space below bars */
-        .ap-chart { position: relative; height: 270px; flex-shrink: 0; overflow: hidden; }
-
-        /* Divider between export and import */
-        .ap-sep { height: 1px; background: #ebeae6; flex-shrink: 0; }
-
-        /* Timeline at the bottom */
-        .ap-timeline-wrap { padding: 7px 12px 10px; flex-shrink: 0; }
-        .ap-tl-track { height: 3px; background: #ebeae6; border-radius: 2px; overflow: hidden; }
-        #ap-tl-fill {
-            height: 100%; background: #009edb; border-radius: 2px;
-            width: 0%; transition: width 0.75s ease;
-        }
-
-        /* ── Bar chart row elements ── */
-        .ap-row {
-            position: absolute; left: 0; top: 0; width: 100%;
-            height: 27px; display: flex; align-items: center;
-            will-change: transform, opacity;
-        }
-
-        /* Flag icon + ISO3 label */
-        .ap-flag {
-            width: 66px; flex-shrink: 0;
-            font-size: 11.5px; color: #231f20;
-            white-space: nowrap; overflow: hidden; line-height: 27px;
-            display: flex; align-items: center; gap: 4px;
-        }
-        .ap-flag .fi {
-            width: 16px; height: 12px;
-            flex-shrink: 0; border-radius: 1px;
-        }
-
-        /* Bar */
-        .ap-bar-wrap { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; }
-        .ap-bar { height: 7px; border-radius: 0; opacity: 0.82; flex-shrink: 0; min-width: 2px; }
-
-        /* Value label */
-        .ap-val {
-            font-size: 10px; font-family: Inter, monospace;
-            color: #6e6259; white-space: nowrap; flex-shrink: 0;
-        }
-
-        /* ── Map annotation legend (shown during animation mode) ── */
-        #anim-legend {
-            position: absolute;
-            bottom: 18px;
-            left: 12px;
-            background: rgba(255,255,255,0.93);
-            border: 1px solid #ded9d5;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 11px;
-            font-family: Inter, "Helvetica Neue", Arial, sans-serif;
-            color: #3a3530;
-            pointer-events: none;
-            z-index: 15;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.09);
-        }
-        .al-section { margin-bottom: 4px; }
-        .al-section:last-child { margin-bottom: 0; }
-        .al-section-title {
-            font-size: 8.5px; font-weight: 700; color: #aea29a;
-            text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px;
-        }
-        .al-divider { height: 1px; background: #ebeae6; margin: 5px 0; }
-        .al-row { display: flex; gap: 10px; align-items: center; }
-        .al-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-        .al-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .al-swatch { width: 14px; height: 4px; border-radius: 1px; flex-shrink: 0; }
-        .al-muted { color: #aea29a; font-size: 10px; white-space: nowrap; }
-        .al-dash {
-            width: 18px; height: 0;
-            border-top: 2px dashed rgba(80,80,80,0.45);
-            flex-shrink: 0;
-        }
-    </style>
 </head>
-<body>
+<body class="mode-explore">
 
-    <!-- ── UNCTAD Header ── -->
+    <!-- ── Header: title · view modes · help and download ── -->
     <header id="main-header">
         <div class="header-inner">
 
@@ -294,259 +17,274 @@
                 <img src="assets/unctad-icon.svg" alt="UNCTAD" class="header-logo">
                 <div class="header-text">
                     <h3>Global Second-Hand Clothes Trade Monitor</h3>
-                    <h4>UNCTAD &middot; SMEP project &middot; Source: BACI based on UN Comtrade (HS 6309: Worn clothing and other worn articles)</h4>
+                    <h4>UN Trade and Development (UNCTAD) &middot; Sustainable Manufacturing and Environmental Pollution (SMEP) Programme &middot; HS&nbsp;6309 worn clothing</h4>
                 </div>
             </div>
 
-            <div class="header-controls">
+            <!-- View modes: what the map does. Phones get the same buttons in #mobile-nav. -->
+            <nav class="mode-tabs" aria-label="View mode">
+                <button id="mode-explore-btn" class="mode-tab js-mode active" data-mode="explore" type="button" aria-pressed="true" title="Explore: filter the trade flows by year, region, country and direction">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
+                    Explore
+                </button>
+                <button id="linefilter-btn" class="mode-tab js-mode" data-mode="connect" type="button" aria-pressed="false" title="Connect: click two countries on the map to draw and compare their trade">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M6.7 7.6 17.3 16.4"/></svg>
+                    Connect
+                </button>
+                <button id="anim-btn" class="mode-tab js-mode" data-mode="animate" type="button" aria-pressed="false" title="Animate: play 2015–2024 as a bar-chart race">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor" stroke="none"/></svg>
+                    Animate
+                </button>
+            </nav>
 
-                <div class="ctrl-divider"></div>
-
-                <!-- Region filter -->
-                <div class="ctrl-pill" id="region-group">
-                    <button class="region-btn btn-toggle active" data-region="Global" title="Global">All</button>
-                    <button class="region-btn btn-toggle" data-region="Africa"   title="Africa">Africa</button>
-                    <button class="region-btn btn-toggle" data-region="Americas" title="Americas">Americas</button>
-                    <button class="region-btn btn-toggle" data-region="Asia"     title="Asia">Asia</button>
-                    <button class="region-btn btn-toggle" data-region="Europe"   title="Europe">Europe</button>
-                    <button class="region-btn btn-toggle" data-region="Oceania"  title="Oceania">Oceania</button>
-                </div>
-
-                <div class="ctrl-divider"></div>
-
-                <!-- Year select -->
-                <div class="ctrl-pill">
-                    <select id="year-select" class="ctrl-year">
-                        <option value="2024" selected>2024</option>
-                        <option value="2023">2023</option>
-                        <option value="2022">2022</option>
-                        <option value="2021">2021</option>
-                        <option value="2020">2020</option>
-                        <option value="2019">2019</option>
-                        <option value="2018">2018</option>
-                        <option value="2017">2017</option>
-                        <option value="2016">2016</option>
-                        <option value="2015">2015</option>
-                    </select>
-                </div>
-
-                <div class="ctrl-divider"></div>
-
-                <!-- Metric toggle: trade value (USD) vs trade weight (tonnes) -->
-                <div class="ctrl-pill" id="metric-group" title="Switch between trade value (USD) and trade weight (tonnes)">
-                    <button class="metric-btn btn-toggle active" data-metric="value">Value</button>
-                    <button class="metric-btn btn-toggle" data-metric="weight">Weight</button>
-                </div>
-
-                <!-- Flow direction filter -->
-                <div class="ctrl-pill" id="flow-filter-group" title="Filter by economic flow direction">
-                    <span class="ctrl-flows-label">Flows</span>
-                    <label class="flow-label flow-ns" title="Trade from developed to developing economies">
-                        <input type="checkbox" class="flow-checkbox" value="north-south" checked>
-                        <span>North &rarr; South</span>
-                    </label>
-                    <label class="flow-label flow-sn" title="Trade from developing to developed economies">
-                        <input type="checkbox" class="flow-checkbox" value="south-north" checked>
-                        <span>South &rarr; North</span>
-                    </label>
-                    <label class="flow-label flow-ss" title="Trade between developing economies">
-                        <input type="checkbox" class="flow-checkbox" value="south-south" checked>
-                        <span>South &rarr; South</span>
-                    </label>
-                    <label class="flow-label flow-nn" title="Trade between developed economies">
-                        <input type="checkbox" class="flow-checkbox" value="north-north" checked>
-                        <span>North &rarr; North</span>
-                    </label>
-                </div>
-
-                <div id="threshold-divider" class="ctrl-divider"></div>
-
-                <!-- Threshold filter -->
-                <div id="threshold-group" class="ctrl-pill" title="Visibility threshold — minimum trade flow (value or weight) to display">
-                    <button class="threshold-btn btn-toggle active" data-threshold="auto">Auto</button>
-                    <button class="threshold-btn btn-toggle" data-threshold="10000000">$10M</button>
-                    <button class="threshold-btn btn-toggle" data-threshold="1000000">$1M</button>
-                    <button class="threshold-btn btn-toggle" data-threshold="500000">$500k</button>
-                    <button class="threshold-btn btn-toggle" data-threshold="100000">$100k</button>
-                    <button class="threshold-btn btn-toggle" data-threshold="10000">$10k</button>
-                </div>
-
-                <div id="topn-divider" class="ctrl-divider"></div>
-
-                <!-- Top-N line limit — how many trade lines to draw, largest first.
-                     Metric-independent, so it survives a value ⇄ weight switch. -->
-                <div id="topn-group" class="ctrl-pill" title="Draw only the N largest net flows. With Auto it replaces the automatic limit; with a fixed threshold both apply.">
-                    <span class="ctrl-flows-label">Lines</span>
-                    <button class="topn-btn btn-toggle active" data-topn="all">All</button>
-                    <button class="topn-btn btn-toggle" data-topn="50">50</button>
-                    <button class="topn-btn btn-toggle" data-topn="100">100</button>
-                    <button class="topn-btn btn-toggle" data-topn="200">200</button>
-                    <button class="topn-btn btn-toggle" data-topn="500">500</button>
-                </div>
-
-                <div class="ctrl-divider"></div>
-
-                <!-- Exporter picker -->
-                <div class="picker-wrapper">
-                    <button id="exp-btn" class="country-picker-btn">
-                        <div class="picker-labels">
-                            <span class="picker-type">Exporter (From)</span>
-                            <span id="exp-label" class="picker-value">All Exporters</span>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:4px">
-                            <span id="exp-count" class="picker-badge hidden"></span>
-                            <svg class="picker-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                        </div>
-                    </button>
-                    <div id="exp-menu" class="country-picker-menu hidden">
-                        <div class="picker-search-area">
-                            <input type="text" id="exp-search" placeholder="Search Exporter...">
-                            <button id="exp-clear-all" class="picker-clear">Clear</button>
-                        </div>
-                        <div id="exp-list" class="picker-list"></div>
-                    </div>
-                </div>
-
-                <!-- Importer picker -->
-                <div class="picker-wrapper">
-                    <button id="imp-btn" class="country-picker-btn">
-                        <div class="picker-labels">
-                            <span class="picker-type">Importer (To)</span>
-                            <span id="imp-label" class="picker-value">All Importers</span>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:4px">
-                            <span id="imp-count" class="picker-badge hidden" style="background:#b45309"></span>
-                            <svg class="picker-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                        </div>
-                    </button>
-                    <div id="imp-menu" class="country-picker-menu hidden">
-                        <div class="picker-search-area">
-                            <input type="text" id="imp-search" placeholder="Search Importer...">
-                            <button id="imp-clear-all" class="picker-clear">Clear</button>
-                        </div>
-                        <div id="imp-list" class="picker-list"></div>
-                    </div>
-                </div>
-
-                <div class="ctrl-divider"></div>
-
-                <!-- Interactive line filter: draw connections between countries on the map -->
-                <div class="ctrl-pill" title="Draw connections between two countries on the map">
-                    <button id="linefilter-btn" class="btn-toggle" type="button">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px">
-                            <circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M6.7 7.6 17.3 16.4"/>
-                        </svg>Connect
-                    </button>
-                    <button id="linefilter-clear" class="btn-toggle hidden" type="button">Clear</button>
-                </div>
-
-                <div class="ctrl-divider"></div>
-
-                <!-- CSV export — current map view (country / corridor exports live in the panels) -->
+            <!-- Help and download -->
+            <div class="header-utils">
+                <button id="tour-btn" class="util-btn" type="button" title="Guided tour of the monitor" aria-label="Guided tour">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6"/><circle cx="12" cy="16.9" r=".7" fill="currentColor" stroke="none"/></svg>
+                    <span class="util-label">Guided tour</span>
+                </button>
+                <button id="methodology-btn" class="util-btn js-open-methodology" type="button" title="Methodology and data sources" aria-label="Methodology and data sources">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".7" fill="currentColor" stroke="none"/></svg>
+                    <span class="util-label">Methodology</span>
+                </button>
+                <!-- CSV export of the current view (country / corridor exports live in the panels) -->
                 <div class="picker-wrapper" id="export-wrapper">
-                    <button id="export-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Download the flows of the current region or selection as a CSV table">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Export view
+                    <button id="export-btn" class="util-btn util-btn-primary" type="button" aria-haspopup="true" aria-expanded="false" title="Download the flows of the current view as a CSV table" aria-label="Download">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+                        <span class="util-label">Download</span>
                     </button>
                     <div id="export-menu" class="export-menu hidden" role="menu">
                         <div class="export-menu-hdr">
                             <span>Current view</span>
                             <span id="export-scope" class="export-scope">—</span>
                         </div>
-                        <button class="export-opt" data-export="flows" role="menuitem">
-                            <span class="export-opt-title">Trade flows</span>
+                        <button class="export-opt" data-export="flows" role="menuitem" type="button">
+                            <span class="export-opt-title">Trade flows (CSV)</span>
                             <span class="export-opt-sub">One row per net flow · net value and weight, gross flow and unit value</span>
                         </button>
-                        <button class="export-opt" data-export="summary" role="menuitem">
-                            <span class="export-opt-title">Country summary</span>
+                        <button class="export-opt" data-export="summary" role="menuitem" type="button">
+                            <span class="export-opt-title">Country summary (CSV)</span>
                             <span class="export-opt-sub">Ranked · net flows in this view, role, top partner, HHI</span>
                         </button>
-                        <div class="export-menu-foot">Tip: click a country for its own data, or click a flow line for that corridor's history. Exports include every flow in the current region or selection: the display threshold is not applied, the Lines limit and flow-direction filters are.</div>
+                        <div class="export-menu-foot">Covers every net flow in the current region or selection, or your drawn connections. The minimum flow size is ignored; the Lines limit and the flow-direction filters are applied. For one country or one corridor, use the CSV button in its panel.</div>
                     </div>
                 </div>
+            </div>
 
-                <button id="tour-btn" title="Take a guided tour of the visualization">Tour</button>
-                <button id="anim-btn" title="Auto-play 2015–2024 with bar chart race">&#9654; Animate</button>
-                <!-- <a id="factsheet-link" href="factsheet.html" title="Open the SMEP fact sheet">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
-                    SMEP Fact Sheet　preview
-                </a> -->
-
-            </div><!-- /.header-controls -->
-
-            <!-- Right-side controls — only visible during animation mode -->
+            <!-- Shown only while the animation runs -->
             <div id="anim-header-right">
-              <img id="anim-smep-logo" src="/assets/smep-logo.png" alt="SMEP / UNCTAD / UK Aid" />
-              <button id="anim-stop-btn" title="Stop animation">&#9632; Stop</button>
+                <img id="anim-smep-logo" src="assets/smep-logo.png" alt="SMEP / UNCTAD / UK International Development">
+                <button id="anim-stop-btn" type="button" title="Stop the animation and return to the map"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" fill="currentColor"/></svg>Stop</button>
             </div>
 
         </div><!-- /.header-inner -->
     </header>
 
-    <!-- ── Legend Bar (between filters and KPI) ── -->
-    <div id="legend-panel">
-        <div class="legend-mobile-header">
-            <span>Legend</span>
-            <button id="mobile-legend-close" class="btn-close">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-        <div id="legend-content"></div>
-        <div id="total-stats">
-            <div class="stat-row">
-                <span class="stat-label" title="Net flows drawn on the map">Shown</span>
-                <span class="stat-val" id="stat-value">—</span>
+    <!-- ── Filter bar (tablets and computers; phones use #mobile-filter-panel) ── -->
+    <div id="filter-bar" role="toolbar" aria-label="Filters">
+        <div class="filter-inner">
+
+            <div class="fctl" id="year-group">
+                <label class="fctl-label fctl-label-opt" for="year-select">Year</label>
+                <select id="year-select" class="fselect" title="Year">
+                    <option value="2024" selected>2024</option>
+                    <option value="2023">2023</option>
+                    <option value="2022">2022</option>
+                    <option value="2021">2021</option>
+                    <option value="2020">2020</option>
+                    <option value="2019">2019</option>
+                    <option value="2018">2018</option>
+                    <option value="2017">2017</option>
+                    <option value="2016">2016</option>
+                    <option value="2015">2015</option>
+                </select>
             </div>
-            <div class="stat-row">
-                <span class="stat-label" title="All net flows in the current region or selection, before the threshold, Lines limit and flow-direction filters">Total</span>
-                <span class="stat-secondary" id="stat-bilateral">—</span>
+
+            <!-- Metric: trade value (USD) or trade weight (tonnes) -->
+            <div class="fctl" id="metric-group" title="Trade value (US dollars) or trade weight (tonnes)">
+                <span class="fctl-label fctl-label-opt">Measure</span>
+                <fieldset class="seg" aria-label="Measure">
+                    <button class="metric-btn seg-btn active" data-metric="value" type="button">Value</button>
+                    <button class="metric-btn seg-btn" data-metric="weight" type="button">Weight</button>
+                </fieldset>
             </div>
-            <span id="stat-coverage"></span>
-        </div>
-        <div class="legend-footer">
-            <img src="assets/smep-logo.png" alt="SMEP">
+
+            <span class="fsep explore-only"></span>
+
+            <!-- Region: only flows with both partners in the region -->
+            <div class="fctl explore-only" id="region-group" title="Show trade within one region (both partners in the region)">
+                <label class="fctl-label fctl-label-opt" for="region-select">Region</label>
+                <select id="region-select" class="fselect">
+                    <option value="Global" selected>World</option>
+                    <option value="Africa">Africa</option>
+                    <option value="Americas">Americas</option>
+                    <option value="Asia">Asia</option>
+                    <option value="Europe">Europe</option>
+                    <option value="Oceania">Oceania</option>
+                </select>
+            </div>
+
+            <!-- Exporter picker -->
+            <div class="fctl explore-only picker-wrapper">
+                <button id="exp-btn" class="country-picker-btn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Only net flows from the selected economies">
+                    <div class="picker-labels">
+                        <span class="picker-type">From</span>
+                        <span id="exp-label" class="picker-value">All Exporters</span>
+                    </div>
+                    <div class="picker-trailing">
+                        <span id="exp-count" class="picker-badge hidden"></span>
+                        <svg class="picker-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                </button>
+                <div id="exp-menu" class="country-picker-menu hidden">
+                    <div class="picker-search-area">
+                        <input type="text" id="exp-search" placeholder="Search exporters…" aria-label="Search exporters">
+                        <button id="exp-clear-all" class="picker-clear" type="button">Clear</button>
+                        <button class="picker-done" type="button">Done</button>
+                    </div>
+                    <div id="exp-list" class="picker-list"></div>
+                </div>
+            </div>
+
+            <!-- Importer picker -->
+            <div class="fctl explore-only picker-wrapper">
+                <button id="imp-btn" class="country-picker-btn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Only net flows to the selected economies">
+                    <div class="picker-labels">
+                        <span class="picker-type">To</span>
+                        <span id="imp-label" class="picker-value">All Importers</span>
+                    </div>
+                    <div class="picker-trailing">
+                        <span id="imp-count" class="picker-badge importer hidden"></span>
+                        <svg class="picker-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                </button>
+                <div id="imp-menu" class="country-picker-menu hidden">
+                    <div class="picker-search-area">
+                        <input type="text" id="imp-search" placeholder="Search importers…" aria-label="Search importers">
+                        <button id="imp-clear-all" class="picker-clear" type="button">Clear</button>
+                        <button class="picker-done" type="button">Done</button>
+                    </div>
+                    <div id="imp-list" class="picker-list"></div>
+                </div>
+            </div>
+
+            <span class="fsep"></span>
+
+            <!-- Flow direction: the chips double as the line-colour key -->
+            <fieldset class="fctl" id="flow-filter-group" aria-label="Flow direction">
+                <span class="fctl-label">Flows</span>
+                <div class="flow-chips">
+                    <label class="flow-chip flow-ns" title="North → South: from developed to developing economies">
+                        <input type="checkbox" class="flow-checkbox" value="north-south" checked>
+                        <span class="chip-body"><span class="chip-swatch"></span>N&rarr;S</span>
+                    </label>
+                    <label class="flow-chip flow-sn" title="South → North: from developing to developed economies">
+                        <input type="checkbox" class="flow-checkbox" value="south-north" checked>
+                        <span class="chip-body"><span class="chip-swatch"></span>S&rarr;N</span>
+                    </label>
+                    <label class="flow-chip flow-ss" title="South → South: between developing economies">
+                        <input type="checkbox" class="flow-checkbox" value="south-south" checked>
+                        <span class="chip-body"><span class="chip-swatch"></span>S&rarr;S</span>
+                    </label>
+                    <label class="flow-chip flow-nn" title="North → North: between developed economies">
+                        <input type="checkbox" class="flow-checkbox" value="north-north" checked>
+                        <span class="chip-body"><span class="chip-swatch"></span>N&rarr;N</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <!-- Lines on the map: minimum flow size and number of lines -->
+            <div class="fctl explore-only picker-wrapper" id="display-wrapper">
+                <button id="display-btn" class="fbtn" type="button" aria-haspopup="true" aria-expanded="false" title="Which flows are drawn: minimum flow size and maximum number of lines">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h11M4 17h6"/></svg>
+                    <span class="fbtn-k">Lines</span>
+                    <span id="display-summary">Auto</span>
+                    <svg class="picker-chevron" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div id="display-menu" class="pop-menu align-right hidden" role="dialog" aria-label="Lines on the map">
+                    <div class="pop-sec">
+                        <div class="pop-title">Minimum flow size</div>
+                        <fieldset id="threshold-group" class="seg seg-wrap" aria-label="Minimum flow size">
+                            <button class="threshold-btn seg-btn active" data-threshold="auto" type="button">Auto</button>
+                            <button class="threshold-btn seg-btn" data-threshold="10000000" type="button">$10M</button>
+                            <button class="threshold-btn seg-btn" data-threshold="1000000" type="button">$1M</button>
+                            <button class="threshold-btn seg-btn" data-threshold="500000" type="button">$500K</button>
+                            <button class="threshold-btn seg-btn" data-threshold="100000" type="button">$100K</button>
+                            <button class="threshold-btn seg-btn" data-threshold="10000" type="button">$10K</button>
+                        </fieldset>
+                        <p class="pop-hint"><b>Auto</b> draws the largest net flows, at most 40, and none below a minimum that depends on the view (world, a region, or the countries picked), so a region may show only a few lines. A fixed value draws every net flow at or above it.</p>
+                    </div>
+                    <div class="pop-sec">
+                        <div class="pop-title">Maximum number of lines</div>
+                        <fieldset id="topn-group" class="seg seg-wrap" aria-label="Maximum number of lines">
+                            <button class="topn-btn seg-btn active" data-topn="all" type="button">All</button>
+                            <button class="topn-btn seg-btn" data-topn="50" type="button">50</button>
+                            <button class="topn-btn seg-btn" data-topn="100" type="button">100</button>
+                            <button class="topn-btn seg-btn" data-topn="200" type="button">200</button>
+                            <button class="topn-btn seg-btn" data-topn="500" type="button">500</button>
+                        </fieldset>
+                        <p class="pop-hint">Draws only the N largest net flows. With <b>Auto</b> it replaces both the automatic minimum and the 40-line cap; with a fixed value both limits apply.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Connect mode: replaces the region / country / line controls -->
+            <div class="connect-tools connect-only" id="connect-tools">
+                <span class="connect-step">
+                    <span class="connect-step-icon" aria-hidden="true">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M6.7 7.6 17.3 16.4"/></svg>
+                    </span>
+                    <span id="connect-hint">Click an <b>exporter</b> on the map, then an <b>importer</b>.</span>
+                </span>
+                <button id="linefilter-clear" class="fbtn fbtn-danger hidden" type="button">Clear connections</button>
+            </div>
+
+            <button id="filters-reset" class="fbtn fbtn-ghost explore-only" type="button" title="Back to the world view with all countries and flow directions and Auto lines (year and measure are kept)" disabled>Reset</button>
+
         </div>
     </div>
 
-    <!-- ── KPI Bar ── -->
+    <!-- ── Key figures for the current view ── -->
     <div id="kpi-bar">
         <div class="kpi-inner">
-            <div class="kpi-item" title="Active filter: region or country selection">
-                <span class="kpi-label">Filter</span>
-                <span class="kpi-value" id="kpi-scope">Global</span>
+            <div class="kpi-item kpi-scope" title="What the figures and the map cover">
+                <span class="kpi-label">View</span>
+                <span class="kpi-value" id="kpi-scope">World</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="Sum of the net flows drawn on the map — after the threshold, Lines limit and flow-direction filters">
-                <span class="kpi-label">Shown</span>
+            <div class="kpi-item" title="Sum of the net flows drawn on the map, and its share of all net flows in the current region or selection (before the minimum flow size, the Lines limit and the flow-direction filters)">
+                <span class="kpi-label">On map</span>
                 <span class="kpi-value" id="kpi-total">—</span>
+                <span class="kpi-sub"><span id="stat-coverage">—</span> of <span id="stat-bilateral">—</span></span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item" title="Number of net flows drawn on the map — after the threshold, Lines limit and flow-direction filters">
-                <span class="kpi-label">Corridors</span>
+            <div class="kpi-item" title="Number of net flows drawn on the map">
+                <span class="kpi-label">Lines</span>
                 <span class="kpi-value" id="kpi-flows">—</span>
             </div>
             <div class="kpi-divider"></div>
             <div class="kpi-item" title="Number of economies connected by the flows drawn on the map">
-                <span class="kpi-label">Countries</span>
+                <span class="kpi-label">Economies</span>
                 <span class="kpi-value" id="kpi-countries">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item kpi-item-col" title="Largest net exporter (exports minus imports) over all flows in the current region or selection — before the threshold, Lines limit and flow-direction filters">
-                <span class="kpi-label">#1 Exporter</span>
+            <div class="kpi-item" title="Largest net exporter (exports minus imports) over all flows in the current region or selection — before the minimum flow size, the Lines limit and the flow-direction filters">
+                <span class="kpi-label">Top net exporter</span>
                 <span class="kpi-value kpi-value-exp" id="kpi-top-exp">—</span>
             </div>
             <div class="kpi-divider"></div>
-            <div class="kpi-item kpi-item-col" title="Largest net importer (imports minus exports) over all flows in the current region or selection — before the threshold, Lines limit and flow-direction filters">
-                <span class="kpi-label">#1 Importer</span>
+            <div class="kpi-item" title="Largest net importer (imports minus exports) over all flows in the current region or selection — before the minimum flow size, the Lines limit and the flow-direction filters">
+                <span class="kpi-label">Top net importer</span>
                 <span class="kpi-value kpi-value-imp" id="kpi-top-imp">—</span>
             </div>
-            <div class="kpi-divider"></div>
-            <div class="kpi-item" title="North→South share of the net flows drawn on the map">
-                <span class="kpi-label">N→S</span>
+            <div class="kpi-divider kpi-share-div"></div>
+            <div class="kpi-item kpi-share" title="North → South share of the net flows drawn on the map">
+                <span class="kpi-label">N&rarr;S share</span>
                 <span class="kpi-value kpi-value-ns" id="kpi-ns-pct">—</span>
             </div>
-            <div class="kpi-divider"></div>
-            <div class="kpi-item" title="South→South share of the net flows drawn on the map">
-                <span class="kpi-label">S→S</span>
+            <div class="kpi-divider kpi-share-div"></div>
+            <div class="kpi-item kpi-share" title="South → South share of the net flows drawn on the map">
+                <span class="kpi-label">S&rarr;S share</span>
                 <span class="kpi-value kpi-value-ss" id="kpi-ss-pct">—</span>
             </div>
         </div>
@@ -558,146 +296,161 @@
         <div class="map-area">
             <div id="map-container"></div>
 
-            <!-- Interactive line filter: live drawing status -->
-            <div id="linefilter-status" class="hidden"></div>
+            <!-- Nothing matches the filters -->
+            <div id="map-empty" class="hidden" role="status">
+                <p>No net flows match these filters.</p>
+                <button id="map-empty-reset" type="button">Reset filters</button>
+            </div>
 
-<div id="tooltip"></div>
+            <!-- Connect mode: live drawing status -->
+            <div id="linefilter-status" class="hidden" role="status"></div>
 
-            <!-- Insight Side Panel (P1) -->
-            <div id="insight-panel">
+            <div id="tooltip"></div>
+
+            <!-- Zoom in / out / reset -->
+            <div id="map-tools">
+                <button id="zoom-in-btn" class="map-tool-btn" type="button" title="Zoom in" aria-label="Zoom in">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <button id="zoom-out-btn" class="map-tool-btn" type="button" title="Zoom out" aria-label="Zoom out">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>
+                </button>
+                <button id="fit-screen-btn" class="map-tool-btn" type="button" title="Reset the map view" aria-label="Reset the map view">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+                </button>
+            </div>
+
+            <!-- Legend (collapsible card) -->
+            <section id="legend-panel" aria-label="Legend">
+                <button id="legend-toggle" class="legend-head" type="button" aria-expanded="true" aria-controls="legend-content">
+                    <span>Legend</span>
+                    <svg class="legend-head-chevron" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div id="legend-content"></div>
+            </section>
+
+            <!-- Country insight panel -->
+            <aside id="insight-panel" aria-label="Details">
                 <div class="panel-header">
                     <div class="panel-title-group">
                         <div class="panel-country-name-row">
                             <div id="panel-country-name">—</div>
-                            <button id="searoute-btn" class="searoute-btn" title="Show indicative sea routes (experimental)" disabled>
-                                <span class="searoute-btn-label">Sea Route</span>
-                                <span class="searoute-experimental-badge">EXPERIMENTAL</span>
-                            </button>
                         </div>
                         <div id="panel-country-meta">—</div>
+                        <button id="searoute-btn" class="searoute-btn" type="button" title="Show indicative sea routes (experimental)" aria-pressed="false" disabled>
+                            <span class="searoute-btn-label">Sea routes</span>
+                            <span class="searoute-experimental-badge">(experimental)</span>
+                        </button>
                     </div>
-                    <button id="panel-export-btn" class="focus-export-btn" title="Download this country's data (CSV)">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+                    <button id="panel-export-btn" class="focus-export-btn" type="button" title="Download this country's data (CSV)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                         CSV
                     </button>
-                    <button id="panel-close-btn" class="btn-close" title="Close">
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <button id="panel-clear-btn" class="focus-export-btn hidden" type="button" title="Remove every drawn connection">Clear all</button>
+                    <button id="panel-close-btn" class="btn-close" type="button" title="Close" aria-label="Close">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
                 <div id="panel-body">
                     <div style="text-align:center;color:#AEA29A;font-size:12px;padding:32px 0">Click a country on the map</div>
                 </div>
-            </div>
+            </aside>
 
-            <!-- P2-A: Arc Detail Modal -->
+            <!-- Corridor history pop-up -->
             <div id="arc-modal" class="hidden">
                 <div class="modal-backdrop" id="arc-modal-backdrop"></div>
-                <div class="modal-card">
+                <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="arc-modal-title">
                     <div class="modal-header">
                         <div>
                             <div id="arc-modal-title" class="modal-title">—</div>
-                            <div id="arc-modal-meta" class="modal-subtitle">Bilateral Trade History</div>
+                            <div id="arc-modal-meta" class="modal-subtitle">Bilateral trade history</div>
                         </div>
-                        <button id="arc-export-btn" class="focus-export-btn" title="Download this corridor's 10-year history (CSV)">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+                        <button id="arc-export-btn" class="focus-export-btn" type="button" title="Download this corridor's 10-year history (CSV)">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                             CSV
                         </button>
-                        <button id="arc-modal-close" class="btn-close">
-                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        <button id="arc-modal-close" class="btn-close" type="button" aria-label="Close">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
                     <div id="arc-modal-body" class="modal-body"></div>
                 </div>
             </div>
 
-            <!-- P2-B: Compare Modal -->
+            <!-- Country comparison pop-up -->
             <div id="compare-modal" class="hidden">
                 <div class="modal-backdrop" id="compare-modal-backdrop"></div>
-                <div class="modal-card">
+                <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="compare-modal-title">
                     <div class="modal-header">
-                        <div id="compare-modal-title" class="modal-title">Country Comparison</div>
-                        <button id="compare-modal-close" class="btn-close">
-                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        <div id="compare-modal-title" class="modal-title">Country comparison</div>
+                        <button id="compare-modal-close" class="btn-close" type="button" aria-label="Close">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
                     <div id="compare-modal-body" class="modal-body"></div>
                 </div>
             </div>
 
-            <!-- Mobile FABs -->
-            <button id="mobile-legend-btn">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
-                Legend
-            </button>
-
-            <button id="fit-screen-btn" title="Fit to screen">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
-            </button>
-
-            <button id="mobile-filter-btn">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-                Filters
-                <span id="mobile-filter-badge" class="filter-badge"></span>
-            </button>
-
             <!-- Backdrops (initially hidden, JS toggles .hidden) -->
-            <div id="mobile-legend-backdrop"  class="hidden"></div>
             <div id="mobile-filter-backdrop"  class="hidden"></div>
             <div id="mobile-country-backdrop" class="hidden"></div>
 
             <div id="loader">
                 <div class="loader-spinner"></div>
-                <p>Loading Trade Data...</p>
+                <p>Loading trade data…</p>
             </div>
         </div><!-- /.map-area -->
 
     </main>
 
-    <!-- ── Map Footer ── -->
+    <!-- ── Footer: source, notes, logos ── -->
     <footer id="map-footer">
-        <p>Source: BACI based on UN Comtrade. Data cover HS&nbsp;6309 (Worn clothing and other worn articles).</p>
-        <p>Note: Sea routes are shown only for flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania) and are indicative routes between representative ports, computed with the Eurostat <em>searoute</em> algorithm (ports chosen mainly by UNCTAD PLSCI). Flows within the same region are shown as curved lines. Routes do not reflect actual tracked second-hand clothing (HS&nbsp;6309) cargo paths and may not represent the actual mode of transport used.</p>
-        <p class="footer-method-link"><button id="methodology-btn" class="footer-link-btn">Methodology &amp; Data Sources</button></p>
+        <div class="footer-row">
+            <p><strong>Source:</strong> UN Trade and Development (UNCTAD) and BACI (CEPII), based on UN Comtrade. Data cover HS&nbsp;6309 (worn clothing and other worn articles).
+                <button type="button" class="footer-link-btn js-open-methodology">Methodology &amp; data sources</button> &middot;
+                <a href="https://unctad.org/page/map-disclaimer" target="_blank" rel="noopener">Map disclaimer</a></p>
+            <div class="footer-logos"><img src="assets/smep-logo.png" alt="SMEP · UN Trade and Development · UK International Development"></div>
+        </div>
     </footer>
 
     <!-- ── Methodology Modal ── -->
     <div id="methodology-modal" class="hidden">
         <div class="modal-backdrop" id="methodology-modal-backdrop"></div>
-        <div class="modal-card methodology-card">
+        <div class="modal-card methodology-card" role="dialog" aria-modal="true" aria-label="Methodology and data sources">
             <div class="modal-header">
                 <div>
-                    <div class="modal-title">Methodology &amp; Data Sources</div>
-                    <div class="modal-subtitle">Global Second-Hand Clothes Trade Monitor &mdash; Technical Notes</div>
+                    <div class="modal-title">Methodology and data sources</div>
+                    <div class="modal-subtitle">Global Second-Hand Clothes Trade Monitor &mdash; technical notes</div>
                 </div>
-                <button id="methodology-modal-close" class="btn-close">
+                <button id="methodology-modal-close" class="btn-close" type="button" aria-label="Close">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             <div class="modal-body method-body">
 
                 <section class="method-section">
-                    <h3 class="method-section-title">Data Source</h3>
+                    <h3 class="method-section-title">Data source</h3>
                     <dl class="method-dl">
                         <dt>Database</dt>
-                        <dd>BACI International Trade Database (CEPII), derived from UN Comtrade mirror data. Harmonized bilateral trade flows at the HS 6-digit level.</dd>
+                        <dd>BACI international trade database (CEPII), which reconciles the exports and imports reported to UN Comtrade into one harmonized value and quantity per bilateral flow, at the HS 6-digit level. The monitor uses an HS&nbsp;6309 extract of BACI for 2015&ndash;2024.</dd>
                         <dt>Product coverage</dt>
                         <dd>HS&nbsp;6309 &mdash; <em>Worn clothing and other worn articles</em>: worn clothing, clothing accessories, blankets, household linen, furnishing articles, footwear and headgear showing signs of appreciable wear, presented in bulk, bales, sacks or similar packings. Rags (HS&nbsp;6310) are not included.</dd>
                         <dt>Years available</dt>
-                        <dd>2015&ndash;2024 (provisional for the most recent year)</dd>
+                        <dd>2015&ndash;2024. The latest year is based on fewer country reports and may be revised in later BACI releases.</dd>
                         <dt>Value unit</dt>
                         <dd>Current US dollars (FOB), displayed as $K / $M / $B.</dd>
                         <dt>Weight unit</dt>
                         <dd>Kilograms (BACI harmonized export weight), displayed in metric tonnes (t&thinsp;/&thinsp;kt&thinsp;/&thinsp;Mt).</dd>
-                        <dt>Metric toggle</dt>
-                        <dd>The <strong>Value / Weight</strong> switch in the toolbar recomputes every figure on the map, legend, KPIs and country panels from the selected measure. Net flow direction, thresholds and rankings are all derived from whichever metric is active, so the direction of a net flow can differ between value and weight.</dd>
+                        <dt>Measure (value or weight)</dt>
+                        <dd>The <strong>Measure</strong> switch (Value / Weight) in the filter bar changes every figure on the map, legend, key figures, country panels and the Animate view to the selected measure. Net flows, minimum flow sizes and rankings are computed separately for each measure, so the direction of a net flow can differ between value and weight.</dd>
                         <dt>Not shown</dt>
-                        <dd>Trade recorded as &ldquo;Other Asia, nes&rdquo; and with special partner areas (bunkers, free zones, special categories) is not shown.</dd>
+                        <dd>Trade recorded under &ldquo;Other Asia, nes&rdquo; and with special or unspecified partner areas (bunkers, free zones, special categories and other &ldquo;nes&rdquo; areas) is not shown.</dd>
                     </dl>
                 </section>
 
                 <section class="method-section">
-                    <h3 class="method-section-title">Flow Direction Classification</h3>
-                    <p class="method-note">Economies are classified as <strong>North</strong> (developed) or <strong>South</strong> (developing, including least developed) using the UNCTAD development status classification, consistent with UNCTAD flagship publications.</p>
+                    <h3 class="method-section-title">Flow direction classification</h3>
+                    <p class="method-note">Economies are classified as <strong>North</strong> (developed) or <strong>South</strong> (developing, including least developed) using the UNCTAD development status classification, consistent with UNCTAD flagship publications. The designations &ldquo;developed&rdquo; and &ldquo;developing&rdquo; are intended for statistical convenience and do not necessarily express a judgement about the stage reached by a particular country or area in the development process.</p>
                     <dl class="method-dl">
                         <dt><span class="method-flow-dot" style="background:#009EDB"></span> N&rarr;S</dt>
                         <dd>Net flow from a developed economy to a developing economy</dd>
@@ -711,40 +464,40 @@
                 </section>
 
                 <section class="method-section">
-                    <h3 class="method-section-title">Trade Flow Calculation</h3>
+                    <h3 class="method-section-title">Trade flow calculation</h3>
                     <dl class="method-dl">
                         <dt>Net bilateral flow</dt>
                         <dd>For each pair of economies (A, B), the net flow is A&rsquo;s exports to B minus B&rsquo;s exports to A. The line runs from the net exporter to the net importer, and its size reflects the absolute net amount. Trade in both directions therefore partly offsets; the gross flows in each direction are shown in the corridor history and in the CSV downloads.</dd>
                         <dt>Line width</dt>
                         <dd>Square-root scale of the net flow, so that large flows do not hide small ones. Flows above the 98th percentile of those shown are drawn at the maximum width. Larger flows are also drawn more opaque.</dd>
                         <dt>Line curvature</dt>
-                        <dd>All lines curve in a consistent clockwise direction (SVG <code>sweep-flag = 1</code>). Eastward flows bend northward and westward flows bend southward, a secondary cue for direction that complements the colour.</dd>
+                        <dd>All lines bend the same way (clockwise from exporter to importer), so eastward flows bow northward and westward flows bow southward. This shows which end is the exporter without arrows.</dd>
                         <dt>Circles</dt>
-                        <dd>Colour shows the economy&rsquo;s net balance (exports minus imports) over all flows in the current region or selection, before the display threshold: blue for net exporters, red for net importers. Size shows the total of the flows drawn for that economy.</dd>
+                        <dd>Colour shows the economy&rsquo;s net balance (exports minus imports) over all flows in the current region or selection, before the minimum flow size, the Lines limit and the flow-direction filters: blue for net exporters, red for net importers, paler near balance. In a region view this is the balance within the region, so it can differ from the country panel, which uses all partners. Size shows the total of the lines drawn for that economy.</dd>
                     </dl>
                 </section>
 
                 <section class="method-section">
-                    <h3 class="method-section-title">What the Map Shows</h3>
-                    <p class="method-note">To avoid visual overload, the map draws only the largest net flows. The totals in the legend (&ldquo;Shown&rdquo; and &ldquo;Total&rdquo;) tell how much of the trade in the current region or selection is on the map.</p>
+                    <h3 class="method-section-title">What the map shows</h3>
+                    <p class="method-note">To avoid visual overload, the map draws only the largest net flows. The <strong>Shown</strong> figure in the key-figures bar gives the total of the lines drawn and its share of all net flows in the current region or selection. The minimum flow size and the number of lines are set under <strong>Lines</strong> in the filter bar.</p>
                     <dl class="method-dl">
                         <dt>Auto (default)</dt>
-                        <dd>At most <strong>40</strong> lines. A minimum flow applies first: $10&thinsp;M in the global view, $1&thinsp;M for a region; with countries selected, $10&thinsp;K (1&ndash;3 countries), $100&thinsp;K (4&ndash;10), $500&thinsp;K (11&ndash;30) or $1&thinsp;M (31 or more). If more than 40 flows clear it, the 40 largest are drawn. In weight mode the same steps apply in tonnes (10&thinsp;kt, 1&thinsp;kt, 10&thinsp;t, 100&thinsp;t, 500&thinsp;t, 1&thinsp;kt).</dd>
-                        <dt>Fixed thresholds</dt>
-                        <dd>$10&thinsp;M to $10&thinsp;K (10&thinsp;kt to 10&thinsp;t in weight mode): every flow at or above the chosen value is drawn.</dd>
-                        <dt>Lines</dt>
-                        <dd>Draws only the N largest flows. With Auto it replaces the 40-line limit; with a fixed threshold both conditions apply. The N largest are taken before the flow-direction boxes, so hiding a direction can leave fewer than N lines.</dd>
+                        <dd>At most <strong>40</strong> lines, and none below a minimum: $10&thinsp;M in the world view, $1&thinsp;M for a region; with countries picked in From / To (counted together), $10&thinsp;K (1&ndash;3), $100&thinsp;K (4&ndash;10), $500&thinsp;K (11&ndash;30) or $1&thinsp;M (31 or more). If more than 40 flows clear the minimum, the 40 largest are drawn; if fewer do, fewer lines are drawn (a region may show only a few). The flow-direction filters apply afterwards, so hiding a direction also leaves fewer lines. In weight mode the same steps apply in tonnes (10&thinsp;kt, 1&thinsp;kt, 10&thinsp;t, 100&thinsp;t, 500&thinsp;t, 1&thinsp;kt).</dd>
+                        <dt>Fixed minimum</dt>
+                        <dd>$10&thinsp;M to $10&thinsp;K (10&thinsp;kt to 10&thinsp;t in weight mode): every net flow at or above the chosen value is drawn.</dd>
+                        <dt>Number of lines</dt>
+                        <dd>Draws only the N largest net flows. With Auto, it replaces both the automatic minimum and the 40-line cap, so the N largest flows are drawn however small they are; with a fixed minimum both conditions apply. The N largest are taken before the flow-direction filters, so hiding a direction can leave fewer than N lines.</dd>
                         <dt>Regions</dt>
-                        <dd>A region shows only flows between economies of that region.</dd>
+                        <dd>A region shows only flows between economies of that region (UN M49 regions).</dd>
                         <dt>Connect</dt>
-                        <dd>Drawn connections are shown whatever their size; the region, threshold and Lines settings do not apply to them.</dd>
+                        <dd>Only the connections you draw are shown, whatever their size. The region, From / To, minimum flow size and Lines settings do not apply to them; the flow-direction filters still do.</dd>
                         <dt>Country panel</dt>
-                        <dd>Gross trade is the economy&rsquo;s exports plus imports with all partners; net balance is exports minus imports. Partner lists, concentration, trade split, fingerprint and flow composition use all of the economy&rsquo;s net flows, never the display threshold, Lines limit or flow-direction boxes; when a region is selected they are limited to partners in that region.</dd>
+                        <dd>Gross trade is the economy&rsquo;s exports plus imports with all partners; net balance is exports minus imports. Trading partners, partner concentration, partners by compass direction and flow composition use all of the economy&rsquo;s net flows; &ldquo;Exports and imports by partner&rdquo; shows the gross flows in each direction with its main partners. None of them use the minimum flow size, the Lines limit or the flow-direction filters. When a region is selected they are limited to partners in that region.</dd>
                     </dl>
                 </section>
 
                 <section class="method-section">
-                    <h3 class="method-section-title">Partner Concentration (HHI)</h3>
+                    <h3 class="method-section-title">Partner concentration (HHI)</h3>
                     <p class="method-note">Shown in the country panel. Measures how much an economy&rsquo;s trade is spread across partners or concentrated on a few &mdash; does it trade with everyone, or depend heavily on one partner?</p>
                     <dl class="method-dl">
                         <dt>Index used</dt>
@@ -753,38 +506,39 @@
                         <dd><code>HHI = &sum;(share<sub>i</sub>&sup2;) &times; 10,000</code>, where share<sub>i</sub> is partner i&rsquo;s share of the economy&rsquo;s net bilateral flows. Export and import partners are counted together, in the selected measure (value or weight).</dd>
                         <dt>Interpretation</dt>
                         <dd>
-                            <span class="method-hhi-band" style="color:#72BF44">&#9632;</span> <strong>Diversified</strong> (below 2,000): trade spread across many partners<br>
-                            <span class="method-hhi-band" style="color:#FBAF17">&#9632;</span> <strong>Moderate</strong> (2,000 to below 4,000): some partners dominate but diversification remains<br>
-                            <span class="method-hhi-band" style="color:#ef4444">&#9632;</span> <strong>Highly concentrated</strong> (4,000 and above): trade heavily dependent on one or two partners
+                            <span class="method-hhi-band" style="background:#d9eaf6"></span>Diversified (below 2,000): trade spread across many partners<br>
+                            <span class="method-hhi-band" style="background:#a9d0ec"></span>Moderate (2,000 to below 4,000): some partners dominate but diversification remains<br>
+                            <span class="method-hhi-band" style="background:#6fb2df"></span>Highly concentrated (4,000 and above): trade heavily dependent on one or two partners
                         </dd>
                         <dt>Threshold note</dt>
                         <dd>These bands are specific to this tool and indicative. They are more lenient than the thresholds used in competition law (for example, the 2023 United States Merger Guidelines treat markets above 1,800 as highly concentrated).</dd>
                         <dt>Data scope</dt>
-                        <dd>All of the economy&rsquo;s net bilateral flows for the selected year, regardless of the display threshold, Lines limit and flow-direction boxes; limited to partners in the region when a region is selected.</dd>
+                        <dd>All of the economy&rsquo;s net bilateral flows for the selected year, regardless of the minimum flow size, the Lines limit and the flow-direction filters; limited to partners in the region when a region is selected.</dd>
                     </dl>
                 </section>
 
                 <section class="method-section">
-                    <h3 class="method-section-title">Maritime Route Visualization</h3>
+                    <h3 class="method-section-title">Sea route visualization</h3>
                     <dl class="method-dl">
                         <dt>Coverage</dt>
-                        <dd>Sea routes can be switched on in the country panel (&ldquo;Sea Route&rdquo;, experimental). They are drawn only for flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania); flows within a region keep their curved line to avoid clutter from short routes.</dd>
+                        <dd>Sea routes can be switched on in the country panel (&ldquo;Sea routes&rdquo;, experimental). They are drawn only for flows between different UNCTAD regions (Africa, Americas, Asia, Europe, Oceania); flows within a region keep their curved line to avoid clutter from short routes.</dd>
                         <dt>Algorithm</dt>
                         <dd>Routes are computed with the Eurostat <em>searoute</em> algorithm over a navigable sea graph.</dd>
                         <dt>Port selection</dt>
-                        <dd>Each economy is routed through one representative port, chosen mainly as its highest-ranked port in the UNCTAD Port Liner Shipping Connectivity Index (PLSCI), with some ports set manually. Landlocked economies are routed through a gateway port of a neighbouring country. For the United States, Canada and Australia, a Pacific-coast port is used when the partner lies east of 60&deg;E and an Atlantic- or Indian-Ocean-coast port otherwise.</dd>
+                        <dd>Each economy is routed through one representative port, chosen mainly as its highest-ranked port in the UNCTAD Port Liner Shipping Connectivity Index (PLSCI), with some ports set manually. Landlocked economies are routed through a usual transit port in another country, usually a neighbour (for example, Uganda through Mombasa, Kenya). The United States and Canada have two ports: a Pacific-coast port (Los Angeles, Vancouver) when the partner lies east of 60&deg;E, and an Atlantic-coast port (New York, Halifax) otherwise. Australia uses Sydney for partners east of 60&deg;E and in the Americas, and Fremantle on the Indian Ocean for partners in Europe, Africa and western Asia.</dd>
                         <dt>Disclaimer</dt>
                         <dd>Routes are indicative only. They do not represent actual tracked HS&nbsp;6309 cargo paths, may not reflect the mode of transport used, and should not be used for navigation.</dd>
                     </dl>
                 </section>
 
                 <section class="method-section">
-                    <h3 class="method-section-title">Map Disclaimer</h3>
-                    <p class="method-note">The boundaries and names shown on this map do not imply official endorsement or acceptance by the United Nations. Dotted and dashed lines represent approximate borders for which the final status has not yet been determined. The designation of countries or territories does not imply the expression of any opinion on the part of UNCTAD concerning their legal status.</p>
+                    <h3 class="method-section-title">Map disclaimer</h3>
+                    <p class="method-note">The boundaries and names shown and the designations used on this map do not imply official endorsement or acceptance by the United Nations. Dashed lines represent undefined borders. Dotted line represents approximately the Line of Control in Jammu and Kashmir agreed upon by India and Pakistan. The final boundary between the Sudan and South Sudan has not yet been determined. A dispute exists between the Governments of Argentina and the United Kingdom of Great Britain and Northern Ireland concerning sovereignty over the Falkland Islands (Malvinas). The final status of the following territories has not yet been agreed or determined: Abyei area, Aksai Chin, Arunachal Pradesh, Bi&rsquo;r Tawil, Hala&rsquo;ib Triangle, Ilemi Triangle, Jammu and Kashmir, Kuril Islands, Paracel Islands, Scarborough Shoal, Senkaku Islands and Spratly Islands.</p>
+                    <p class="method-note">Full text: <a href="https://unctad.org/page/map-disclaimer" target="_blank" rel="noopener">UN Trade and Development map disclaimer</a>.</p>
                 </section>
 
                 <section class="method-section method-section-last">
-                    <h3 class="method-section-title">How to Cite</h3>
+                    <h3 class="method-section-title">How to cite</h3>
                     <p class="method-cite">UN Trade and Development (UNCTAD) (2026). <em>Global Second-Hand Clothes Trade Monitor.</em> Geneva.</p>
                 </section>
 
@@ -792,130 +546,166 @@
         </div>
     </div>
 
-    <!-- ── Mobile Filter Panel (bottom sheet) ── -->
-    <div id="mobile-filter-panel">
+    <!-- ── Phones: filter sheet ── -->
+    <div id="mobile-filter-panel" role="dialog" aria-label="Filters">
         <div class="sheet-handle"></div>
         <div class="sheet-header">
-            <span>Filters</span>
-            <button id="mobile-filter-close" class="btn-close">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <span class="sheet-title">Filters</span>
+            <button id="mobile-filter-close" class="btn-close" type="button" aria-label="Close">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
         <div class="sheet-body">
 
             <div class="sheet-section">
+                <div class="sheet-row">
+                    <div>
+                        <label class="section-label" for="m-year-select">Year</label>
+                        <select id="m-year-select" class="sheet-select">
+                            <option value="2024">2024</option>
+                            <option value="2023">2023</option>
+                            <option value="2022">2022</option>
+                            <option value="2021">2021</option>
+                            <option value="2020">2020</option>
+                            <option value="2019">2019</option>
+                            <option value="2018">2018</option>
+                            <option value="2017">2017</option>
+                            <option value="2016">2016</option>
+                            <option value="2015">2015</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="section-label">Measure</div>
+                        <div class="btn-row seg-fill">
+                            <button class="metric-btn btn-toggle-lg active" data-metric="value" type="button">Value</button>
+                            <button class="metric-btn btn-toggle-lg" data-metric="weight" type="button">Weight</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sheet-section explore-only">
                 <div class="section-label">Region</div>
-                <div style="display:flex;flex-wrap:wrap;gap:8px">
-                    <button class="region-btn btn-toggle-lg" data-region="Global">All</button>
-                    <button class="region-btn btn-toggle-lg" data-region="Africa">Africa</button>
-                    <button class="region-btn btn-toggle-lg" data-region="Americas">Americas</button>
-                    <button class="region-btn btn-toggle-lg" data-region="Asia">Asia</button>
-                    <button class="region-btn btn-toggle-lg" data-region="Europe">Europe</button>
-                    <button class="region-btn btn-toggle-lg" data-region="Oceania">Oceania</button>
+                <div class="btn-row">
+                    <button class="region-btn btn-toggle-lg active" data-region="Global" type="button">World</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Africa" type="button">Africa</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Americas" type="button">Americas</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Asia" type="button">Asia</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Europe" type="button">Europe</button>
+                    <button class="region-btn btn-toggle-lg" data-region="Oceania" type="button">Oceania</button>
                 </div>
             </div>
 
-            <div class="sheet-section">
-                <div class="section-label">Year</div>
-                <select id="m-year-select" class="sheet-select">
-                    <option value="2024">2024</option>
-                    <option value="2023">2023</option>
-                    <option value="2022">2022</option>
-                    <option value="2021">2021</option>
-                    <option value="2020">2020</option>
-                    <option value="2019">2019</option>
-                    <option value="2018">2018</option>
-                    <option value="2017">2017</option>
-                    <option value="2016">2016</option>
-                    <option value="2015">2015</option>
-                </select>
-            </div>
-
-            <div class="sheet-section">
-                <div class="section-label">Metric</div>
-                <div style="display:flex;gap:8px">
-                    <button class="metric-btn btn-toggle-lg active" data-metric="value">Value ($)</button>
-                    <button class="metric-btn btn-toggle-lg" data-metric="weight">Weight (t)</button>
-                </div>
-            </div>
-
-            <div class="sheet-section">
-                <div class="section-label">Flow Direction</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                    <label class="flow-label-lg">
-                        <input type="checkbox" class="flow-checkbox" value="north-south" checked style="accent-color:#009EDB">
-                        <span style="color:#009EDB">N → S</span>
-                    </label>
-                    <label class="flow-label-lg">
-                        <input type="checkbox" class="flow-checkbox" value="south-north" checked style="accent-color:#72BF44">
-                        <span style="color:#72BF44">S → N</span>
-                    </label>
-                    <label class="flow-label-lg">
-                        <input type="checkbox" class="flow-checkbox" value="south-south" checked style="accent-color:#FBAF17">
-                        <span style="color:#FBAF17">S → S</span>
-                    </label>
-                    <label class="flow-label-lg">
-                        <input type="checkbox" class="flow-checkbox" value="north-north" checked style="accent-color:#A066AA">
-                        <span style="color:#A066AA">N → N</span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="sheet-section">
-                <div class="section-label">Min. Trade Flow</div>
-                <div style="display:flex;flex-wrap:wrap;gap:8px">
-                    <button class="threshold-btn btn-toggle-lg" data-threshold="auto">Auto</button>
-                    <button class="threshold-btn btn-toggle-lg" data-threshold="10000000">$10M</button>
-                    <button class="threshold-btn btn-toggle-lg" data-threshold="1000000">$1M</button>
-                    <button class="threshold-btn btn-toggle-lg" data-threshold="500000">$500k</button>
-                    <button class="threshold-btn btn-toggle-lg" data-threshold="100000">$100k</button>
-                    <button class="threshold-btn btn-toggle-lg" data-threshold="10000">$10k</button>
-                </div>
-            </div>
-
-            <div class="sheet-section">
-                <div class="section-label">Top Trade Lines</div>
-                <div style="display:flex;flex-wrap:wrap;gap:8px">
-                    <button class="topn-btn btn-toggle-lg active" data-topn="all">All</button>
-                    <button class="topn-btn btn-toggle-lg" data-topn="50">50</button>
-                    <button class="topn-btn btn-toggle-lg" data-topn="100">100</button>
-                    <button class="topn-btn btn-toggle-lg" data-topn="200">200</button>
-                    <button class="topn-btn btn-toggle-lg" data-topn="500">500</button>
-                </div>
-            </div>
-
-            <div class="sheet-section">
-                <div class="section-label">Exporter (From)</div>
-                <button id="m-exp-btn" class="picker-btn-full">
+            <div class="sheet-section explore-only">
+                <div class="section-label">Exporters (from)</div>
+                <button id="m-exp-btn" class="picker-btn-full" type="button">
                     <span id="m-exp-label" class="picker-value">All Exporters</span>
-                    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">
+                    <span class="picker-trailing-lg">
                         <span id="m-exp-count" class="picker-badge hidden"></span>
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </div>
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </span>
+                </button>
+            </div>
+
+            <div class="sheet-section explore-only">
+                <div class="section-label">Importers (to)</div>
+                <button id="m-imp-btn" class="picker-btn-full" type="button">
+                    <span id="m-imp-label" class="picker-value">All Importers</span>
+                    <span class="picker-trailing-lg">
+                        <span id="m-imp-count" class="picker-badge importer hidden"></span>
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </span>
                 </button>
             </div>
 
             <div class="sheet-section">
-                <div class="section-label">Importer (To)</div>
-                <button id="m-imp-btn" class="picker-btn-full">
-                    <span id="m-imp-label" class="picker-value">All Importers</span>
-                    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">
-                        <span id="m-imp-count" class="picker-badge hidden" style="background:#b45309"></span>
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <div class="section-label">Flow direction</div>
+                <div class="flow-chips">
+                    <label class="flow-chip flow-ns">
+                        <input type="checkbox" class="flow-checkbox" value="north-south" checked>
+                        <span class="chip-body"><span class="chip-swatch"></span>North &rarr; South</span>
+                    </label>
+                    <label class="flow-chip flow-sn">
+                        <input type="checkbox" class="flow-checkbox" value="south-north" checked>
+                        <span class="chip-body"><span class="chip-swatch"></span>South &rarr; North</span>
+                    </label>
+                    <label class="flow-chip flow-ss">
+                        <input type="checkbox" class="flow-checkbox" value="south-south" checked>
+                        <span class="chip-body"><span class="chip-swatch"></span>South &rarr; South</span>
+                    </label>
+                    <label class="flow-chip flow-nn">
+                        <input type="checkbox" class="flow-checkbox" value="north-north" checked>
+                        <span class="chip-body"><span class="chip-swatch"></span>North &rarr; North</span>
+                    </label>
+                </div>
+                <p class="section-hint">North = developed economies, South = developing economies (UNCTAD classification).</p>
+            </div>
+
+            <details class="sheet-advanced explore-only">
+                <summary>Lines on the map <span class="sheet-adv-sub" id="m-display-summary">Auto</span></summary>
+                <div class="sheet-section">
+                    <div class="section-label">Minimum flow size</div>
+                    <div class="btn-row">
+                        <button class="threshold-btn btn-toggle-lg active" data-threshold="auto" type="button">Auto</button>
+                        <button class="threshold-btn btn-toggle-lg" data-threshold="10000000" type="button">$10M</button>
+                        <button class="threshold-btn btn-toggle-lg" data-threshold="1000000" type="button">$1M</button>
+                        <button class="threshold-btn btn-toggle-lg" data-threshold="500000" type="button">$500K</button>
+                        <button class="threshold-btn btn-toggle-lg" data-threshold="100000" type="button">$100K</button>
+                        <button class="threshold-btn btn-toggle-lg" data-threshold="10000" type="button">$10K</button>
                     </div>
-                </button>
+                    <p class="section-hint">Auto draws at most 40 lines, and none below a minimum that depends on the view.</p>
+                </div>
+                <div class="sheet-section">
+                    <div class="section-label">Maximum number of lines</div>
+                    <div class="btn-row">
+                        <button class="topn-btn btn-toggle-lg active" data-topn="all" type="button">All</button>
+                        <button class="topn-btn btn-toggle-lg" data-topn="50" type="button">50</button>
+                        <button class="topn-btn btn-toggle-lg" data-topn="100" type="button">100</button>
+                        <button class="topn-btn btn-toggle-lg" data-topn="200" type="button">200</button>
+                        <button class="topn-btn btn-toggle-lg" data-topn="500" type="button">500</button>
+                    </div>
+                </div>
+            </details>
+
+            <div class="sheet-section connect-only">
+                <p class="section-hint">Connect shows only the connections you draw, so region, countries and line limits do not apply (flow directions still do). Tap <b>Explore</b> to return to the full map.</p>
             </div>
 
             <div class="sheet-section">
                 <div class="section-label">Download CSV (current view)</div>
                 <div style="display:flex;flex-direction:column;gap:8px">
-                    <button class="picker-btn-full" data-export="flows" type="button">Trade flows — USD, kg &amp; unit value</button>
+                    <button class="picker-btn-full" data-export="flows" type="button">Trade flows — value, weight &amp; unit value</button>
                     <button class="picker-btn-full" data-export="summary" type="button">Country summary — ranked</button>
                 </div>
             </div>
 
         </div><!-- /.sheet-body -->
+        <div class="sheet-footer">
+            <button id="m-filters-reset" class="sheet-reset" type="button" disabled>Reset</button>
+            <button id="mobile-filter-done" class="sheet-done" type="button">Show map</button>
+        </div>
     </div><!-- /#mobile-filter-panel -->
+
+    <!-- ── Phones: bottom bar (view modes + filters) ── -->
+    <nav id="mobile-nav" aria-label="View mode">
+        <button class="mnav-btn js-mode active" data-mode="explore" type="button" aria-pressed="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
+            <span>Explore</span>
+        </button>
+        <button id="m-connect-btn" class="mnav-btn js-mode" data-mode="connect" type="button" aria-pressed="false">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M6.7 7.6 17.3 16.4"/></svg>
+            <span>Connect</span>
+        </button>
+        <button id="m-anim-btn" class="mnav-btn js-mode" data-mode="animate" type="button" aria-pressed="false">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor" stroke="none"/></svg>
+            <span>Animate</span>
+        </button>
+        <button id="mobile-filter-btn" class="mnav-btn" type="button" aria-haspopup="dialog">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+            <span>Filters</span>
+            <span id="mobile-filter-badge" class="filter-badge"></span>
+        </button>
+    </nav>
 
     <script type="module" src="src/main.js"></script>
 </body>

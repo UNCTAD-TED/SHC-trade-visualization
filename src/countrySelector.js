@@ -71,7 +71,7 @@ class CountrySelector {
         this._installSearchDedup();
 
         // ── Geographic Regions ────────────────────────────────────
-        this._addSectionHeader(list, '🌍 Geographic Regions');
+        this._addSectionHeader(list, 'Geographic regions');
         const regionOrder = ['5100', '5200', '5300', '5400', '5500'];
         regionOrder.forEach(contCode => {
             const cont = this.classificationData.regions[contCode];
@@ -81,7 +81,7 @@ class CountrySelector {
                 label: `${cont.name} (All)`,
                 countries: continentCountries,
                 indent: 0,
-                icon: '▶',
+                icon: '',
             });
             (cont.subregions || []).forEach(sub => {
                 const subCountries = this.getCountriesInRegion(sub.code);
@@ -109,7 +109,7 @@ class CountrySelector {
         });
 
         // ── Development Status ────────────────────────────────────
-        this._addSectionHeader(list, '📊 Development Status');
+        this._addSectionHeader(list, 'Development status');
         ['1500', '1400', '1610'].forEach(devCode => {
             const devGroup = this.classificationData.development[devCode];
             if (!devGroup) return;
@@ -118,7 +118,7 @@ class CountrySelector {
                 label: devGroup.name,
                 countries: devCountries,
                 indent: 0,
-                icon: '▶',
+                icon: '',
             });
             this._addSortedCountries(childContainer, devCountries, 1);
         });
@@ -162,7 +162,8 @@ class CountrySelector {
         toggle.type = 'button';
         toggle.className = 'group-toggle';
         toggle.setAttribute('aria-expanded', 'false');
-        toggle.textContent = '▶';
+        toggle.setAttribute('aria-label', 'Show the economies in this group');
+        toggle.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -200,9 +201,9 @@ class CountrySelector {
         checkbox.addEventListener('change', (e) => {
             e.stopPropagation();
             if (e.target.checked) {
-                countries.forEach(code => this.selectedCountries.add(code));
+                countries.forEach(code => { this.selectedCountries.add(code); });
             } else {
-                countries.forEach(code => this.selectedCountries.delete(code));
+                countries.forEach(code => { this.selectedCountries.delete(code); });
             }
             this.updateSelection();
         });
@@ -224,7 +225,7 @@ class CountrySelector {
         const sorted = codes
             .map(code => ({ code, name: this.classificationData.countries[code]?.name || code }))
             .sort((a, b) => a.name.localeCompare(b.name));
-        sorted.forEach(c => this._addCountryItem(container, c.code, c.name, indentLevel));
+        sorted.forEach(c => { this._addCountryItem(container, c.code, c.name, indentLevel); });
     }
 
     _addCountryItem(parent, code, name, indentLevel = 0) {
@@ -278,7 +279,7 @@ class CountrySelector {
             // not list (e.g. MAC, NRU): fall back to the map's name for them.
             labelEl.textContent = country ? country.name : (STATE.countryNames[code] || code);
         } else {
-            labelEl.textContent = `${count} Countries`;
+            labelEl.textContent = `${count} economies`;
         }
         for (const [code, boxes] of Object.entries(this._checkboxesByCode)) {
             const should = this.selectedCountries.has(code);

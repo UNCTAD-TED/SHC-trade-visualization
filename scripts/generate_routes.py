@@ -57,7 +57,14 @@ def get_port_coords(iso: str, ports: dict, partner_iso: str | None = None) -> li
             p_lon = partner["coords"][0]
             # パートナーが経度60°以東（アジア・大洋州）→ 太平洋岸港
             # それ以外（欧州・アフリカ・中東・アメリカ大陸）→ 大西洋岸港
-            if p_lon > 60:
+            use_pacific = p_lon > 60
+            # AUS: the Americas and the Pacific islands east of the antimeridian
+            # (negative longitudes, west of 30°W) are also reached eastwards, so they
+            # use the Pacific-side port (Sydney). Europe / Africa / Middle East
+            # (30°W–60°E) use "atlantic" = Fremantle (Indian Ocean side).
+            if iso == "AUS" and p_lon < -30:
+                use_pacific = True
+            if use_pacific:
                 return entry["directional"].get("pacific", entry["coords"])
             else:
                 return entry["directional"].get("atlantic", entry["coords"])

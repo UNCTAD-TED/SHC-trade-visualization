@@ -197,11 +197,10 @@ export const DeepLink = {
         ['exporters', 'importers', 'bilateralPairs'].forEach(k => { if (link[k] && !link[k].length) delete link[k]; });
 
         if (link.bilateralPairs) {
-            // Drawn connections take precedence over x / i, exactly as in the
-            // sender's view (the pickers there mirror the pairs' endpoints).
+            // Drawn connections: the link was made in Connect mode, which shows
+            // only the pairs. App.updateDashboard() then switches to the Connect
+            // tab and turns drawing on.
             STATE.bilateralPairs = link.bilateralPairs.map(p => ({ ...p }));
-            if (app._syncBilateralSelectors) app._syncBilateralSelectors();
-            app._updateLineFilterUI?.({ active: false, stage: 'export' });
             // The connections panel lists the pairs with their history; it
             // refreshes itself on every later updateDashboard().
             Promise.resolve(app.openConnectionsPanel?.())
@@ -276,7 +275,9 @@ export const DeepLink = {
             const raw = rawHash();
             if (raw === this._lastHash) return;          // the app's own state
             // Only a view link (key=value…) or a cleared hash is ours to follow.
-            if (raw && !raw.includes('=')) return;
+            // A hash cleared by the host page (e.g. an href="#" link) is not a view
+            // to load: never reload the page for it.
+            if (!raw || !raw.includes('=')) return;
             this._lastHash = raw;
             location.reload();
         });

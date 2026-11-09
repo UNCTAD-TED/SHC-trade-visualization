@@ -1,221 +1,204 @@
 @import 'variables.less';
 
-// ── Legend Bar (horizontal, between header and KPI) ───────────
+// ══════════════════════════════════════════════════════════════
+//  Legend card (floats on the map; collapsible)
+// ══════════════════════════════════════════════════════════════
 #legend-panel {
-  flex-shrink: 0;
-  background: @unblue-bg;
-  border-bottom: 1px solid @ungrey-border;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  overflow: hidden;
-  min-height: 38px;
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
 
-  // Mobile: hidden as bar; appears as fixed floating card via mobile.less
-  .legend-mobile-header {
-    display: none;
+  @media (min-width: 768px) and (orientation: portrait) and (min-height: 501px) {
+    top: 12px;
+    bottom: auto;
+    left: 56px;
+  }
+  z-index: 15;
+  width: 252px;
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid @ungrey-border;
+  border-radius: @radius-lg;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
+  font-family: @font-family;
+  overflow: hidden;
+
+  .legend-head {
+    display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 16px 8px;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    font-family: @font-family;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: @ungrey-dark;
+    background: transparent;
+    border: none;
     border-bottom: 1px solid @ungrey-bg;
+    cursor: pointer;
     flex-shrink: 0;
-    background: #fff;
-    border-radius: @radius-xl @radius-xl 0 0;
 
-    span {
-      font-size: 13px;
-      font-weight: 700;
-      color: @ungrey-dark;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .btn-close {
-      padding: 6px;
-      margin: -4px -6px;
-      border-radius: @radius-lg;
-      border: none;
-      background: transparent;
-      color: @ungrey-text;
-      cursor: pointer;
-      transition: background 0.12s;
-      &:hover { background: @unblue-bg; }
-    }
-
-    @media (max-width: (@bp-md - 1px)) { display: flex; }
+    .legend-head-chevron { transition: transform 0.2s; }
+    &:hover { color: @unblue-dark; }
+    &:focus-visible { outline: 2px solid @unblue; outline-offset: -2px; }
   }
 
-  // Legend content: horizontal flex row of sections
+  &.collapsed {
+    width: auto;
+    .legend-head { border-bottom: none; }
+    .legend-head-chevron { transform: rotate(180deg); }
+    #legend-content { display: none; }
+  }
+
   #legend-content {
-    flex: 1;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  // Stats block (right of legend content)
-  #total-stats {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
-    border-left: 1px solid @ungrey-border;
-    flex-shrink: 0;
-
-    .stat-row {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0;
-      margin-bottom: 0;
-
-      .stat-label   { font-size: 8px; color: @ungrey-text; }
-      .stat-val     { font-size: 11px; font-weight: 700; color: @ungrey-dark; font-family: @font-mono; }
-      .stat-secondary { font-size: 10px; color: @ungrey-text; font-family: @font-mono; }
-    }
-
-    #stat-coverage {
-      font-size: 9px;
-      color: @ungrey-text;
-      font-family: @font-mono;
-      white-space: nowrap;
-    }
-  }
-
-  // SMEP logo (far right)
-  .legend-footer {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    padding: 0 12px;
-    border-left: 1px solid @ungrey-border;
-    flex-shrink: 0;
-
-    img {
-      height: 22px;
-      width: auto;
-      object-fit: contain;
-      opacity: 0.65;
-      transition: opacity 0.15s;
-      &:hover { opacity: 1; }
-    }
+    padding: 8px 10px 10px;
+    overflow-y: auto;
+    min-height: 0;
   }
 }
 
-// ── Legend bar: rendered content classes ──────────────────────
-.legend-section {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  flex-shrink: 0;
+.lg-sec + .lg-sec {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid @ungrey-bg;
 }
 
-.legend-section-label {
-  font-size: 8px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: @ungrey-text;
-  white-space: nowrap;
-  margin-right: 2px;
-}
-
-.legend-flows {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  align-items: center;
-}
-
-.legend-flow-item {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 4px;
-  transition: opacity 0.2s;
-}
-
-.legend-flow-dot {
-  width: 10px;
-  height: 3px;
-  border-radius: 2px;
-  flex-shrink: 0;
-  display: inline-block;
-}
-
-.legend-flow-label {
-  font-size: 9px;
+.lg-title {
+  font-size: 11px;
   font-weight: 700;
   color: @ungrey-dark;
-  font-family: @font-mono;
+  margin-bottom: 5px;
 }
 
-.legend-flow-stat {
-  font-size: 9px;
-  color: @ungrey-text;
-  font-family: @font-mono;
+.lg-flows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
 }
 
-.legend-bar-divider {
-  width: 1px;
-  height: 22px;
-  background: @ungrey-border;
-  flex-shrink: 0;
-}
-
-.legend-nodes {
+.lg-flow {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  gap: 2px;
-}
+  gap: 7px;
+  font-size: 11px;
+  color: @ungrey-dark;
+  transition: opacity 0.2s;
 
-.legend-nodes-hint {
-  font-size: 8px;
-  color: @ungrey-text;
-  font-family: @font-mono;
-  white-space: nowrap;
-}
+  &.is-off { opacity: 0.35; }
 
-.legend-node {
-  border-radius: 50%;
-  flex-shrink: 0;
-  display: inline-block;
-}
-
-.legend-threshold-badge {
-  font-size: 8px;
-  font-weight: 700;
-  background: @unblue-bg;
-  color: @unblue-dark;
-  border: 1px solid @unblue-dark;
-  border-radius: 99px;
-  padding: 1px 5px;
-  white-space: nowrap;
-
-  &.manual {
-    background: #fefce8;
-    color: #92400e;
-    border-color: #fcd34d;
+  .lg-swatch {
+    width: 18px;
+    height: 3px;
+    flex-shrink: 0;
   }
+
+  .lg-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .lg-stat {
+    font-variant-numeric: tabular-nums;
+    font-size: 10.5px;
+    color: @ungrey-text;
+    white-space: nowrap;
+  }
+}
+
+.lg-note {
+  font-size: 10px;
+  color: @ungrey-text;
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+.lg-nodes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: @ungrey-text;
+
+  .lg-node {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+  .lg-nodes-end { white-space: nowrap; }
+}
+
+.lg-shown {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-size: 11px;
+}
+
+// The label text is upper case in the DOM (AUTO, FIXED · TOP 50, CONNECT);
+// it is shown in sentence case ("Auto:", "Fixed · top 50:", "Connect:").
+.legend-threshold-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: @ungrey-text;
+  text-transform: lowercase;
+  white-space: nowrap;
+
+  &::first-letter { text-transform: uppercase; }
+  &::after { content: ':'; }
 }
 
 .legend-threshold-val {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: @ungrey-dark;
   font-family: @font-mono;
 }
 
 .legend-arc-count {
-  font-size: 8px;
+  font-size: 10px;
   color: @ungrey-text;
   font-family: @font-mono;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Map tools (zoom in / out / reset), top-left of the map
+// ══════════════════════════════════════════════════════════════
+#map-tools {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid @ungrey-border;
+  border-radius: @radius-md;
+  box-shadow: @shadow-sm;
+  overflow: hidden;
+
+  .map-tool-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: @ungrey-dark;
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+
+    & + .map-tool-btn { border-top: 1px solid @ungrey-bg; }
+    &:hover { background: @unblue-bg; color: @unblue-dark; }
+    &:active { background: @ungrey-bg; }
+    &:focus-visible { outline: 2px solid @unblue; outline-offset: -2px; }
+  }
 }
 
 // ── Insight Side Panel (right) ──────────────────────────────────
@@ -230,19 +213,20 @@
   z-index: 30;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 20px rgba(0,0,0,0.08);
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.06);
   transform: translateX(100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  visibility: hidden;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 0.3s;
 
-  &.open { transform: translateX(0); }
+  &.open { transform: translateX(0); visibility: visible; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
   .panel-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid @ungrey-bg;
-    background: @unblue-bg;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid @ungrey-dark;
+    background: #fff;
     flex-shrink: 0;
 
     .panel-title-group {
@@ -255,12 +239,11 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
       min-width: 0;
     }
 
     #panel-country-name {
-      font-size: 15px;
+      font-size: 18px;
       font-weight: 700;
       color: @ungrey-dark;
       line-height: 1.2;
@@ -270,68 +253,55 @@
     }
 
     #panel-country-meta {
-      font-size: 10px;
+      font-size: 11.5px;
       color: @ungrey-text;
-      margin-top: 2px;
+      margin-top: 3px;
     }
 
+    // Sea routes: an on/off checkbox (experimental feature)
     .searoute-btn {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 3px 8px 3px 7px;
-      border-radius: 99px;
-      border: 1.5px solid @unblue;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 0;
+      border: 0;
       background: transparent;
-      color: @unblue;
+      color: @ungrey-dark;
       cursor: pointer;
       font-family: @font-family;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
-      flex-shrink: 0;
+      font-size: 11.5px;
+      font-weight: 600;
+      line-height: 1.2;
 
-      &:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
-        border-color: @ungrey-border;
-        color: @ungrey-text;
-
-        .searoute-experimental-badge {
-          background: @ungrey-text;
-          color: #fff;
-        }
+      &::before {
+        content: '';
+        flex-shrink: 0;
+        width: 13px;
+        height: 13px;
+        box-sizing: border-box;
+        border: 1.5px solid @ungrey-text;
+        border-radius: @radius-sm;
+        background: #fff no-repeat center / 9px 9px;
+        transition: background-color 0.12s, border-color 0.12s;
       }
 
-      &:hover:not(:disabled) {
-        background: rgba(0, 158, 219, 0.10);
+      &:hover:not(:disabled)::before { border-color: @unblue-dark; }
+      &:focus-visible { outline: 2px solid @unblue; outline-offset: 2px; }
+
+      &.active::before {
+        border-color: @unblue-dark;
+        background-color: @unblue-dark;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5l2.6 2.5L10 3.5' fill='none' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E");
       }
 
-      &.active {
-        background: @unblue;
-        color: #fff;
-        border-color: @unblue;
+      &:disabled { opacity: 0.45; cursor: not-allowed; }
 
-        .searoute-experimental-badge {
-          background: rgba(255, 255, 255, 0.25);
-          color: #fff;
-        }
-      }
-
-      .searoute-btn-label {
-        white-space: nowrap;
-      }
+      .searoute-btn-label { white-space: nowrap; }
 
       .searoute-experimental-badge {
-        font-size: 7px;
-        font-weight: 800;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
-        background: @unyellow-un;
-        color: #4a3800;
-        padding: 1px 5px;
-        border-radius: 3px;
+        font-weight: 400;
+        color: @ungrey-text;
         white-space: nowrap;
       }
     }
@@ -339,21 +309,22 @@
     .btn-close {
       color: @ungrey-text;
       padding: 4px;
-      border-radius: @radius-lg;
+      border-radius: @radius-sm;
       border: none;
       background: transparent;
       cursor: pointer;
       flex-shrink: 0;
-      margin-top: 2px;
+      margin-top: 1px;
       transition: background 0.12s, color 0.12s;
       &:hover { background: @ungrey-bg; color: @ungrey-dark; }
+      &:focus-visible { outline: 2px solid @unblue; outline-offset: 1px; }
     }
   }
 
   #panel-body {
     flex: 1;
     overflow-y: auto;
-    padding: 12px 16px;
+    padding: 14px 16px 20px;
 
     &::-webkit-scrollbar { width: 4px; }
     &::-webkit-scrollbar-track { background: transparent; }
@@ -361,18 +332,5 @@
     &::-webkit-scrollbar-thumb:hover { background: @ungrey; }
   }
 
-  @media (max-width: (@bp-md - 1px)) {
-    width: 100%;
-    height: 50vh;
-    top: auto;
-    bottom: 0;
-    right: 0;
-    left: 0;
-    transform: translateY(100%);
-    border-left: none;
-    border-top: 1px solid @ungrey-border;
-    border-radius: @radius-xl @radius-xl 0 0;
-
-    &.open { transform: translateY(0); }
-  }
+  // Phones: bottom sheet (portrait) or side sheet (landscape) — see mobile.less
 }

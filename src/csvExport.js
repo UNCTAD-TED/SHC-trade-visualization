@@ -45,7 +45,7 @@ async function ensureLoaded() {
 // Per-metric net-flow lookup by undirected pair (fallback when no bilateral history).
 function netMap(metric, year = STATE.year) {
     const m = new Map();
-    ((STATE.metricStore[metric]?.years?.[year]) || []).forEach(d => m.set(pairKey(d.exporter, d.importer), d));
+    ((STATE.metricStore[metric]?.years?.[year]) || []).forEach(d => { m.set(pairKey(d.exporter, d.importer), d); });
     return m;
 }
 
@@ -112,7 +112,8 @@ function scopedFlows(metric) {
     }
     // Top-N limit, applied before the flow-category filter — same order as
     // DataLoader.filterData, so the export and the map agree row-for-arc.
-    if (STATE.topNMode) {
+    // Drawn connections are never cut by it (the map shows them all).
+    if (STATE.topNMode && !(STATE.bilateralPairs && STATE.bilateralPairs.length > 0)) {
         flows = flows.slice().sort((a, b) => b.netValue - a.netValue).slice(0, STATE.topNMode);
     }
     return flows.filter(d => STATE.flowFilters.has(d.flowCategory));
@@ -120,7 +121,7 @@ function scopedFlows(metric) {
 
 function scopeTag() {
     if (STATE.bilateralPairs?.length) return 'connections';
-    const parts = [STATE.region && STATE.region !== 'Global' ? STATE.region : 'Global'];
+    const parts = [STATE.region && STATE.region !== 'Global' ? STATE.region : 'World'];
     if (STATE.selectedExporters.size) parts.push(`${STATE.selectedExporters.size}exp`);
     if (STATE.selectedImporters.size) parts.push(`${STATE.selectedImporters.size}imp`);
     return parts.join('-');
@@ -132,7 +133,7 @@ export function scopeSummary() {
         const n = STATE.bilateralPairs.length;
         return { label: `${n} drawn connection${n > 1 ? 's' : ''}`, count: scopedFlows(STATE.metric).length };
     }
-    const bits = [STATE.region && STATE.region !== 'Global' ? STATE.region : 'Global'];
+    const bits = [STATE.region && STATE.region !== 'Global' ? STATE.region : 'World'];
     if (STATE.selectedExporters.size) bits.push(`${STATE.selectedExporters.size} exporter${STATE.selectedExporters.size > 1 ? 's' : ''}`);
     if (STATE.selectedImporters.size) bits.push(`${STATE.selectedImporters.size} importer${STATE.selectedImporters.size > 1 ? 's' : ''}`);
     return { label: bits.join(' · '), count: scopedFlows(STATE.metric).length };
@@ -326,7 +327,7 @@ export const CsvExport = {
         const open  = () => {
             const { label, count } = scopeSummary();
             const scopeEl = document.getElementById('export-scope');
-            if (scopeEl) scopeEl.textContent = `${label} · ${count.toLocaleString('en-US')} corridor${count === 1 ? '' : 's'}`;
+            if (scopeEl) scopeEl.textContent = `${label} · ${count.toLocaleString('en-US')} net flow${count === 1 ? '' : 's'}`;
             menu.classList.remove('hidden');
             btn.setAttribute('aria-expanded', 'true');
         };
@@ -338,12 +339,13 @@ export const CsvExport = {
         document.addEventListener('click', (e) => {
             if (!menu.contains(e.target) && !btn.contains(e.target)) close();
         });
-        document.querySelectorAll('[data-export]').forEach(el =>
+        document.querySelectorAll('[data-export]').forEach(el => {
             el.addEventListener('click', async (e) => {
                 e.preventDefault();
                 close();
                 await this._run(() => el.dataset.export === 'summary' ? exportSummary() : exportFlows());
-            }));
+            });
+        });
     },
 
     // Focus-anchored buttons: country panel + bilateral (arc) modal.

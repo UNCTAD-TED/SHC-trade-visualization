@@ -1,0 +1,88 @@
+@import 'variables.less';
+
+// ── "Download" menu (header) ───────────────────────────────────
+// The button itself is a .util-btn (header.less); this file styles the menu
+// and the CSV buttons anchored in the country panel and corridor pop-up.
+#export-wrapper { position: relative; }
+
+#export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 280px;
+  background: #fff;
+  border: 1px solid @ungrey-border;
+  border-radius: @radius-lg;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  z-index: 70;
+  padding: 6px;
+  font-family: @font-family;
+  &.hidden { display: none; }
+}
+
+.export-menu-hdr {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: @ungrey-text;
+  padding: 4px 8px 6px;
+}
+.export-scope {
+  font-size: 11px;
+  font-weight: 600;
+  color: @ungrey-dark;
+  text-align: right;
+}
+
+.export-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: 8px;
+  border: none;
+  border-radius: @radius-md;
+  background: transparent;
+  font-family: @font-family;
+  transition: background 0.12s;
+  &:hover, &:focus-visible { background: @unblue-bg; }
+}
+.export-opt-title { font-size: 12px; font-weight: 700; color: @unblue-dark; }
+.export-opt-sub { font-size: 10px; color: @ungrey-text; }
+.export-menu-foot {
+  font-size: 9.5px;
+  color: @ungrey-text;
+  padding: 6px 8px 2px;
+  margin-top: 2px;
+  border-top: 1px solid @ungrey-bg;
+  line-height: 1.4;
+}
+
+// ── Focus-anchored CSV buttons (country panel + corridor pop-up) ──
+.focus-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: @font-family;
+  border: 1px solid @ungrey-border;
+  border-radius: @radius-sm;
+  background: #fff;
+  color: @unblue-dark;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  &:hover { background: @unblue-dark; border-color: @unblue-dark; color: #fff; }
+  &:focus-visible { outline: 2px solid @unblue; outline-offset: 1px; }
+  svg { flex-shrink: 0; }
+}

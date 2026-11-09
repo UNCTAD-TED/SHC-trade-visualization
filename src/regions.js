@@ -3,7 +3,7 @@ export const RegionConfig = {
     regions: {
         "Global": { center: [0, 20], scale: 1 },
         "Africa": { center: [20, 0], scale: 2.5 },
-        "Americas": { center: [-80, 10], scale: 1.8 }, // 北米・南米全体が見える中心位置
+        "Americas": { center: [-80, 10], scale: 1.8 }, // centre that shows both North and South America
         "Asia": { center: [100, 30], scale: 2.0 },
         "Europe": { center: [15, 50], scale: 3.5 },
         "Oceania": { center: [140, -25], scale: 3.0 }
@@ -21,6 +21,8 @@ export const RegionConfig = {
         "NER": "Africa", "NGA": "Africa", "RWA": "Africa", "STP": "Africa", "SEN": "Africa", "SYC": "Africa", 
         "SLE": "Africa", "SOM": "Africa", "ZAF": "Africa", "SSD": "Africa", "SDN": "Africa", "SWZ": "Africa", 
         "TGO": "Africa", "TUN": "Africa", "UGA": "Africa", "TZA": "Africa", "ZMB": "Africa", "ZWE": "Africa",
+        // territories and areas (UN M49: Africa)
+        "ESH": "Africa", "SHN": "Africa", "IOT": "Africa", "ATF": "Africa", "MYT": "Africa", "REU": "Africa",
 
         // --- Americas ---
         "ATG": "Americas", "ARG": "Americas", "BHS": "Americas", "BRB": "Americas", "BLZ": "Americas", 
@@ -30,6 +32,12 @@ export const RegionConfig = {
         "HND": "Americas", "JAM": "Americas", "MEX": "Americas", "NIC": "Americas", "PAN": "Americas", 
         "PRY": "Americas", "PER": "Americas", "KNA": "Americas", "LCA": "Americas", "VCT": "Americas", 
         "SUR": "Americas", "TTO": "Americas", "USA": "Americas", "URY": "Americas", "VEN": "Americas",
+        // territories and areas (UN M49: Americas)
+        "GRL": "Americas", "BMU": "Americas", "SPM": "Americas", "AIA": "Americas", "ABW": "Americas",
+        "BES": "Americas", "VGB": "Americas", "CYM": "Americas", "CUW": "Americas", "BLM": "Americas",
+        "MSR": "Americas", "SXM": "Americas", "TCA": "Americas", "FLK": "Americas", "SGS": "Americas",
+        "BVT": "Americas", "PRI": "Americas", "VIR": "Americas", "GLP": "Americas", "MTQ": "Americas",
+        "GUF": "Americas", "MAF": "Americas",
 
         // --- Asia (Middle East included) ---
         "AFG": "Asia", "ARM": "Asia", "AZE": "Asia", "BHR": "Asia", "BGD": "Asia", "BTN": "Asia", 
@@ -40,7 +48,7 @@ export const RegionConfig = {
         "PRK": "Asia", "OMN": "Asia", "PAK": "Asia", "PHL": "Asia", "QAT": "Asia", "KOR": "Asia", 
         "SAU": "Asia", "SGP": "Asia", "LKA": "Asia", "SYR": "Asia", "TWN": "Asia", "TJK": "Asia", 
         "THA": "Asia", "TLS": "Asia", "TUR": "Asia", "TKM": "Asia", "ARE": "Asia", "UZB": "Asia", 
-        "VNM": "Asia", "YEM": "Asia",
+        "VNM": "Asia", "YEM": "Asia", "PSE": "Asia",
 
         // --- Europe ---
         "ALB": "Europe", "AND": "Europe", "AUT": "Europe", "BLR": "Europe", "BEL": "Europe", "BIH": "Europe", 
@@ -51,11 +59,17 @@ export const RegionConfig = {
         "POL": "Europe", "PRT": "Europe", "ROU": "Europe", "RUS": "Europe", "SMR": "Europe", "SRB": "Europe", 
         "SVK": "Europe", "SVN": "Europe", "ESP": "Europe", "SWE": "Europe", "CHE": "Europe", "UKR": "Europe", 
         "GBR": "Europe", "VAT": "Europe",
+        // territories and areas (UN M49: Europe)
+        "FRO": "Europe", "GIB": "Europe", "GGY": "Europe", "JEY": "Europe", "IMN": "Europe", "ALA": "Europe", "SJM": "Europe",
 
         // --- Oceania ---
         "AUS": "Oceania", "FJI": "Oceania", "KIR": "Oceania", "MHL": "Oceania", "FSM": "Oceania", 
         "NRU": "Oceania", "NZL": "Oceania", "PLW": "Oceania", "PNG": "Oceania", "WSM": "Oceania", 
-        "SLB": "Oceania", "TON": "Oceania", "TUV": "Oceania", "VUT": "Oceania"
+        "SLB": "Oceania", "TON": "Oceania", "TUV": "Oceania", "VUT": "Oceania",
+        // territories and areas (UN M49: Oceania)
+        "NCL": "Oceania", "PYF": "Oceania", "WLF": "Oceania", "ASM": "Oceania", "GUM": "Oceania",
+        "MNP": "Oceania", "UMI": "Oceania", "NIU": "Oceania", "COK": "Oceania", "TKL": "Oceania",
+        "PCN": "Oceania", "NFK": "Oceania", "CXR": "Oceania", "CCK": "Oceania", "HMD": "Oceania"
     },
 
     getRegion(isoCode) {

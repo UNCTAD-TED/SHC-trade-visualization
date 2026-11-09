@@ -1,124 +1,206 @@
 @import 'variables.less';
 
-// ── Shared panel content — data insight sections ───────────────
-.si-section {
-  margin-bottom: 14px;
+// ══════════════════════════════════════════════════════════════
+//  Country panel, corridor and comparison pop-ups
+//  House style: a statistical profile in the manner of UNCTADstat —
+//  white page, hairline rules, sentence-case headings, figures in
+//  tabular numerals, flat charts. No tinted cards, pills or gauges.
+// ══════════════════════════════════════════════════════════════
 
-  & + .si-section {
-    border-top: 1px solid @ungrey-bg;
-    padding-top: 14px;
-  }
+@si-ink:   @ungrey-dark;     // text
+@si-muted: @ungrey-text;     // labels and notes
+@si-rule:  @ungrey-border;   // hairlines
+
+.si-num { font-variant-numeric: tabular-nums; }
+
+// ── Sections ──────────────────────────────────────────────────
+.si-section {
+  padding: 14px 0 16px;
+  border-top: 1px solid @si-rule;
+
+  &:first-child { border-top: 0; padding-top: 4px; }
 }
 
 .si-label {
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 700;
-  color: @ungrey-text;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 8px;
+  line-height: 1.3;
+  color: @si-ink;
+  margin: 0 0 2px;
 }
 
 .si-sublabel {
-  font-size: 8px;
-  color: @ungrey;
-  font-style: italic;
-  margin-bottom: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: @si-muted;
+  margin-bottom: 10px;
 }
 
-// ── KPI grid (3-col for arc modal, 2-col for insight panel) ──
+.si-note {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: @si-muted;
+  margin-top: 8px;
+
+  b { font-weight: 600; color: @si-ink; }
+}
+
+// ── In brief (generated summary) ──────────────────────────────
+.si-narrative-box {
+  margin-top: 6px;
+
+  p {
+    font-size: 13px;
+    line-height: 1.55;
+    color: @si-ink;
+    margin: 0 0 8px;
+
+    &:last-child { margin-bottom: 0; }
+  }
+
+  .si-empty { color: @si-muted; }
+}
+
+// ── Key figures (large numbers divided by hairlines) ──────────
 .si-kpi-grid {
   display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
+  margin: 8px 0 0;
 
-  &.cols-3 { grid-template-columns: repeat(3, 1fr); }
-  &.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  &.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  &.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .si-kpi-card {
-  border-radius: @radius-lg;
-  padding: 8px 10px;
-  text-align: center;
+  min-width: 0;
+  padding: 0 12px 0 0;
+
+  & + .si-kpi-card {
+    padding-left: 12px;
+    border-left: 1px solid @si-rule;
+  }
 
   .si-kpi-label {
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: 11px;
+    line-height: 1.35;
+    color: @si-muted;
     margin-bottom: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .si-kpi-value {
-    font-size: 13px;
+    font-size: 20px;
     font-weight: 700;
-    font-family: @font-mono;
-    color: @ungrey-dark;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: @si-ink;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
-  &.exp {
-    background: rgba(0, 119, 184, 0.09);
-    border: 1px solid rgba(0, 119, 184, 0.22);
-    .si-kpi-label { color: @unblue-dark; }
+  .si-kpi-note {
+    font-size: 11px;
+    color: @si-muted;
+    margin-top: 3px;
   }
 
-  &.net {
-    background: @unblue-bg;
-    border: 1px solid @ungrey-border;
-    .si-kpi-label { color: @ungrey-text; }
-  }
-
-  &.imp {
-    background: rgba(237, 24, 71, 0.07);
-    border: 1px solid rgba(237, 24, 71, 0.18);
-    .si-kpi-label { color: @unred-dark; }
-  }
+  .cols-3 & .si-kpi-value { font-size: 17px; }
 }
 
-// ── Inline badge (flow category, etc.) ───────────────────────
+// Net exporter / net importer, written out under the net balance
+.si-role-badge {
+  font-weight: 600;
+  color: @si-ink;
+
+  &::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 5px;
+    border-radius: 50%;
+    vertical-align: 0.05em;
+  }
+  &.exp::before { background: @unblue; }
+  &.imp::before { background: @unred; }
+}
+
+// Flow type of a corridor ("North → South flow"): text with a colour key
 .si-badge {
-  display: inline-block;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 10px;
-  border-radius: 99px;
-  border: 1px solid;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: @si-ink;
+
+  .si-key {
+    width: 14px;
+    height: 3px;
+    flex-shrink: 0;
+  }
 }
 
-// ── Chart legend ──────────────────────────────────────────────
+.si-flowtype {
+  margin-top: 10px;
+  font-size: 11px;
+  color: @si-muted;
+}
+
+// ── Chart key ─────────────────────────────────────────────────
 .si-chart-legend {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
+  gap: 4px 14px;
+  margin-bottom: 8px;
 
   .si-legend-item {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
 
     .si-legend-swatch {
-      width: 12px;
-      height: 2px;
-      border-radius: 1px;
+      width: 10px;
+      height: 10px;
       flex-shrink: 0;
     }
 
-    span { font-size: 9px; color: @ungrey-text; }
+    span { font-size: 11px; color: @si-muted; }
   }
 }
 
-// ── Data table ────────────────────────────────────────────────
+.si-chart-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 8px 0 0;
+
+  .si-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    .si-legend-swatch { width: 10px; height: 10px; flex-shrink: 0; }
+    span { font-size: 11px; color: @si-muted; }
+  }
+}
+
+// ── Tables ────────────────────────────────────────────────────
 .si-table {
   width: 100%;
   border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 
   th {
-    padding: 3px 8px;
-    font-size: 9px;
-    color: @ungrey-text;
-    font-weight: 700;
-    border-bottom: 1px solid @ungrey-border;
+    padding: 0 6px 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: @si-muted;
+    border-bottom: 1px solid @si-ink;
+    vertical-align: bottom;
 
     &.ar { text-align: right; }
     &.ac { text-align: center; }
@@ -126,237 +208,310 @@
   }
 
   td {
-    padding: 4px 8px;
-    font-size: 10px;
-    font-family: @font-mono;
+    padding: 5px 6px;
+    font-size: 12px;
+    color: @si-ink;
+    border-bottom: 1px solid @ungrey-bg;
 
     &.ar { text-align: right; }
     &.ac { text-align: center; }
     &.al { text-align: left; }
     &.bold { font-weight: 700; }
-    &.muted { color: @ungrey-text; }
-    &.cur { color: @unblue-dark; font-weight: 700; }
+    &.muted { color: @si-muted; }
+    &.cur { font-weight: 700; }
   }
 
-  tr:hover td { background: @unblue-bg; }
-  tr.row-cur td { background: rgba(0, 119, 184, 0.08); }
+  th:first-child, td:first-child { padding-left: 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+
+  tr.row-cur td { font-weight: 700; background: @unblue-bg; }
 }
 
-// ── Narrative / Auto-Insights box ────────────────────────────
-.si-narrative-box {
-  background: rgba(0, 73, 144, 0.06);
-  border: 1px solid rgba(0, 73, 144, 0.14);
-  border-radius: @radius-lg;
-  padding: 12px;
-  margin-bottom: 14px;
+// ── Partner concentration (HHI): score + linear scale ─────────
+.si-hhi {
+  .si-hhi-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
 
-  .si-narrative-title {
-    font-size: 9px;
+  .hhi-score {
+    font-size: 26px;
     font-weight: 700;
-    color: @unblue-dark;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 8px;
+    line-height: 1;
+    color: @si-ink;
+    font-variant-numeric: tabular-nums;
   }
 
-  p {
-    font-size: 11px;
-    color: @ungrey-dark;
-    line-height: 1.5;
-    margin: 0 0 6px;
+  .si-badge { font-size: 12px; }
+  .hhi-of { font-size: 11px; color: @si-muted; }
+}
 
-    &:last-child { margin-bottom: 0; }
+// The 0–10,000 scale, shaded in three bands (2,000 and 4,000 are the cut-offs)
+.si-hhi-scale {
+  position: relative;
+  height: 10px;
+  display: grid;
+  grid-template-columns: 20fr 20fr 60fr;
+  gap: 1px;
+
+  .hhi-band { height: 100%; }
+  .hhi-band-1 { background: #d9eaf6; }
+  .hhi-band-2 { background: #a9d0ec; }
+  .hhi-band-3 { background: #6fb2df; }
+
+  .hhi-marker {
+    position: absolute;
+    top: -4px;
+    width: 2px;
+    height: 18px;
+    margin-left: -1px;
+    background: @si-ink;
   }
 }
 
-// ── Role badge ────────────────────────────────────────────────
-.si-role-wrap {
-  display: flex;
-  justify-content: center;
-  margin-top: 8px;
-}
-
-.si-role-badge {
-  display: inline-block;
+.si-hhi-axis {
+  position: relative;
+  height: 14px;
+  margin-top: 4px;
   font-size: 10px;
-  font-weight: 700;
-  padding: 3px 14px;
-  border-radius: 99px;
+  color: @si-muted;
+  font-variant-numeric: tabular-nums;
 
-  &.exp { background: rgba(0, 158, 219, 0.12); color: @unblue; }
-  &.imp { background: rgba(237, 24, 71, 0.10); color: @unred-dark; }
+  span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+  span:first-child { transform: none; }
+  span:last-child { transform: translateX(-100%); }
 }
 
-// ── Card box (gauge, charts) ──────────────────────────────────
-.si-card {
-  background: @unblue-bg;
-  border: 1px solid @ungrey-border;
-  border-radius: @radius-lg;
-  padding: 12px;
+.si-hhi-bands {
+  display: grid;
+  grid-template-columns: 20fr 20fr 60fr;
+  gap: 1px;
+  font-size: 10px;
+  color: @si-muted;
+  margin-top: 1px;
+
+  span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  span:last-child { text-align: right; }
 }
 
-// ── Trading partner list ──────────────────────────────────────
+.si-hhi-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+  border-top: 1px solid @si-rule;
+  padding-top: 10px;
+
+  > div { min-width: 0; padding-right: 10px; }
+  > div + div { padding-left: 10px; border-left: 1px solid @si-rule; }
+
+  .hhi-l { font-size: 11px; color: @si-muted; }
+  .hhi-v { font-size: 16px; font-weight: 700; color: @si-ink; font-variant-numeric: tabular-nums; line-height: 1.3; }
+  .hhi-s { font-size: 11px; color: @si-muted; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+// ── Main partners: a ruled table ──────────────────────────────
+@si-partner-cols: 16px 12px minmax(0, 1fr) 34px 62px 40px 36px;
+
 .si-partners {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+}
+
+.si-partner-head,
+.si-partner-row {
+  display: grid;
+  grid-template-columns: @si-partner-cols;
+  align-items: center;
+  column-gap: 5px;
+}
+
+.si-partner-head {
+  align-items: end;
+  padding-bottom: 5px;
+  border-bottom: 1px solid @si-ink;
+  font-size: 10px;
+  font-weight: 600;
+  color: @si-muted;
+  line-height: 1.2;
+
+  .h-rank { grid-column: 1 / span 2; }
+  .h-name { grid-column: 3; }
+  .h-val { grid-column: 4 / span 2; text-align: right; }
+  .h-split, .h-their { text-align: right; }
+  span[title] { cursor: help; }
 }
 
 .si-partner-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  position: relative;
+  min-height: 26px;
+  border-bottom: 1px solid @ungrey-bg;
+  font-variant-numeric: tabular-nums;
 
-  .si-rank {
-    font-size: 9px;
-    font-family: @font-mono;
-    color: @ungrey-text;
-    flex-shrink: 0;
-    min-width: 28px;
-  }
+  .si-rank { font-size: 11px; color: @si-muted; }
 
   .si-arrow {
-    font-weight: 700;
-    font-size: 10px;
-    flex-shrink: 0;
+    font-size: 11px;
+    color: @si-muted;
+    text-align: center;
   }
 
   .si-name {
-    flex: 1;
-    font-size: 11px;
-    color: @ungrey-dark;
+    font-size: 12px;
+    color: @si-ink;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .si-bar-wrap {
-    width: 36px;
-    height: 5px;
+    height: 6px;
     background: @ungrey-bg;
-    border-radius: 99px;
-    overflow: hidden;
-    flex-shrink: 0;
 
-    .si-bar-fill {
-      height: 100%;
-      border-radius: 99px;
-      opacity: 0.75;
-    }
-  }
-
-  .si-split {
-    font-size: 9px;
-    font-family: @font-mono;
-    font-weight: 700;
-    flex-shrink: 0;
-    width: 34px;
-    text-align: right;
+    .si-bar-fill { height: 100%; }
   }
 
   .si-val {
-    font-size: 10px;
-    font-family: @font-mono;
-    color: @ungrey-text;
-    width: 44px;
+    font-size: 12px;
+    font-weight: 600;
+    color: @si-ink;
     text-align: right;
-    flex-shrink: 0;
+    white-space: nowrap;
   }
 
+  .si-split, .si-their {
+    font-size: 11px;
+    text-align: right;
+    white-space: nowrap;
+    color: @si-muted;
+  }
+
+  .si-split .is-strong { font-weight: 600; }
+  .si-their.is-top { color: @si-ink; font-weight: 600; }
+
+  // Shown on hover / focus, over the bar column (the figures stay readable)
   .si-actions {
+    position: absolute;
+    right: 153px;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
-    gap: 3px;
-    flex-shrink: 0;
+    gap: 2px;
+    padding-left: 10px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0), #fff 10px);
     opacity: 0;
+    pointer-events: none;
     transition: opacity 0.12s;
   }
 
-  &:hover .si-actions { opacity: 1; }
+  &:hover, &:focus-within {
+    background: @unblue-bg;
+    .si-actions { opacity: 1; pointer-events: auto; background: linear-gradient(to right, rgba(242, 248, 252, 0), @unblue-bg 10px); }
+  }
 }
 
-// ── Action buttons ────────────────────────────────────────────
 .si-btn {
-  font-size: 8px;
-  padding: 2px 6px;
-  border-radius: @radius-sm;
-  background: @ungrey-bg;
-  color: @ungrey-text;
-  border: none;
-  cursor: pointer;
   font-family: @font-family;
-  transition: background 0.12s, color 0.12s;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: @radius-sm;
+  background: #fff;
+  color: @unblue-text;
+  border: 1px solid @si-rule;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 
-  &:hover { background: @unblue-dark; color: #fff; }
-  &.cmp:hover { background: #b45309; }
+  &:hover { background: @unblue-dark; border-color: @unblue-dark; color: #fff; }
+  &:focus-visible { outline: 2px solid @unblue; outline-offset: 1px; }
 }
 
-// ── Flow composition bar ──────────────────────────────────────
+// ── Flow composition: one flat stacked bar + a key table ──────
 .si-flow-bar {
   display: flex;
-  height: 6px;
-  border-radius: 99px;
-  overflow: hidden;
+  height: 10px;
   gap: 1px;
-  margin-bottom: 8px;
+  margin: 2px 0 10px;
+  background: #fff;
 }
 
-.si-comp-rows { display: flex; flex-direction: column; gap: 4px; }
+.si-comp-rows { display: flex; flex-direction: column; }
 
 .si-comp-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid @ungrey-bg;
 
-  .si-comp-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
+  &:last-child { border-bottom: 0; }
 
-  .si-comp-label { flex: 1; font-size: 10px; color: @ungrey-dark; }
-  .si-comp-pct { font-size: 10px; font-weight: 700; font-family: @font-mono; }
+  .si-comp-dot { width: 10px; height: 10px; flex-shrink: 0; }
+  .si-comp-label { flex: 1; font-size: 12px; color: @si-ink; }
+  .si-comp-pct { font-size: 12px; font-weight: 600; color: @si-ink; font-variant-numeric: tabular-nums; }
 }
 
-// ── HHI stats row ─────────────────────────────────────────────
-.si-hhi-stats {
+// ── Charts drawn as SVG ───────────────────────────────────────
+.si-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: @font-family;
+}
+
+// Small colour key in table heads and labels
+.si-key-sq {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  vertical-align: 0;
+}
+
+// Body rows can carry a row label (comparison table)
+.si-table tbody th {
+  padding: 5px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: @si-muted;
+  border-bottom: 1px solid @ungrey-bg;
+}
+
+// ── Comparison pop-up: two named columns around a label column ─
+.si-compare-head {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid @ungrey-border;
-  text-align: center;
+  grid-template-columns: 2fr 1fr 2fr;
+  padding-bottom: 8px;
+  border-bottom: 1px solid @si-ink;
 
-  .hhi-l { font-size: 8px; color: @ungrey-text; text-transform: uppercase; font-weight: 700; }
-  .hhi-v { font-size: 12px; font-weight: 700; font-family: @font-mono; color: @ungrey-dark; }
-  .hhi-s { font-size: 8px; color: @ungrey-text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-}
-
-// ── Chart footer legend (polar / butterfly) ───────────────────
-.si-chart-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 8px;
-
-  .si-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-
-    .si-legend-swatch { width: 10px; height: 3px; border-radius: 2px; }
-    span { font-size: 9px; color: @ungrey-dark; }
+  .si-compare-name {
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: @si-ink;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+  .is-a { text-align: right; }
+  .is-b { grid-column: 3; }
 }
 
-// ── Partners header row ───────────────────────────────────────
-.si-partners-hdr {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+.si-compare-table {
+  table-layout: fixed;
 
-  .si-partners-hint { font-size: 8px; color: @ungrey; font-style: italic; }
+  tr > :nth-child(2) { width: 20%; }
+  tr > :first-child { padding-right: 10px; }
+  tr > :last-child { padding-left: 10px; }
+}
+
+// Narrow screens: the three corridor figures need a smaller size
+@media (max-width: 480px) {
+  .si-kpi-grid.cols-3 .si-kpi-card .si-kpi-value { font-size: 15px; }
+  .si-kpi-grid.cols-3 .si-kpi-card + .si-kpi-card { padding-left: 8px; }
+  .si-kpi-grid.cols-3 .si-kpi-card { padding-right: 8px; }
 }

@@ -1,62 +1,73 @@
 @import 'variables.less';
 
+// ══════════════════════════════════════════════════════════════
+//  Key figures for the current view
+// ══════════════════════════════════════════════════════════════
 #kpi-bar {
-  background: rgba(255,255,255,0.97);
-  border-bottom: 1px solid rgba(203,213,224,0.9);
-  padding: 6px 16px;
-  z-index: 20;
+  background: @unblue-bg;
+  border-bottom: 1px solid @ungrey-border;
   flex-shrink: 0;
-  transition: all 0.3s ease;
+  z-index: 20;
 
   .kpi-inner {
     max-width: @content-max-width;
     margin: 0 auto;
+    padding: 6px 16px;
     display: flex;
     align-items: center;
-    gap: 16px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    justify-content: flex-start;
-
-    @media (min-width: @bp-md) { justify-content: center; flex-wrap: wrap; }
+    justify-content: center;
+    gap: 6px 18px;
+    flex-wrap: wrap;
   }
 
   .kpi-item {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: 6px;
     white-space: nowrap;
-    flex-shrink: 0;
-
-    &.kpi-item-col {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0;
-    }
+    min-width: 0;
   }
 
   .kpi-label {
-    font-size: var(--fs-micro);
+    font-size: 11px;
     color: @ungrey-text;
-    text-transform: uppercase;
-    font-weight: 600;
-    letter-spacing: 0.05em;
+    font-weight: 500;
   }
 
   .kpi-value {
-    font-size: var(--fs-sm);
+    font-size: 13px;
     font-weight: 700;
-    font-family: @font-mono;
+    font-variant-numeric: tabular-nums;
     color: @ungrey-dark;
-    transition: color 0.3s ease;
+    overflow: hidden;
+    text-overflow: ellipsis;
 
-    // Semantic color variants (mirror reference kpi.css). Prefer these
-    // over inline `style="color:#…"` in index.html so palette changes
-    // stay in the tokens layer (src/styles/variables.less).
-    &.kpi-value-exp { color: var(--un-color-blue-dark); }
-    &.kpi-value-imp { color: var(--un-color-red); }
-    &.kpi-value-ns  { color: var(--un-color-blue); }
-    &.kpi-value-ss  { color: var(--un-color-yellow); }
+    // A small key in front of the value (circle = economy, line = flow direction)
+    &.kpi-value-exp::before,
+    &.kpi-value-imp::before,
+    &.kpi-value-ns::before,
+    &.kpi-value-ss::before {
+      content: '';
+      display: inline-block;
+      margin-right: 5px;
+    }
+    &.kpi-value-exp::before, &.kpi-value-imp::before { width: 8px; height: 8px; border-radius: 50%; vertical-align: 0.05em; }
+    &.kpi-value-ns::before, &.kpi-value-ss::before { width: 12px; height: 3px; vertical-align: 0.25em; }
+    &.kpi-value-exp::before { background: var(--un-color-blue); }
+    &.kpi-value-imp::before { background: var(--un-color-red); }
+    &.kpi-value-ns::before  { background: var(--flow-north-south); }
+    &.kpi-value-ss::before  { background: var(--flow-south-south); }
+  }
+
+  .kpi-sub {
+    font-size: 11px;
+    color: @ungrey-text;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-scope .kpi-value {
+    color: @ungrey-dark;
+    max-width: 260px;
   }
 
   .kpi-divider {
@@ -64,5 +75,10 @@
     height: 16px;
     background: @ungrey-border;
     flex-shrink: 0;
+  }
+
+  // Narrow desktops: the two share figures give way so the bar fits one row
+  @media (max-width: 1199px) and (min-width: 768px) {
+    .kpi-share, .kpi-share-div { display: none; }
   }
 }
