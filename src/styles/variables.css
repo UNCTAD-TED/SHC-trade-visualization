@@ -1,0 +1,41 @@
+/* Layout, typography and shape tokens (colours: colors.css).
+
+   Layout modes — CSS cannot keep media queries in variables, so the rules repeat them.
+   Keep in sync with COMPACT_MQ in src/config.js.
+     compact        (max-width: 767px), (max-height: 500px) and (max-width: 1024px)
+                    phones in any orientation: bottom navigation, filter sheet
+     compact-tall   (max-width: 767px) and (min-height: 501px)      portrait phones
+     compact-short  (max-height: 500px) and (max-width: 1024px)     landscape phones
+     desktop        (min-width: 768px) and (min-height: 501px), (min-width: 1025px)
+     narrow         (max-width: 1279px)     small laptops and tablets: icon-only header buttons */
+:root {
+  /* Layout */
+  --content-max-width: 1600px;
+  --panel-insight-width: clamp(280px, 25vw, 380px);
+  --nav-h: 58px; /* phone bottom navigation bar */
+  --si-partner-cols: 16px 12px minmax(0, 1fr) 34px 62px 40px 36px; /* partner table (insight.css) */
+
+  /* Typography */
+  --font-family: Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'Inter', ui-monospace, monospace;
+  /* Font sizes (same scale as the unctad-infovis tracker) */
+  --fs-micro: 0.5625rem; /* 9px */
+  --fs-xxs: 0.625rem; /* 10px */
+  --fs-xs: 0.6875rem; /* 11px */
+  --fs-sm: 0.75rem; /* 12px */
+  --fs-label: 0.8125rem; /* 13px */
+  --fs-base: 0.875rem; /* 14px */
+  --fs-body: 0.9375rem; /* 15px */
+  --fs-md: 1.0625rem; /* 17px */
+  --fs-xl: 1.5rem; /* 24px */
+
+  /* Border radius — unctad.org is near-square (most of its rules use 0) */
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 8%);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 10%);
+}

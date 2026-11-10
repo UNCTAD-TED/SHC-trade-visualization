@@ -1,0 +1,950 @@
+/* The monitor is a box of at most 1350px, centred: the size it has on the
+   UNCTAD.org page (#app-root-2026-second_hand_clothes). Its height follows the
+   content (the map is a 16:9 box), so on short screens the page scrolls. */
+html {
+  background: #fff;
+  margin: 0 auto;
+  max-width: 1350px;
+  padding: 0;
+}
+
+/* Global reset & base */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--unblue-bg-alt);
+  border-bottom: 4px solid var(--un-color-blue); /* UNCTAD accent line under the app */
+  color: var(--ungrey-dark);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-family);
+  font-size: 16px;
+  letter-spacing: normal;
+  line-height: normal;
+  margin: 0;
+  /* clip, not hidden: hidden would make the app a scroll container, and the phone
+     bottom bar (position: sticky) would stick to the app instead of the screen. */
+  overflow: clip;
+  padding: 0;
+  position: relative;
+  text-align: left;
+  @media (max-width: 767px), (max-height: 500px) and (max-width: 1024px) {
+    border-bottom: none;
+  }
+}
+
+/* Utility */
+.hidden {
+  /* biome-ignore lint/complexity/noImportantStyles: a hide utility must win over every component's own display */
+  display: none !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--unblue-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--un-color-grey-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--un-color-grey);
+}
+
+/* Layout shells */
+main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Map container */
+#map-container {
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+  z-index: 0;
+}
+
+.map-area {
+  background: var(--unblue-bg-alt);
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Tablets and computers: the map is a 16:9 box, 400–600px tall.
+   (Phones: portrait sizes the map by the width, landscape by the screen; see mobile.css.) */
+@media (min-width: 768px) and (min-height: 501px), (min-width: 1025px) {
+  .map-area {
+    aspect-ratio: 16 / 9;
+    max-height: 600px;
+    min-height: 400px;
+  }
+  /* Animate: the bar-chart race needs more height than the 16:9 box */
+  body.anim-mode .map-area {
+    aspect-ratio: auto;
+    max-height: none;
+    min-height: 650px;
+  }
+}
+
+/* Map footer (source, notes, logos) */
+#map-footer {
+  background: var(--unblue-bg);
+  border-top: 1px solid var(--un-color-grey-light);
+  flex-shrink: 0;
+  padding: 6px 16px;
+
+  .footer-row {
+    align-items: center;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    margin: 0 auto;
+    max-width: var(--content-max-width);
+  }
+
+  p {
+    color: var(--un-color-grey-dark);
+    font-size: 10.5px;
+    line-height: 1.5;
+    margin: 0;
+
+    strong {
+      color: var(--ungrey-dark);
+      font-weight: 700;
+    }
+    a {
+      color: var(--un-color-blue-darkest);
+      text-underline-offset: 2px;
+      &:hover {
+        color: var(--un-color-blue);
+      }
+    }
+  }
+
+  .footer-logos img {
+    display: block;
+    height: 26px;
+    opacity: 0.75;
+    width: auto;
+  }
+
+  @media (max-width: 767px), (max-height: 500px) and (max-width: 1024px) {
+    display: none;
+  }
+}
+
+/* Tooltip */
+#tooltip {
+  background: #fff;
+  border: 1px solid var(--un-color-grey-light);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  color: var(--ungrey-dark);
+  display: none;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  max-width: 300px;
+  min-width: 248px;
+  padding: 11px 13px 12px;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 0.15s ease;
+  z-index: 50;
+
+  .tt-head {
+    align-items: baseline;
+    border-bottom: 1px solid var(--ungrey-dark);
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding-bottom: 7px;
+  }
+  .tt-name {
+    font-size: var(--fs-base);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .tt-meta {
+    color: var(--un-color-grey-dark);
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+
+  .tt-figs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .tt-fig {
+    min-width: 0;
+    padding-right: 10px;
+  }
+  .tt-fig + .tt-fig {
+    border-left: 1px solid var(--un-color-grey-light);
+    padding: 0 0 0 10px;
+  }
+  .tt-fig-l {
+    color: var(--un-color-grey-dark);
+    font-size: 10.5px;
+  }
+  .tt-fig-v {
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .tt-role {
+    font-size: 10.5px;
+    font-weight: 600;
+    &::before {
+      border-radius: 50%;
+      content: '';
+      display: inline-block;
+      height: 7px;
+      margin-right: 4px;
+      vertical-align: 0.05em;
+      width: 7px;
+    }
+    &.exp::before {
+      background: var(--un-color-blue);
+    }
+    &.imp::before {
+      background: var(--un-color-red);
+    }
+  }
+
+  .tt-sec {
+    border-top: 1px solid var(--un-color-grey-light);
+    margin-top: 9px;
+    padding-top: 8px;
+  }
+  .tt-title {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+
+  .tt-prow {
+    align-items: center;
+    display: grid;
+    font-size: var(--fs-xs);
+    gap: 6px;
+    grid-template-columns: 10px 86px minmax(0, 1fr) 58px;
+    margin-bottom: 3px;
+  }
+  .tt-arrow {
+    font-weight: 700;
+  }
+  .tt-pname {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tt-pbar {
+    background: var(--un-color-grey-lightest);
+    height: 5px;
+    span {
+      display: block;
+      height: 100%;
+    }
+  }
+  .tt-pval {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .tt-compbar {
+    display: flex;
+    gap: 1px;
+    height: 6px;
+    span {
+      height: 100%;
+    }
+  }
+  .tt-comp {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 10.5px;
+    gap: 2px 5px;
+    margin-top: 5px;
+    i {
+      display: inline-block;
+      height: 7px;
+      margin-right: 4px;
+      width: 7px;
+    }
+    .tt-sep {
+      color: var(--un-color-grey);
+    }
+  }
+
+  .tt-trend-head {
+    align-items: baseline;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+  }
+  .tt-trend-figs {
+    color: var(--un-color-grey-dark);
+    display: flex;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    gap: 8px;
+  }
+  .tt-trend {
+    display: block;
+    height: 28px;
+    width: 100%;
+  }
+  .tt-years {
+    color: var(--un-color-grey-dark);
+    display: flex;
+    font-size: var(--fs-xxs);
+    justify-content: space-between;
+    margin-top: 2px;
+  }
+
+  .tt-rank {
+    border-top: 1px solid var(--un-color-grey-light);
+    color: var(--un-color-grey-dark);
+    font-size: 10.5px;
+    margin-top: 8px;
+    padding-top: 7px;
+    b {
+      color: var(--ungrey-dark);
+      font-size: 11.5px;
+    }
+  }
+}
+
+/* Loader overlay */
+#loader {
+  align-items: center;
+  background: var(--unblue-bg-alt);
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  z-index: 50;
+
+  .loader-spinner {
+    animation: spin 0.8s linear infinite;
+    border: 4px solid rgb(0 73 144 / 20%);
+    border-radius: 50%;
+    border-top-color: var(--un-color-blue-darkest);
+    height: 48px;
+    margin-bottom: 16px;
+    width: 48px;
+  }
+
+  p {
+    animation: pulse 1.5s ease-in-out infinite;
+    color: var(--un-color-blue-darkest);
+    font-family: var(--font-mono);
+    font-size: var(--fs-label);
+    margin: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Map elements (D3 SVG) */
+.land {
+  cursor: grab;
+  transition: fill 0.2s ease;
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+/* Political border lines (UN cartographic standard)
+   All political border lines render in WHITE so they read as negative
+   space between tan land polygons and do not visually assert sovereignty
+   on disputed lines (Kashmir, Golan, West Bank, Kosovo, DMZ, Abyei,
+   Hala'ib, Western Sahara, Ogaden).
+   
+   stroke-width and stroke-dasharray are refreshed per zoom step by the
+   zoom handler in src/map.js (search "border-dashed"). Only stroke color
+   and shared attributes live here. */
+.border {
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+}
+.border-plain {
+  stroke: var(--col-border-plain);
+}
+.border-dashed {
+  stroke: var(--col-border-dashed);
+}
+.border-dotted {
+  stroke: var(--col-border-dashed);
+}
+.border-dash-dotted {
+  stroke: var(--col-border-dashed);
+}
+
+/* Small island-nation point markers */
+.economy-point {
+  pointer-events: none;
+}
+
+.trade-arc {
+  cursor: pointer;
+  fill: none;
+  pointer-events: stroke;
+  stroke-linecap: round;
+  &:hover {
+    filter: brightness(1.6);
+  }
+}
+
+.focus-halo {
+  pointer-events: none;
+}
+.focus-halo .halo-core {
+  fill: var(--un-color-blue-darkest);
+  stroke: #fff;
+  stroke-width: 1;
+}
+.focus-halo .halo-pulse {
+  fill: none;
+  stroke: var(--un-color-blue-darkest);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.focus-halo .halo-pulse-1 {
+  animation: halo-pulse 2.2s ease-out infinite;
+}
+.focus-halo .halo-pulse-2 {
+  animation: halo-pulse 2.2s ease-out infinite;
+  animation-delay: 1.1s;
+}
+@keyframes halo-pulse {
+  0% {
+    opacity: 0.85;
+    stroke-width: 2.5;
+    transform: scale(0.4);
+  }
+  80% {
+    opacity: 0.05;
+  }
+  100% {
+    opacity: 0;
+    stroke-width: 0.5;
+    transform: scale(2.6);
+  }
+}
+
+.trade-particle {
+  pointer-events: none;
+}
+
+/* Lines darken where they cross (multiply). Applied once to the whole layer: on every
+   line it cost a separate compositing pass per line and made adding lines stutter. */
+.flow-layer {
+  mix-blend-mode: multiply;
+}
+
+/* Interactive line filter
+   Cursor + pickable affordance while the draw mode is active. */
+.map-2d-layer.line-filter-mode {
+  cursor: crosshair;
+}
+.map-2d-layer.line-filter-mode .land {
+  cursor: crosshair;
+  &:active {
+    cursor: crosshair;
+  }
+}
+.map-2d-layer.line-filter-mode .country-node,
+.map-2d-layer.line-filter-mode .economy-point {
+  cursor: crosshair;
+}
+
+.line-filter-layer {
+  pointer-events: none;
+}
+.line-filter-temp {
+  animation: line-filter-dash 0.6s linear infinite;
+  fill: none;
+  opacity: 0.9;
+  stroke: var(--un-color-blue-darkest);
+  stroke-linecap: round;
+}
+.line-filter-tip {
+  fill: var(--un-color-blue-darkest);
+  stroke: #fff;
+  stroke-width: 0.6;
+}
+@keyframes line-filter-dash {
+  to {
+    stroke-dashoffset: -11;
+  }
+}
+
+.line-filter-start .lf-start-core {
+  fill: var(--un-color-blue-darkest);
+  stroke: #fff;
+  stroke-width: 1;
+}
+.line-filter-start .lf-start-pulse {
+  animation: halo-pulse 2s ease-out infinite;
+  fill: none;
+  stroke: var(--un-color-blue-darkest);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* "Use two fingers" hint on portrait phones */
+#map-hint {
+  background: rgb(35 31 32 / 82%);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  left: 50%;
+  opacity: 0;
+  padding: 8px 14px;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s;
+  z-index: 17;
+  &.show {
+    opacity: 1;
+  }
+}
+
+/* Empty result: message in the middle of the map */
+#map-empty {
+  background: rgb(255 255 255 / 96%);
+  border: 1px solid var(--un-color-grey-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--ungrey-dark);
+  font-size: var(--fs-label);
+  left: 50%;
+  max-width: calc(100% - 32px);
+  padding: 14px 18px;
+  position: absolute;
+  text-align: center;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 16;
+  p {
+    margin: 0 0 10px;
+  }
+  button {
+    background: var(--un-color-blue-darkest);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #fff;
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    padding: 7px 14px;
+    &:hover {
+      background: var(--unblue-darker);
+    }
+  }
+  &.hidden {
+    display: none;
+  }
+}
+
+/* Live drawing status (floating, top-center of the map) */
+#linefilter-status {
+  background: var(--un-color-blue-darkest);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  left: 50%;
+  padding: 6px 14px;
+  pointer-events: none;
+  position: absolute;
+  top: 12px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 25;
+  &.hidden {
+    display: none;
+  }
+}
+
+/* Connections panel (drawn corridors, newest first) */
+.conn-empty {
+  color: var(--ungrey-dark);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+  padding: 4px 0;
+
+  .conn-steps {
+    margin: 0 0 12px;
+    padding-left: 20px;
+    li {
+      margin: 0 0 6px;
+      padding-left: 2px;
+    }
+    li::marker {
+      color: var(--un-color-blue-darkest);
+      font-weight: 700;
+    }
+  }
+  .conn-empty-sub {
+    color: var(--un-color-grey-dark);
+    font-size: var(--fs-xs);
+    margin: 0;
+  }
+}
+
+.conn-card {
+  .conn-card-hdr {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .conn-flow {
+    color: var(--ungrey-dark);
+    font-size: var(--fs-label);
+    b {
+      font-weight: 700;
+    }
+    .conn-arrow {
+      color: var(--un-color-grey-dark);
+      margin: 0 2px;
+    }
+  }
+  .conn-remove {
+    background: #fff;
+    border: 1px solid var(--un-color-grey-light);
+    border-radius: var(--radius-sm);
+    color: var(--un-color-grey-dark);
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: var(--fs-body);
+    height: 24px;
+    line-height: 1;
+    transition:
+      border-color 0.12s,
+      color 0.12s;
+    width: 24px;
+    &:hover {
+      border-color: var(--un-color-red-text-dark);
+      color: var(--un-color-red-text-dark);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--un-color-blue);
+      outline-offset: 1px;
+    }
+  }
+  .conn-card-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 10px;
+
+    .conn-stat {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding-right: 8px;
+      & + .conn-stat {
+        border-left: 1px solid var(--un-color-grey-light);
+        padding-left: 8px;
+      }
+      .conn-stat-lbl {
+        color: var(--un-color-grey-dark);
+        font-size: 10.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      b {
+        color: var(--ungrey-dark);
+        font-size: var(--fs-base);
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+        line-height: 1.3;
+      }
+    }
+  }
+  .conn-nodata {
+    color: var(--un-color-grey-dark);
+    font-size: var(--fs-xs);
+    padding: 8px 0;
+  }
+  .conn-card-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+
+    .conn-detail-btn {
+      background: #fff;
+      border: 1px solid var(--un-color-grey-light);
+      border-radius: var(--radius-sm);
+      color: var(--un-color-blue-text);
+      cursor: pointer;
+      font: 600 11px / 1 var(--font-family);
+      padding: 6px 10px;
+      transition:
+        background 0.12s,
+        color 0.12s,
+        border-color 0.12s;
+      &:hover {
+        background: var(--un-color-blue-darkest);
+        border-color: var(--un-color-blue-darkest);
+        color: #fff;
+      }
+      &:focus-visible {
+        outline: 2px solid var(--un-color-blue);
+        outline-offset: 1px;
+      }
+    }
+  }
+}
+
+/* Animation-mode: pulsing halo rings for top-3 export / import countries */
+@keyframes anim-halo-pulse {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+.anim-halo-ring {
+  fill: none;
+  pointer-events: none;
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.anim-halo-ring-1 {
+  animation: anim-halo-pulse 2.4s ease-out infinite;
+}
+.anim-halo-ring-2 {
+  animation: anim-halo-pulse 2.4s ease-out infinite 1.2s;
+}
+
+/* Animation-mode: flowing particle arcs for corridors to top-3 countries */
+@keyframes anim-particle-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+.anim-particle-arc {
+  animation: anim-particle-flow 1.5s linear infinite;
+  fill: none;
+  opacity: 0.7;
+  pointer-events: none;
+  stroke: #ffffff;
+  stroke-dasharray: 6 18;
+  stroke-linecap: round;
+}
+
+.map-label {
+  fill: var(--ungrey-dark);
+  font-family: var(--font-family);
+  font-weight: 600;
+  pointer-events: none;
+  text-shadow:
+    0 0 3px #fff,
+    0 0 5px #fff;
+}
+
+/* Checkbox customization */
+.custom-checkbox {
+  appearance: none;
+  background-color: var(--un-color-grey-lightest);
+  border: 1px solid var(--un-color-grey-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: grid;
+  height: 1rem;
+  place-content: center;
+  width: 1rem;
+
+  &::before {
+    box-shadow: inset 1em 1em var(--un-color-blue-darkest);
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    content: '';
+    height: 0.65em;
+    transform: scale(0);
+    transform-origin: center;
+    transition: 120ms transform ease-in-out;
+    width: 0.65em;
+  }
+
+  &:checked::before {
+    transform: scale(1);
+  }
+}
+
+/* Country selector dropdown internals */
+
+.picker-section-header {
+  background: var(--ungrey-light);
+  border-bottom: 1px solid var(--un-color-grey-light);
+  color: var(--ungrey-dark);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  padding: 6px 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.group-option {
+  align-items: center;
+  border-bottom: 1px solid rgb(226 232 240 / 40%);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--fs-xs);
+  gap: 6px;
+  padding: 5px 8px;
+  transition: background 0.12s;
+
+  &:hover {
+    background: rgb(0 73 144 / 6%);
+  }
+}
+
+.group-toggle {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  color: var(--un-color-grey-dark);
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+  font-size: 7px;
+  height: 14px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  transition:
+    background 0.12s,
+    transform 0.15s;
+  width: 14px;
+
+  &:hover {
+    background: var(--un-color-grey-lightest);
+    color: var(--ungrey-dark);
+  }
+  &[aria-expanded='true'] {
+    transform: rotate(90deg);
+  }
+}
+
+.group-icon {
+  color: var(--un-color-grey-dark);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+}
+
+.group-label {
+  color: var(--ungrey-dark);
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-count {
+  color: var(--un-color-grey-dark);
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.group-children {
+  &.hidden {
+    display: none;
+  }
+}
+
+.country-option {
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--ungrey-dark);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--fs-xs);
+  gap: 6px;
+  padding: 3px 8px;
+  transition: background 0.1s;
+
+  &:hover {
+    background: var(--unblue-bg);
+  }
+
+  input[type='checkbox'] {
+    flex-shrink: 0;
+    height: 13px;
+    width: 13px;
+  }
+}
+
+#exp-list,
+#imp-list {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: var(--unblue-bg);
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--un-color-grey-light);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--un-color-grey);
+  }
+}

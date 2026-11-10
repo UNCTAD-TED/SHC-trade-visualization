@@ -1,0 +1,681 @@
+/* Phones (portrait and landscape)
+   - header: title + help icons only
+   - the filter bar becomes a bottom sheet, the view modes a bottom bar
+   - portrait: map, legend and key figures stacked (the page scrolls)
+   - landscape: the map fills the screen, legend collapsed on it */
+
+/* Bottom navigation (view modes + filters)
+   Sticky, not fixed: it stays at the bottom of the screen while the monitor is
+   in view and scrolls away with it when the monitor is embedded in a page. */
+#mobile-nav {
+  background: #fff;
+  border-top: 1px solid var(--un-color-grey-light);
+  bottom: 0;
+  box-shadow: 0 -2px 12px rgb(0 0 0 / 6%);
+  display: none;
+  flex-shrink: 0;
+  order: 5;
+  padding-bottom: env(safe-area-inset-bottom);
+  position: sticky;
+  z-index: 31;
+
+  .mnav-btn {
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--un-color-grey-dark);
+    cursor: pointer;
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    font-family: var(--font-family);
+    font-size: 10.5px;
+    font-weight: 700;
+    gap: 3px;
+    height: var(--nav-h);
+    justify-content: center;
+    min-width: 0;
+    padding: 0 2px;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+
+    svg {
+      flex-shrink: 0;
+    }
+
+    &.active {
+      color: var(--un-color-blue-darkest);
+      &::before {
+        background: var(--un-color-blue);
+        border-radius: 0;
+        content: '';
+        height: 3px;
+        left: 22%;
+        position: absolute;
+        right: 22%;
+        top: 0;
+      }
+    }
+    &:active {
+      background: var(--unblue-bg);
+    }
+  }
+
+  .filter-badge {
+    background: var(--un-color-blue-darkest);
+    border-radius: var(--radius-sm);
+    color: #fff;
+    display: none;
+    font-size: var(--fs-micro);
+    font-weight: 700;
+    height: 16px;
+    left: calc(50% + 6px);
+    line-height: 16px;
+    min-width: 16px;
+    padding: 0 4px;
+    position: absolute;
+    text-align: center;
+    top: 6px;
+    &.visible {
+      display: block;
+    }
+  }
+}
+
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1024px) {
+  #mobile-nav {
+    display: flex;
+  }
+
+  /* Header: compact, no tabs, help as icons, download lives in the filter sheet */
+  #main-header {
+    .header-inner {
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+    }
+    .header-title {
+      gap: 8px;
+      padding: 8px 0;
+      img.header-logo {
+        height: 26px;
+        width: 26px;
+      }
+      .header-text h3 {
+        font-size: var(--fs-body);
+        line-height: 1.25;
+      }
+      .header-text h4 {
+        display: none;
+      }
+    }
+  }
+  .mode-tabs,
+  #export-wrapper,
+  #filter-bar {
+    display: none;
+  }
+  .util-btn {
+    height: 36px;
+    width: 36px;
+  }
+  .util-btn .util-label {
+    display: none;
+  }
+
+  /* Pinch zooms on phones: keep only the reset button */
+  #map-tools {
+    left: 8px;
+    top: 8px;
+    #zoom-in-btn,
+    #zoom-out-btn {
+      display: none;
+    }
+    .map-tool-btn {
+      height: 34px;
+      width: 34px;
+    }
+  }
+
+  /* Country panel: bottom sheet above everything else */
+  #insight-panel {
+    position: fixed;
+    z-index: 34;
+  }
+
+  /* Pop-ups centre on the screen, not on the (short) map */
+  #arc-modal,
+  #compare-modal {
+    position: fixed;
+    z-index: 190;
+    .modal-backdrop {
+      position: fixed;
+    }
+    .modal-card {
+      max-height: calc(100dvh - 32px);
+    }
+  }
+
+  /* While the country panel is open the header steps aside; the page is then
+     shorter than the screen, so the bottom bar is pinned instead of sticky */
+  body.insight-open #main-header,
+  body.insight-open #kpi-bar {
+    display: none;
+  }
+  body.insight-open #mobile-nav {
+    bottom: 0;
+    left: 0;
+    position: fixed;
+    right: 0;
+  }
+}
+
+/* Portrait phones: stacked, scrolling layout */
+@media (max-width: 767px) and (min-height: 501px) {
+  /* Short pages: the bottom bar stays at the bottom of the app */
+  #mobile-nav {
+    margin-top: auto;
+  }
+
+  #main-header {
+    order: 1;
+  }
+  main {
+    flex: none;
+    min-width: 0;
+    order: 2;
+    overflow: visible;
+  }
+  #kpi-bar {
+    order: 3;
+  }
+  #map-footer {
+    display: block;
+    order: 4;
+  }
+
+  .map-area {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    min-width: 0;
+    overflow: visible;
+    width: 100%;
+  }
+
+  /* The world map fits the width; nothing is left empty above or below it */
+  #map-container {
+    flex-shrink: 0;
+    height: clamp(200px, 54vw, 46dvh);
+    inset: auto;
+    position: relative;
+  }
+
+  /* Legend: a regular block under the map */
+  #legend-panel {
+    background: #fff;
+    box-shadow: none;
+    margin: 0 12px;
+    max-height: none;
+    position: static;
+    width: auto;
+
+    &.collapsed {
+      width: auto;
+    }
+
+    .lg-flows {
+      column-gap: 12px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .lg-flow .lg-stat {
+      font-size: var(--fs-xxs);
+    }
+  }
+
+  /* Key figures: a two-column grid of small cards */
+  #kpi-bar {
+    background: transparent;
+    border-bottom: none;
+
+    .kpi-inner {
+      align-items: stretch;
+      column-gap: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 4px 16px 6px;
+    }
+
+    .kpi-divider {
+      display: none;
+    }
+
+    .kpi-item {
+      align-items: flex-start;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--un-color-grey-light);
+      border-radius: 0;
+      flex-direction: column;
+      gap: 2px;
+      padding: 9px 0 8px;
+      white-space: normal;
+    }
+
+    .kpi-scope .kpi-value {
+      font-size: var(--fs-base);
+      white-space: normal;
+    }
+    .kpi-value {
+      font-size: var(--fs-base);
+      max-width: 100%;
+    }
+  }
+
+  #map-footer {
+    background: transparent;
+    border-top: none;
+    padding: 10px 12px 12px;
+    .footer-row {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+
+  #insight-panel {
+    border-left: none;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-top: 1px solid var(--un-color-grey-light);
+    bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    height: auto;
+    left: 0;
+    max-height: 62dvh;
+    right: 0;
+    top: auto;
+    transform: translateY(calc(100% + var(--nav-h) + 20px));
+    width: 100%;
+    z-index: 30;
+    &.open {
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Landscape phones: the map fills the screen */
+@media (max-height: 500px) and (max-width: 1024px) {
+  #kpi-bar,
+  #map-footer {
+    display: none;
+  }
+
+  #main-header .header-title {
+    padding: 5px 0;
+  }
+
+  #mobile-nav .mnav-btn {
+    flex-direction: row;
+    font-size: 11.5px;
+    gap: 6px;
+    height: 44px;
+  }
+
+  #legend-panel {
+    bottom: 8px;
+    left: 8px;
+    max-height: calc(100% - 16px);
+  }
+
+  #insight-panel {
+    bottom: 0;
+    height: auto;
+    left: auto;
+    right: 0;
+    top: 0;
+    transform: translateX(100%);
+    width: min(440px, 56vw);
+    &.open {
+      transform: translateX(0);
+    }
+  }
+
+  /* Header + map + bottom bar fit one screen, so the page around stays scrollable */
+  .map-area {
+    height: calc(100svh - 37px - 44px - env(safe-area-inset-bottom));
+    min-height: 0;
+  }
+}
+
+/* Filter sheet (phones) */
+#mobile-filter-panel {
+  background: #fff;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  bottom: 0;
+  box-shadow: 0 -4px 30px rgb(0 0 0 / 15%);
+  display: none;
+  flex-direction: column;
+  font-family: var(--font-family);
+  left: 0;
+  max-height: 86dvh;
+  position: fixed;
+  right: 0;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 33;
+
+  &.open {
+    transform: translateY(0);
+  }
+
+  @media (max-width: 767px), (max-height: 500px) and (max-width: 1024px) {
+    display: flex;
+  }
+
+  .sheet-handle {
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+    padding: 8px 0 2px;
+
+    &::after {
+      background: var(--un-color-grey-light);
+      border-radius: 2px;
+      content: '';
+      height: 4px;
+      width: 40px;
+    }
+  }
+
+  .sheet-header {
+    align-items: center;
+    border-bottom: 1px solid var(--un-color-grey-lightest);
+    display: flex;
+    flex-shrink: 0;
+    justify-content: space-between;
+    padding: 6px 16px 10px;
+
+    .sheet-title {
+      color: var(--ungrey-dark);
+      font-size: var(--fs-body);
+      font-weight: 700;
+    }
+
+    .btn-close {
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-lg);
+      color: var(--un-color-grey-dark);
+      cursor: pointer;
+      margin: -6px;
+      padding: 8px;
+      &:hover {
+        background: var(--unblue-bg);
+      }
+    }
+  }
+
+  .sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px 16px 8px;
+  }
+
+  .sheet-section {
+    margin-bottom: 18px;
+
+    .section-label {
+      color: var(--un-color-grey-dark);
+      display: block;
+      font-size: var(--fs-label);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .section-hint {
+      color: var(--un-color-grey-dark);
+      font-size: var(--fs-xs);
+      line-height: 1.45;
+      margin: 6px 0 0;
+    }
+  }
+
+  .sheet-row {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .btn-toggle-lg {
+    background: #fff;
+    border: 1px solid var(--un-color-grey-light);
+    border-radius: var(--radius-sm);
+    color: var(--un-color-grey-dark);
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: var(--fs-label);
+    font-weight: 700;
+    min-height: 40px;
+    padding: 8px 14px;
+    transition:
+      background 0.15s,
+      color 0.15s,
+      border-color 0.15s;
+
+    &.active {
+      background: var(--un-color-blue-darkest);
+      border-color: var(--un-color-blue-darkest);
+      color: #fff;
+    }
+  }
+
+  .btn-row.seg-fill .btn-toggle-lg {
+    flex: 1 1 0;
+  }
+
+  .flow-chips {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .flow-chip .chip-body {
+    font-size: var(--fs-label);
+    height: 40px;
+    justify-content: flex-start;
+    padding: 0 12px;
+    width: 100%;
+  }
+
+  select.sheet-select {
+    appearance: none;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 24 24' stroke='%236e6259' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E") no-repeat right 12px center;
+    border: 1px solid var(--un-color-grey-light);
+    border-radius: var(--radius-lg);
+    color: var(--ungrey-dark);
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: var(--fs-base);
+    font-weight: 700;
+    min-height: 44px;
+    outline: none;
+    padding: 0 36px 0 12px;
+    width: 100%;
+    &:focus {
+      border-color: var(--un-color-blue-darkest);
+    }
+  }
+
+  .picker-btn-full {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--un-color-grey-light);
+    border-radius: var(--radius-lg);
+    color: var(--ungrey-dark);
+    cursor: pointer;
+    display: flex;
+    font-family: var(--font-family);
+    font-size: var(--fs-label);
+    gap: 8px;
+    justify-content: space-between;
+    min-height: 44px;
+    padding: 0 12px;
+    text-align: left;
+    transition: border-color 0.15s;
+    width: 100%;
+
+    &:hover {
+      border-color: var(--un-color-blue-darkest);
+    }
+    &.has-selection {
+      border-color: var(--un-color-blue-darkest);
+    }
+
+    .picker-value {
+      font-size: var(--fs-label);
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .picker-trailing-lg {
+      align-items: center;
+      display: flex;
+      flex-shrink: 0;
+      gap: 8px;
+    }
+    .picker-badge {
+      font-size: var(--fs-xxs);
+      padding: 2px 8px;
+    }
+  }
+
+  /* "More display options" (minimum flow, number of lines) */
+  details.sheet-advanced {
+    border: 1px solid var(--un-color-grey-light);
+    border-radius: var(--radius-lg);
+    margin-bottom: 18px;
+    padding: 0 12px;
+
+    > summary {
+      align-items: center;
+      color: var(--ungrey-dark);
+      cursor: pointer;
+      display: flex;
+      font-size: var(--fs-label);
+      font-weight: 700;
+      justify-content: space-between;
+      list-style: none;
+      min-height: 44px;
+      &::-webkit-details-marker {
+        display: none;
+      }
+      .sheet-adv-sub {
+        color: var(--un-color-grey-dark);
+        font-size: var(--fs-sm);
+        font-weight: 600;
+      }
+    }
+
+    &[open] > summary {
+      border-bottom: 1px solid var(--un-color-grey-lightest);
+      margin-bottom: 12px;
+    }
+  }
+
+  .sheet-footer {
+    background: #fff;
+    border-top: 1px solid var(--un-color-grey-lightest);
+    display: flex;
+    flex-shrink: 0;
+    gap: 10px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+
+    button {
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      flex: 1;
+      font-family: var(--font-family);
+      font-size: var(--fs-base);
+      font-weight: 700;
+      min-height: 44px;
+    }
+    .sheet-reset {
+      background: #fff;
+      border: 1px solid var(--un-color-grey-light);
+      color: var(--un-color-blue-text);
+    }
+    .sheet-reset:disabled {
+      color: var(--un-color-grey);
+      cursor: default;
+    }
+    .sheet-done {
+      background: var(--un-color-blue-darkest);
+      border: 1px solid var(--un-color-blue-darkest);
+      color: #fff;
+    }
+  }
+}
+
+/* Phones: country picker as a full-width sheet */
+#exp-menu.mobile-menu-fixed,
+#imp-menu.mobile-menu-fixed {
+  border-bottom: none;
+  border-left: none;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border-right: none;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  height: 75dvh;
+  left: 0;
+  margin-top: 0;
+  max-height: 75dvh;
+  max-width: 100%;
+  padding-bottom: env(safe-area-inset-bottom);
+  position: fixed;
+  right: 0;
+  top: auto;
+  width: 100%;
+
+  z-index: 200;
+  .picker-search-area input {
+    font-size: 16px;
+  } /* 16px stops iOS zooming in */
+  .picker-done {
+    display: inline-flex;
+  }
+  .country-option,
+  .group-option {
+    font-size: var(--fs-label);
+    padding-bottom: 8px;
+    padding-top: 8px;
+  }
+
+  /* A flex child only scrolls if it may shrink below its content height */
+  .picker-list {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+/* Backdrops (the .hidden class hides them) */
+#mobile-filter-backdrop,
+#mobile-country-backdrop {
+  display: block;
+  inset: 0;
+  position: fixed;
+}
+#mobile-filter-backdrop {
+  background: rgb(0 0 0 / 40%);
+  z-index: 32;
+}
+#mobile-country-backdrop {
+  background: rgb(0 0 0 / 50%);
+  z-index: 195;
+}

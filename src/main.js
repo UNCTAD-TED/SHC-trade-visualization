@@ -1,5 +1,5 @@
-import './styles/styles.less';
-import * as d3 from 'd3';
+import './styles/styles.css';
+import { format, sum } from 'd3';
 import { CONFIG, STATE, METRIC_FORMAT, fmtSigned, isCompact } from './config.js';
 import { startAnimation, stopAnimation, stopAnimationForMetricChange } from './sns/animationMode.js';
 import { RegionConfig } from './regions.js';
@@ -10,7 +10,7 @@ import { Tour } from './tour/tour.js';
 import { CsvExport } from './csvExport.js';
 import { DeepLink } from './deepLink.js';
 
-// "+5.2%" / "−3.7%" with a true minus sign (U+2212), like every net figure.
+// Signed percentage with a true minus sign (U+2212)
 const signedPct = (v, dp) => `${v >= 0 ? '+' : '\u2212'}${Math.abs(v).toFixed(dp)}%`;
 // 1 → 1st, 2 → 2nd, 11 → 11th, 23 → 23rd
 const ordinal = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
@@ -23,12 +23,11 @@ const App = {
     _resizeTimer: null,
     _prevSelectionCount: 0,
     _yearReq: 0,      // latest year request; older ones may not apply
-    _metricReq: 0,    // latest metric request
-    // Connections drawn in Connect mode, kept aside while the user is back in
-    // Explore so returning to Connect shows them again.
+    _metricReq: 0,
+    // Connect-mode connections kept aside while in Explore
     _stashedPairs: [],
 
-    // Keep the loading overlay up, but say that loading failed instead of spinning forever.
+    // Show a load error in the loading overlay instead of spinning forever
     _showLoadError(message) {
         const loader = document.getElementById('loader');
         if (!loader) return;
@@ -47,8 +46,7 @@ const App = {
 
         STATE.region = "Global";
 
-        // Deep link: restore a shared/reloaded view before any data is fetched,
-        // so DataLoader.loadAll() reads the right metric and year straight away.
+        // Restore a shared view before loading, so the right metric and year are fetched
         this._deepLink = DeepLink.read();
         DeepLink.applyPreLoad(this._deepLink);
 
@@ -58,16 +56,13 @@ const App = {
             return;
         }
 
-        console.log('Initializing country selectors...');
         this.exporterSelector = new CountrySelector('exp', 'exp-label', 'exporter');
         this.importerSelector = new CountrySelector('imp', 'imp-label', 'importer');
 
         try {
             await this.exporterSelector.init();
             await this.importerSelector.init();
-            console.log('Country selectors initialized successfully');
-            // Country selection has to be restored into the selectors, not into
-            // STATE — updateDashboard() rebuilds STATE.selected* from them.
+            // Restore countries into the selectors; updateDashboard() rebuilds STATE from them
             DeepLink.applyPostLoad(this._deepLink, this);
         } catch (error) {
             console.error('Failed to initialize country selectors:', error);
@@ -78,29 +73,26 @@ const App = {
         TradeMap.init();
         this.setupEventListeners();
 
-        // Phones and portrait tablets: start with the legend folded (the map and
-        // key figures come first; the legend card would cover part of the world)
+        // Phones and portrait tablets: start with the legend folded
         if (isCompact() || window.matchMedia?.('(orientation: portrait) and (max-width: 1023px)').matches) this.setLegendCollapsed(true);
 
         this.exporterSelector.updateSelection();
         this.updateDashboard();
         document.getElementById('loader').classList.add('hidden');
 
-        // Guided Story tour: wires the header button + first-visit auto-launch
+        // Guided tour: started from the header button only
         this.tour = Tour;
-        // A shared deep link must survive first contact: the tour's opening reset
-        // would wipe the linked-to view before the recipient ever sees it.
-        Tour.init(this, { autoLaunch: !DeepLink.isLink(this._deepLink) });
+        Tour.init(this);
     },
 
     setupEventListeners() {
-        // Region: a select in the filter bar, buttons in the phone sheet
+        // Region select and phone sheet buttons
         document.querySelectorAll('.region-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.setRegion(e.currentTarget.dataset.region));
         });
         document.getElementById('region-select')?.addEventListener('change', (e) => this.setRegion(e.target.value));
 
-        // View modes: Explore / Connect / Animate (header tabs and phone bottom bar)
+        // View mode tabs: Explore / Connect / Animate
         document.querySelectorAll('.js-mode').forEach(btn => {
             btn.addEventListener('click', (e) => this.setMode(e.currentTarget.dataset.mode));
         });
@@ -119,7 +111,7 @@ const App = {
             });
         }
 
-        // Reset filters (filter bar + phone sheet)
+        // Reset filters
         ['filters-reset', 'm-filters-reset'].forEach(id => {
             document.getElementById(id)?.addEventListener('click', () => this.resetFilters());
         });
@@ -134,9 +126,7 @@ const App = {
         document.getElementById('zoom-in-btn')?.addEventListener('click', () => TradeMap.zoomBy?.(1.6));
         document.getElementById('zoom-out-btn')?.addEventListener('click', () => TradeMap.zoomBy?.(1 / 1.6));
 
-        // Year. Only the latest choice may apply: a slow file for an earlier choice
-        // must not overwrite the year the user picked last. The exporter/importer
-        // selection is kept — the same economies are meaningful in every year.
+        // Year select: only the latest request may apply; the country selection is kept
         const yearSelect = document.getElementById('year-select');
         if (yearSelect) {
             yearSelect.addEventListener('change', async (e) => {
@@ -147,8 +137,7 @@ const App = {
                 try {
                     await DataLoader.loadYear(year);
                     if (req !== this._yearReq) return;
-                    // The metric may have switched while the file was loading: make
-                    // sure the year is there for the metric now shown.
+                    // The metric may have changed while loading: get the year for the current metric
                     while (!STATE.yearCache[year]) {
                         await DataLoader.loadYear(year, STATE.metric);
                         if (req !== this._yearReq) return;
@@ -177,32 +166,23 @@ const App = {
             });
         });
 
-        // Top-N line limit. Buttons live in both the desktop bar and the mobile
-        // sheet, so activate by value across all of them rather than by clicked node.
+        // Top-N line limit
         document.querySelectorAll('.topn-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const val = e.currentTarget.dataset.topn;
                 STATE.topNMode = val === 'all' ? null : +val;
                 this._setActiveTopNButtons(val);
-                // 50ms debounce: prevents overlapping D3 transitions when buttons are clicked rapidly
                 clearTimeout(this._filterDebounce);
                 this._filterDebounce = setTimeout(() => this.updateDashboard(false), 50);
             });
         });
 
-        // Metric toggle (trade value ⇄ trade weight). Loads the metric's pre-computed
-        // JSON on demand, relabels the unit-bearing controls and re-renders.
-        // Every click goes to DataLoader.switchMetric, even a click on the active
-        // metric: that cancels a switch still in flight, so the last click wins.
-        // Units, labels and data change together only when the switch commits.
+        // Metric toggle. Every click goes to switchMetric, so the last click wins.
         document.querySelectorAll('.metric-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const metric = e.currentTarget.dataset.metric;
                 if (!metric) return;
-                // A metric change ends the bar-chart-race run and returns to the
-                // normal dashboard — a race whose units change halfway is easy to
-                // misread. (The header controls are hidden in anim-mode, so this
-                // only fires for a programmatic switch.)
+                // A metric change stops the animation: a race whose units change is easy to misread
                 if (metric !== STATE.metric) stopAnimationForMetricChange();
                 const req = ++this._metricReq;
                 this._setActiveMetricButtons(metric);    // show the click at once
@@ -220,7 +200,6 @@ const App = {
                     console.error('Failed to switch metric:', err);
                 } finally {
                     if (req === this._metricReq) {
-                        // Whatever happened, the buttons end up on the metric shown.
                         this._setActiveMetricButtons(STATE.metric);
                         loader?.classList.add('hidden');
                     }
@@ -228,7 +207,7 @@ const App = {
             });
         });
 
-        // Flow category checkboxes (desktop bar and mobile sheet carry one each)
+        // Flow category checkboxes
         document.querySelectorAll('.flow-checkbox').forEach(cb => {
             cb.addEventListener('change', (e) => {
                 const val = e.target.value;
@@ -251,7 +230,7 @@ const App = {
         // Sea routes toggle (on/off)
         const searouteBtn = document.getElementById('searoute-btn');
         if (searouteBtn) searouteBtn.addEventListener('click', () => {
-            if (TradeMap && TradeMap.toggleSeaRoute) TradeMap.toggleSeaRoute();
+            if (TradeMap?.toggleSeaRoute) TradeMap.toggleSeaRoute();
         });
         document.addEventListener('shc:searoute-toggled', (e) => {
             const btn = document.getElementById('searoute-btn');
@@ -259,7 +238,6 @@ const App = {
         });
 
         // ── Connect mode (draw bilateral connections on the map) ──
-        // The Connect tab itself goes through setMode (see .js-mode above).
         document.getElementById('linefilter-clear')?.addEventListener('click', () => this.clearBilateralFilter());
         document.addEventListener('shc:linefilter-toggled', (e) => this._updateLineFilterUI(e.detail));
         document.addEventListener('shc:bilateral-pair-added', (e) => this.addBilateralPair(e.detail.exporter, e.detail.importer));
@@ -370,8 +348,7 @@ const App = {
         });
 
         document.addEventListener('shc:animation-stopped', () => {
-            // animationMode has put STATE back to the pre-animation view; make every
-            // control show it and re-render (this also refreshes an open panel).
+            // STATE is back to the pre-animation view: sync the controls and re-render
             this.syncControlsFromState();
             this.updateDashboard();
         });
@@ -410,7 +387,7 @@ const App = {
             e.stopPropagation();
             closeOtherMenu();
             
-            // Desktop: the menu drops down under its button, never as the phone sheet
+            // Desktop layout: the menu drops down under its button
             menu.classList.remove('mobile-menu-fixed');
             if (menu.parentElement !== originalParent) {
                 originalParent.appendChild(menu);
@@ -423,7 +400,6 @@ const App = {
             if (menu.classList.contains('hidden')) this._resetPickerMenu(menu);
             else this._clampPickerMenu(menu);
 
-            // Lift the open menu above the neighbouring controls
             originalParent.style.zIndex = menu.classList.contains('hidden') ? '50' : '60';
         });
 
@@ -437,13 +413,13 @@ const App = {
                 
                 menu.classList.remove('hidden');
                 menu.classList.add('mobile-menu-fixed');
-                this._resetPickerMenu(menu);   // mobile.less positions this one
+                this._resetPickerMenu(menu);
                 document.getElementById('mobile-country-backdrop')?.classList.remove('hidden');
             });
         }
 
         document.addEventListener('click', (e) => {
-            const isOutside = !menu.contains(e.target) && !btn.contains(e.target) && (!mBtn || !mBtn.contains(e.target));
+            const isOutside = !menu.contains(e.target) && !btn.contains(e.target) && (!mBtn?.contains(e.target));
             if (isOutside) {
                 menu.classList.add('hidden');
                 btn.setAttribute('aria-expanded', 'false');
@@ -456,6 +432,7 @@ const App = {
             }
         });
 
+        // Search lists each country once (replaces the duplicate hiding of c9abe28)
         search.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase().trim();
             if (!term) {
@@ -490,23 +467,15 @@ const App = {
     },
 
     // ── Country picker dropdown: keep it inside the viewport ──────────
-    // The menu (280px) is wider than its button and the filter bar wraps on
-    // narrow screens, so depending on where the row breaks the menu can hang
-    // off the right edge of the screen.
-    //
-    // CSS cannot fix this on its own: how far the button sits from the edge
-    // depends on where flex-wrap happened to break the row. So keep the CSS
-    // position as the preferred one and nudge it back on screen after opening.
+    // The menu is wider than its button and the bar wraps, so clamp it on screen after opening
     PICKER_EDGE_GAP: 8,   // px kept between the menu and the viewport edge
 
     _clampPickerMenu(menu) {
         if (!menu || menu.classList.contains('hidden')) return;
-        // The mobile sheet is a full-width fixed panel positioned by
-        // mobile.less with !important — nothing to clamp.
+        // The mobile sheet is full-width; nothing to clamp
         if (menu.classList.contains('mobile-menu-fixed')) return;
 
-        // Always measure from the CSS default so repeated opens and resizes
-        // never accumulate an offset.
+        // Measure from the CSS default so offsets never accumulate
         this._resetPickerMenu(menu);
 
         const wrapper = menu.offsetParent;          // .picker-wrapper
@@ -517,9 +486,7 @@ const App = {
         const vw = document.documentElement.clientWidth;
         const gap = this.PICKER_EDGE_GAP;
 
-        // Clamp the CSS-preferred position into the viewport. Math.max last, so
-        // on a viewport narrower than the menu the left edge still wins and the
-        // search box stays reachable.
+        // Math.max last: on a narrow viewport the left edge wins, keeping search reachable
         const wanted = Math.max(gap, Math.min(m.left, vw - gap - m.width));
         if (Math.abs(wanted - m.left) < 0.5) return;   // already fits
 
@@ -527,7 +494,6 @@ const App = {
         menu.style.left  = `${Math.round(wanted - w.left)}px`;
     },
 
-    // Close one country picker (desktop drop-down or phone sheet).
     _closePicker(prefix) {
         const menu = document.getElementById(`${prefix}-menu`);
         const btn = document.getElementById(`${prefix}-btn`);
@@ -558,24 +524,20 @@ const App = {
         menu.style.right = '';
     },
 
-    // Metric buttons span the desktop bar and the mobile sheet, so toggle every
-    // matching button rather than a single clicked element.
+    // Buttons exist in the desktop bar and the mobile sheet, so toggle all of them
     _setActiveMetricButtons(metric) {
         document.querySelectorAll('.metric-btn').forEach(b => {
             b.classList.toggle('active', b.dataset.metric === metric);
         });
     },
 
-    // Top-N buttons span the Lines pop-over and the phone sheet, so toggle every
-    // matching button rather than a single clicked element.
     _setActiveTopNButtons(val) {
         document.querySelectorAll('.topn-btn').forEach(b => {
             b.classList.toggle('active', b.dataset.topn === val);
         });
     },
 
-    // Threshold buttons keep the same numeric data-threshold across metrics; only
-    // their unit-bearing labels change ($ for value, t for weight).
+    // Same thresholds for both metrics; only the unit labels differ
     THRESHOLD_LABELS: {
         value:  { auto: 'Auto', '10000000': '$10M',  '1000000': '$1M',  '500000': '$500K', '100000': '$100K', '10000': '$10K' },
         weight: { auto: 'Auto', '10000000': '10 kt', '1000000': '1 kt', '500000': '500 t', '100000': '100 t', '10000': '10 t' },
@@ -590,28 +552,20 @@ const App = {
     },
 
     updateKPIBar() {
-        // Scope of each figure — deliberately mixed, matching the KPI tooltips:
-        //   filteredData / nodeStats → what is actually drawn, i.e. AFTER the
-        //     magnitude threshold, the Top-N line limit and the flow-category
-        //     filter. Volume, Corridors, Countries and the N→S / S→S shares
-        //     therefore always agree with the map and the CSV export.
-        //   rawNodeStats            → pre-threshold, pre-Top-N. Used only for
-        //     #1 Exporter / #1 Importer so the headline ranking does not flip
-        //     when the user declutters the map (same convention as the HHI and
-        //     partner-rank figures elsewhere).
+        // Totals follow the drawn flows; #1 exporter/importer use pre-threshold stats so they don't flip
         const flows = STATE.filteredData || [];
         const stats = STATE.nodeStats || {};
         const rawStats = STATE.rawNodeStats || stats;
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
 
-        const total = d3.sum(flows, d => d.netValue);
+        const total = sum(flows, d => d.netValue);
         const totalEl = document.getElementById('kpi-total');
         // Connect mode before anything is drawn: nothing to sum yet
         const nothingDrawn = TradeMap.lineFilterMode && !STATE.bilateralPairs?.length;
         if (totalEl) totalEl.textContent = nothingDrawn ? '—' : mf.fmt(total);
 
         const flowsEl = document.getElementById('kpi-flows');
-        if (flowsEl) flowsEl.textContent = d3.format(',')(flows.length);
+        if (flowsEl) flowsEl.textContent = format(',')(flows.length);
 
         const countriesEl = document.getElementById('kpi-countries');
         if (countriesEl) countriesEl.textContent = Object.keys(stats).length;
@@ -628,7 +582,7 @@ const App = {
             if (topExpEl) {
                 if (topExp && topExp[1].netBalance > 0) {
                     const name = STATE.countryNames[topExp[0]] || topExp[0];
-                    topExpEl.textContent = name.length > 16 ? name.slice(0, 15) + '…' : name;
+                    topExpEl.textContent = name.length > 16 ? `${name.slice(0, 15)}…` : name;
                 } else {
                     topExpEl.textContent = '—';
                 }
@@ -636,7 +590,7 @@ const App = {
             if (topImpEl) {
                 if (topImp && topImp[1].netBalance < 0) {
                     const name = STATE.countryNames[topImp[0]] || topImp[0];
-                    topImpEl.textContent = name.length > 16 ? name.slice(0, 15) + '…' : name;
+                    topImpEl.textContent = name.length > 16 ? `${name.slice(0, 15)}…` : name;
                 } else {
                     topImpEl.textContent = '—';
                 }
@@ -652,10 +606,10 @@ const App = {
             else if (d.flowCategory === 'south-south') ssTotal += d.netValue;
         });
         const nsPctEl = document.getElementById('kpi-ns-pct');
-        if (nsPctEl) nsPctEl.textContent = total > 0 ? Math.round(nsTotal / total * 100) + '%' : '—';
+        if (nsPctEl) nsPctEl.textContent = total > 0 ? `${Math.round(nsTotal / total * 100)}%` : '—';
 
         const ssPctEl = document.getElementById('kpi-ss-pct');
-        if (ssPctEl) ssPctEl.textContent = total > 0 ? Math.round(ssTotal / total * 100) + '%' : '—';
+        if (ssPctEl) ssPctEl.textContent = total > 0 ? `${Math.round(ssTotal / total * 100)}%` : '—';
     },
 
     _buildScopeText() {
@@ -697,11 +651,10 @@ const App = {
         }
 
         this._currentPanelIso = iso;
-        this._connectionsPanelOpen = false; // single-country insight now owns the panel
+        this._connectionsPanelOpen = false;
         this.hideTooltip();
 
-        // Reset Sea Route to OFF for each new country — the mode as well as the
-        // button, or routes keep being drawn behind a button that reads OFF.
+        // Reset Sea Route to OFF for each new country (mode and button)
         const searouteBtn = document.getElementById('searoute-btn');
         if (searouteBtn) {
             searouteBtn.disabled = false;
@@ -711,20 +664,17 @@ const App = {
         }
         if (TradeMap) TradeMap.searouteMode = false;
 
-        // Country-level CSV export belongs to single-country focus
         const exportBtn = document.getElementById('panel-export-btn');
         if (exportBtn) exportBtn.style.display = '';
 
-        if (TradeMap && TradeMap.setFocus) {
-            // Ensure routes.json is loaded before switching to sea-route rendering —
-            // but only focus if this country's panel is still the one open.
+        if (TradeMap?.setFocus) {
+            // Wait for routes.json, then focus only if this country's panel is still open
             const doFocus = () => { if (this._currentPanelIso === iso) TradeMap.setFocus(iso); };
             STATE._routesPromise ? STATE._routesPromise.then(doFocus) : doFocus();
         }
     },
 
-    // Fill the open panel for `iso` from the current year / metric / region.
-    // Also used to refresh an open panel when those change.
+    // Fill or refresh the panel for iso from the current year, metric and region
     _renderInsightPanel(iso) {
         const name = STATE.countryNames[iso] || iso;
         const stats = DataLoader.countryTotals(iso);
@@ -738,11 +688,7 @@ const App = {
         document.getElementById('panel-body').innerHTML = this._buildPanelContent(iso, stats, mf);
     },
 
-    // Flows behind the partner-based panel sections (partners, HHI, trade split,
-    // fingerprint, flow composition): every net bilateral flow of `iso` for the
-    // year — never the display threshold, Lines limit or flow-direction filter —
-    // restricted to intra-regional partners when a region is selected, the same
-    // scope as the map. A country is never its own partner.
+    // All net flows of iso for the year, before display filters; intra-regional if a region is set
     _panelFlows(iso) {
         const isRegional = STATE.region && STATE.region !== 'Global';
         return (STATE.yearCache[STATE.year] || []).filter(d =>
@@ -771,18 +717,17 @@ const App = {
 
         this._currentPanelIso = null;
         this._connectionsPanelOpen = false;
-        if (TradeMap && TradeMap.clearFocus) TradeMap.clearFocus();
+        if (TradeMap?.clearFocus) TradeMap.clearFocus();
     },
 
     // ── P2-A: Arc Detail Modal ──────────────────────────────────────
 
     async openArcModal(expIso, impIso) {
-        // The history file loads in the background; wait for it rather than
-        // showing an empty "$0" history.
+        // Wait for the history file rather than show an empty history
         if (!STATE.bilateralHistory) {
-            try { await DataLoader._loadBilateral(STATE.metric); } catch (e) { /* shown as no data */ }
+            try { await DataLoader._loadBilateral(STATE.metric); } catch (_e) { /* shown as no data */ }
         }
-        this._arcPair = { expIso, impIso };   // consumed by the corridor CSV export button
+        this._arcPair = { expIso, impIso };   // used by the corridor CSV export
         this._renderArcModal();
 
         this._closeMenus();
@@ -793,7 +738,6 @@ const App = {
         this.hideTooltip();
     },
 
-    // Fill the corridor pop-up for this._arcPair from the current year / metric.
     _renderArcModal() {
         const p = this._arcPair;
         if (!p) return;
@@ -802,8 +746,7 @@ const App = {
         const impName = STATE.countryNames[impIso] || impIso;
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
 
-        // The net exporter is whoever ships more this year — not simply the first
-        // country of the pair (a drawn connection can run against the net flow).
+        // The net exporter is whoever ships more this year, not the first country of the pair
         const [a, b] = [expIso, impIso].sort();
         const e = STATE.bilateralHistory?.[`${a}|${b}`]?.[String(STATE.year)];
         const out = e ? (expIso === a ? e.aToB : e.bToA) : 0;
@@ -975,13 +918,14 @@ const App = {
     openMethodologyModal() {
         this._closeMenus();
         this._returnFocus = document.activeElement;
-        document.documentElement.style.overflow = 'hidden';
+        // Lock the page behind the pop-up (the page itself, also when embedded)
+        document.scrollingElement.style.overflow = 'hidden';
         document.getElementById('methodology-modal').classList.remove('hidden');
         document.getElementById('methodology-modal-close')?.focus({ preventScroll: true });
     },
 
     closeMethodologyModal() {
-        document.documentElement.style.overflow = '';
+        document.scrollingElement.style.overflow = '';
         document.getElementById('methodology-modal').classList.add('hidden');
         this._restoreFocus();
     },
@@ -990,8 +934,7 @@ const App = {
         const nameA = STATE.countryNames[isoA] || isoA;
         const nameB = STATE.countryNames[isoB] || isoB;
         const A_C = '#009EDB', B_C = '#6E6259';
-        // Same country-level figures as the insight panel: all partners, before
-        // display filters — so "Gross trade" equals the table's current-year row.
+        // Same figures as the insight panel: all partners, before display filters
         const statsA = DataLoader.countryTotals(isoA);
         const statsB = DataLoader.countryTotals(isoB);
 
@@ -1179,7 +1122,7 @@ const App = {
                 let splitBadge = '';
                 if (STATE.bilateralHistory) {
                     const [a, b] = [iso, pIso].sort();
-                    const hist = STATE.bilateralHistory[a + '|' + b];
+                    const hist = STATE.bilateralHistory[`${a}|${b}`];
                     const entry = hist ? hist[String(STATE.year)] : null;
                     if (entry) {
                         const isoIsA = iso === a;
@@ -1236,6 +1179,7 @@ const App = {
         const yVals = years.map(y => yearlyTotals[y]);
         const maxYV = Math.max(...yVals);
         if (maxYV > 0) {
+            // Gross trade by year: one scalable SVG with its own labels (replaces the stretched bars + HTML axis)
             const W = 300, H = 56, gap = 3, top = 14;
             const barW = (W - gap * (years.length - 1)) / years.length;
             const bars = yVals.map((v, i) => {
@@ -1281,7 +1225,7 @@ const App = {
     },
 
     // HHI computed from pre-threshold raw data to avoid zoom-level distortion.
-    _buildConcentrationGauge(iso, mf) {
+    _buildConcentrationGauge(iso, _mf) {
         const combined = {};
         this._panelFlows(iso).forEach(d => {
             if (d.exporter === iso) combined[d.importer] = (combined[d.importer] || 0) + d.netValue;
@@ -1362,6 +1306,7 @@ const App = {
         if (!anyData) return '';
 
         const maxVal = Math.max(...sectorExp, ...sectorImp, 1);
+        // 220 × 220 (was 240 × 240)
         const W = 220, H = 220, cx = W / 2, cy = H / 2, innerR = 14, maxBarLen = 80;
         const labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
         const parts = [];
@@ -1432,7 +1377,7 @@ const App = {
             let expVal = 0, impVal = 0;
             if (STATE.bilateralHistory) {
                 const [a, b] = [iso, pIso].sort();
-                const hist = STATE.bilateralHistory[a + '|' + b];
+                const hist = STATE.bilateralHistory[`${a}|${b}`];
                 const entry = hist ? hist[String(STATE.year)] : null;
                 if (entry) {
                     const isoIsA = iso === a;
@@ -1466,7 +1411,7 @@ const App = {
             const expLen = d.expVal > 0 ? Math.max(1.5, (d.expVal / maxVal) * barMaxLen) : 0;
             const impLen = d.impVal > 0 ? Math.max(1.5, (d.impVal / maxVal) * barMaxLen) : 0;
             const name = STATE.countryNames[d.pIso] || d.pIso;
-            const shortName = name.length > 14 ? name.slice(0, 13) + '…' : name;
+            const shortName = name.length > 14 ? `${name.slice(0, 13)}…` : name;
 
             const impBar = impLen > 0
                 ? `<rect x="${(leftEdge - 4 - impLen).toFixed(1)}" y="${y}" width="${impLen.toFixed(1)}" height="${barH}" fill="#ED1847"/>`
@@ -1538,8 +1483,8 @@ const App = {
                 let cagrStr = '';
                 if (firstNZ >= 0 && curIdx > firstNZ && yearlyTotals[years[firstNZ]] > 0) {
                     const n = curIdx - firstNZ;
-                    const cagr = (Math.pow(curVal / yearlyTotals[years[firstNZ]], 1 / n) - 1) * 100;
-                    if (isFinite(cagr)) cagrStr = ` (average annual growth ${signedPct(cagr, 1)} since ${years[firstNZ]})`;
+                    const cagr = ((curVal / yearlyTotals[years[firstNZ]]) ** (1 / n) - 1) * 100;
+                    if (Number.isFinite(cagr)) cagrStr = ` (average annual growth ${signedPct(cagr, 1)} since ${years[firstNZ]})`;
                 }
                 const what = STATE.metric === 'weight' ? 'Gross trade by weight' : 'Gross trade';
                 sentences.push(`${what} ${dir} ${Math.abs(yoy).toFixed(1)}% from ${years[curIdx - 1]} to ${STATE.year}${cagrStr}.`);
@@ -1578,7 +1523,7 @@ const App = {
         return sentences.map(s => `<p>${s}</p>`).join('');
     },
 
-    updateDashboard(rebuildMenus = true) {
+    updateDashboard(_rebuildMenus = true) {
         STATE.selectedExporters = new Set(this.exporterSelector.getSelectedCountries());
         STATE.selectedImporters = new Set(this.importerSelector.getSelectedCountries());
 
@@ -1598,11 +1543,9 @@ const App = {
         const empty = this.currentMode() === 'explore' && !!STATE.yearCache[STATE.year] && !(STATE.filteredData || []).length;
         document.getElementById('map-empty')?.classList.toggle('hidden', !empty);
 
-        // Single choke point for the URL: every filter change routes through
-        // updateDashboard(), so the hash always describes what is on screen.
+        // Every filter change passes here, so the URL hash always matches the screen
         DeepLink.write();
 
-        // Keep whatever is open in step with the year / metric / region just applied.
         this._refreshOpenViews();
 
         if (this._lastRenderedRegion !== STATE.region) {
@@ -1611,7 +1554,6 @@ const App = {
         }
     },
 
-    // Re-render every open panel / pop-up from the current STATE.
     _refreshOpenViews() {
         if (this._connectionsPanelOpen) this.openConnectionsPanel();
         else if (this._currentPanelIso) this._renderInsightPanel(this._currentPanelIso);
@@ -1624,16 +1566,14 @@ const App = {
 
     // ── Interactive line filter orchestration ───────────────────────────────
 
-    // Commit a drawn connection. Pairs accumulate (earlier lines persist) and are
-    // de-duplicated undirected, matching how DataLoader.filterData resolves them.
+    // Add a drawn connection; pairs are de-duplicated regardless of direction
     addBilateralPair(exporter, importer) {
         if (!exporter || !importer || exporter === importer) return;
         const key = [exporter, importer].sort().join('|');
         const exists = STATE.bilateralPairs.some(p => [p.exporter, p.importer].sort().join('|') === key);
         if (!exists) STATE.bilateralPairs.push({ exporter, importer });
         this._stashedPairs = [];
-        // A connection added from outside the Connect tab (e.g. the guided tour)
-        // puts the dashboard in Connect mode.
+        // A connection added outside Connect (e.g. by the tour) switches to Connect mode
         if (TradeMap.svg && !TradeMap.lineFilterMode) TradeMap.enableLineFilter();
         this.updateDashboard(false);
         this.openConnectionsPanel();
@@ -1649,8 +1589,7 @@ const App = {
         else this.closeConnectionsPanel();
     },
 
-    // Remove every drawn connection. The Explore filters (region, pickers…) are
-    // separate and stay as they were.
+    // Remove every drawn connection; the Explore filters are kept
     clearBilateralFilter() {
         STATE.bilateralPairs = [];
         this._stashedPairs = [];
@@ -1678,8 +1617,7 @@ const App = {
         }
         if (!status) return;
 
-        // The on-map status only guides the live drawing; the connection list/count
-        // lives in the side panel, so nothing is shown once the mode is off.
+        // The on-map status only guides live drawing, so it is empty when the mode is off
         const verb = window.matchMedia?.('(pointer: coarse)').matches ? 'Tap' : 'Click';
         let text = '';
         if (active && detail.stage === 'import') {
@@ -1693,19 +1631,17 @@ const App = {
     },
 
     // ── Connections panel (reuses the Data Insight side-panel container) ──────
-    // Mirrors the single-country Data Insight box, but stacks one simplified
-    // bilateral-history card per drawn connection.
+    // One bilateral-history card per drawn connection
     async openConnectionsPanel() {
         this._closeMenus();
-        // The connections panel replaces a single-country panel: drop that
-        // country's focus, which would otherwise hide the drawn lines.
+        // Drop any country focus, which would hide the drawn lines
         if (this._currentPanelIso || TradeMap.focusedIso) {
             this._currentPanelIso = null;
             if (TradeMap.clearFocus) TradeMap.clearFocus();
         }
         // Mini history charts need the precomputed bilateral history (lazy-loaded)
         if (!STATE.bilateralHistory) {
-            try { await DataLoader._loadBilateral(STATE.metric); } catch (e) { /* fall back to net-only */ }
+            try { await DataLoader._loadBilateral(STATE.metric); } catch (_e) { /* fall back to net-only */ }
         }
         const mf = METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value;
         const n = STATE.bilateralPairs.length;
@@ -1753,8 +1689,7 @@ const App = {
             .map(p => this._buildConnectionCard(p.exporter, p.importer, mf)).join('');
     },
 
-    // Simplified version of the arc-click history modal: current-year split, net,
-    // and a compact per-year bilateral bar chart.
+    // Simplified version of the arc-click history modal
     _buildConnectionCard(expIso, impIso, mf) {
         const expName = STATE.countryNames[expIso] || expIso;
         const impName = STATE.countryNames[impIso] || impIso;
@@ -1879,7 +1814,7 @@ const App = {
             const maxPVal = topPartners[0][1];
             const partnerRows = topPartners.map(([pIso, val]) => {
                 const pName = (STATE.countryNames[pIso] || pIso);
-                const shortName = pName.length > 14 ? pName.slice(0, 13) + '…' : pName;
+                const shortName = pName.length > 14 ? `${pName.slice(0, 13)}…` : pName;
                 const barPct = Math.round((val / maxPVal) * 100);
                 const isExportTo = !!partnerExports[pIso];
                 const color = isExportTo ? '#009EDB' : '#ED1847';
@@ -1955,8 +1890,8 @@ const App = {
             const firstNonZeroIdx = yVals.findIndex(v => v > 0);
             if (firstNonZeroIdx >= 0 && curIdx > firstNonZeroIdx && yVals[firstNonZeroIdx] > 0 && yVals[curIdx] > 0) {
                 const n = curIdx - firstNonZeroIdx;
-                const cagr = (Math.pow(yVals[curIdx] / yVals[firstNonZeroIdx], 1 / n) - 1) * 100;
-                if (isFinite(cagr)) {
+                const cagr = ((yVals[curIdx] / yVals[firstNonZeroIdx]) ** (1 / n) - 1) * 100;
+                if (Number.isFinite(cagr)) {
                     cagrHtml = `<span title="Average annual growth since the first year with trade">${signedPct(cagr, 1)}/yr</span>`;
                 }
             }
@@ -1973,8 +1908,7 @@ const App = {
         }
 
         if (region && region !== 'Other') {
-            // Rank by the country's own gross trade among all economies of its
-            // region with trade that year — not just the ones drawn on the map.
+            // Rank among all economies of the region with trade that year, not just those drawn
             const yStr = String(STATE.year);
             const regionCountries = Object.entries(STATE.trendSummary || {})
                 .filter(([code, ys]) => (ys[yStr] || 0) > 0 && RegionConfig.getRegion(code) === region)
@@ -1995,7 +1929,6 @@ const App = {
         tooltip.style.display = 'block';
         const pad = 15;
         
-        // Size and position of the tooltip's parent (the map frame)
         const container = tooltip.parentElement;
         const rect = container.getBoundingClientRect();
         
@@ -2020,8 +1953,8 @@ const App = {
         if (x < pad) x = pad;
         if (y < pad) y = pad;
 
-        tooltip.style.left = x + 'px';
-        tooltip.style.top = y + 'px';
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
     },
 
     hideTooltip() {
@@ -2054,9 +1987,7 @@ const App = {
         this.syncControlsFromState();
     },
 
-    // Make every filter control — the desktop bar AND the mobile sheet — show what
-    // STATE holds. Controls are matched by their data value, never by the clicked
-    // node, so the two surfaces cannot drift apart.
+    // Sync desktop and mobile controls to STATE, matching them by data value
     syncControlsFromState() {
         const region = STATE.region || 'Global';
         document.querySelectorAll('.region-btn').forEach(b => {
@@ -2084,9 +2015,7 @@ const App = {
 
     // ── Region, view mode, Lines pop-over, reset ──────────────────────────
 
-    // Region change from the filter bar select or the phone sheet buttons. The
-    // pickers list economies of every region, so a region change starts from
-    // an empty selection inside the new region.
+    // A region change clears the country selection
     setRegion(region) {
         STATE.region = region || 'Global';
         this.syncControlsFromState();
@@ -2095,8 +2024,7 @@ const App = {
         this.updateDashboard();
     },
 
-    // The mode follows from the state, so every path that changes it (tabs,
-    // tour, animation hand-back, deep links) shows the right tab.
+    // Derived from STATE, so every path that changes the mode shows the right tab
     currentMode() {
         return (TradeMap.lineFilterMode || STATE.bilateralPairs?.length) ? 'connect' : 'explore';
     },
@@ -2104,7 +2032,7 @@ const App = {
     async setMode(mode) {
         this._setDisplayMenu(false);
         if (mode === 'animate') {
-            startAnimation();          // takes over the screen; Stop hands the view back
+            startAnimation();
             return;
         }
         // Leaving the animation from the tabs: stop it and wait for the hand-back
@@ -2116,8 +2044,7 @@ const App = {
             this._stashedPairs = [];
             if (!TradeMap.lineFilterMode) TradeMap.enableLineFilter();
             this.updateDashboard(false);
-            // Phones: the sheet would cover most of the map, so it opens with the
-            // first connection; until then the on-map hint guides the user.
+            // Phones: open the sheet with the first connection so it does not cover the map
             if (STATE.bilateralPairs.length || !isCompact()) this.openConnectionsPanel();
             else { this.closeInsightPanel(); this.closeConnectionsPanel(); }
             return;
@@ -2134,8 +2061,7 @@ const App = {
 
     _applyModeUI() {
         const mode = this.currentMode();
-        // Connections shown with drawing off (tour, older links): drawing goes on,
-        // so the Connect tab always behaves the same way.
+        // Connections shown with drawing off (tour, deep links): turn drawing on
         if (mode === 'connect' && !TradeMap.lineFilterMode && TradeMap.svg) TradeMap.enableLineFilter();
         document.body.classList.toggle('mode-connect', mode === 'connect');
         document.body.classList.toggle('mode-explore', mode === 'explore');
@@ -2154,8 +2080,7 @@ const App = {
         menu.classList.toggle('hidden', !open);
         btn?.setAttribute('aria-expanded', String(!!open));
         if (!open) return;
-        // Right-aligned by default; if that runs off the left edge (button at the
-        // start of a wrapped row), align it to the button's left instead.
+        // Right-aligned by default; left-aligned if that runs off the left edge
         menu.classList.add('align-right');
         if (menu.getBoundingClientRect().left < 8) menu.classList.remove('align-right');
     },
@@ -2215,8 +2140,7 @@ const App = {
         this.updateDashboard();
     },
 
-    // Snapshot of everything the user can set, so a guided tour or the animation
-    // can hand the dashboard back exactly as they found it.
+    // Snapshot of the user's view, so the tour or animation can restore it
     captureViewState() {
         return {
             metric:         STATE.metric,
@@ -2253,8 +2177,7 @@ const App = {
         }
         this.exporterSelector.setCountries(s.exporters);
         this.importerSelector.setCountries(s.importers);
-        // The restored selection is not a "selection was just cleared" transition,
-        // so the threshold auto-reset in updateDashboard must not fire.
+        // Stop the threshold auto-reset in updateDashboard from firing
         this._prevSelectionCount = s.exporters.length + s.importers.length;
         if (Array.isArray(s.stashedPairs)) this._stashedPairs = s.stashedPairs.map(p => ({ ...p }));
         this.syncControlsFromState();

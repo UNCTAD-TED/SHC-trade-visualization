@@ -1,10 +1,10 @@
-import * as d3 from 'd3';
+import { geoCentroid, json, sum } from 'd3';
 import * as topojson from 'topojson-client';
 import { CONFIG, STATE } from './config.js';
 import { RegionConfig } from './regions.js';
 import { TradeMap } from './map.js';
 
-// fetch + JSON that fails loudly on HTTP errors instead of parsing an error page.
+// Fetch JSON, throwing on HTTP errors instead of parsing an error page.
 async function getJSON(url) {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
@@ -19,8 +19,7 @@ export const DataLoader = {
     // Incremented on every metric request; only the latest request may commit.
     _metricSeq: 0,
 
-    // Directory prefix for a metric's pre-computed JSON files.
-    //   value  -> data/        weight -> data/weight/
+    // Data folder for a metric's JSON files.
     _prefix(metric = STATE.metric) {
         return metric === 'weight' ? 'data/weight/' : 'data/';
     },
@@ -30,7 +29,7 @@ export const DataLoader = {
             const metric = STATE.metric;
             const prefix = this._prefix(metric);
             const [world, meta, trendSummary, yearFlows] = await Promise.all([
-                d3.json(CONFIG.geoJsonUrl),
+                json(CONFIG.geoJsonUrl),
                 getJSON('data/meta.json'),
                 getJSON(`${prefix}trend_summary.json`),
                 getJSON(`${prefix}${STATE.year}.json`),
@@ -70,7 +69,6 @@ export const DataLoader = {
             STATE.trendSummary = store.trendSummary;
 
             // Load routes.json in the background — not needed until a country is clicked.
-            // Routes are geographic (metric-independent), so they are shared across metrics.
             STATE._routesPromise = getJSON('data/routes.json')
                 .then(data => { STATE.routes = data; })
                 .catch(err => console.warn('routes.json load failed:', err));
@@ -85,8 +83,7 @@ export const DataLoader = {
         }
     },
 
-    // Lazily fetch a metric's bilateral history into its store (once), and point
-    // the active view at it if that metric is still selected when the fetch lands.
+    // Fetch a metric's bilateral history once; point STATE at it if still active.
     _loadBilateral(metric = STATE.metric) {
         const store = STATE.metricStore[metric];
         if (store.bilateralHistory) {
@@ -98,8 +95,7 @@ export const DataLoader = {
                 .then(data => {
                     store.bilateralHistory = data;
                     if (STATE.metric === metric) STATE.bilateralHistory = data;
-                    // Views drawn before the file arrived (corridor pop-up, the
-                    // panel's trade split and split badges) re-render on this.
+                    // Lets views drawn before the file arrived re-render.
                     document.dispatchEvent(new CustomEvent('shc:bilateral-loaded', { detail: { metric } }));
                     return data;
                 })
@@ -111,13 +107,9 @@ export const DataLoader = {
         return store._bilateralPromise;
     },
 
-    // Switch the active metric ('value' | 'weight'), loading its files on demand.
-    // The files are loaded FIRST and the switch is committed only afterwards, and
-    // only if this is still the latest request — so STATE.metric (which drives the
-    // units) and the data it points at can never disagree, even when the user
-    // clicks Value / Weight faster than the files arrive.
-    // Resolves true when the switch was committed; false when the metric was
-    // already active (this also cancels a pending switch) or a later request won.
+    // Switch the active metric ('value' | 'weight'). Files load first and the switch
+    // commits only if this is still the latest request, so units and data never disagree.
+    // Resolves false if the metric was already active or a later request won.
     async switchMetric(metric) {
         const seq = ++this._metricSeq;
         if (metric === STATE.metric || !STATE.metricStore[metric]) return false;
@@ -150,7 +142,7 @@ export const DataLoader = {
             const numericId = parseInt(feature.properties.code, 10);
             const alpha3 = TradeMap.isoMap[numericId];
             if (alpha3) {
-                STATE.countryCoords[alpha3] = d3.geoCentroid(feature);
+                STATE.countryCoords[alpha3] = geoCentroid(feature);
                 STATE.countryNames[alpha3] = feature.properties.labelen;
             }
         });
@@ -168,15 +160,8 @@ export const DataLoader = {
         // 1. Use pre-computed net flows for the current year
         let netFlows = STATE.yearCache[STATE.year] || [];
 
-        // 1b. Interactive line filter takes precedence.
-        // While the draw mode is active (or any connection has been drawn) the map
-        // shows ONLY the drawn country pairs — so turning the mode on starts from a
-        // blank map and each connection appears as it is drawn. Pairs are matched
-        // undirected (the dataset holds a single net flow per pair) and bypass the
-        // region / selector / threshold / Top-N filters entirely so the chosen
-        // relationships are always visible regardless of how small they are
-        // ("optimized" exact display). Flow-category visibility is still honoured
-        // for the legend toggles.
+        // 1b. Connect mode: only the drawn pairs (matched undirected), bypassing
+        // every filter except flow category.
         if (TradeMap.lineFilterMode || (STATE.bilateralPairs && STATE.bilateralPairs.length > 0)) {
             const pairKeys = new Set(
                 STATE.bilateralPairs.map(p => [p.exporter, p.importer].sort().join('|'))
@@ -186,11 +171,10 @@ export const DataLoader = {
             );
 
             STATE.effectiveThreshold  = 0;
-            STATE.totalBilateral      = d3.sum(pairFlows, d => d.netValue);
+            STATE.totalBilateral      = sum(pairFlows, d => d.netValue);
             STATE.totalBilateralCount = pairFlows.length;
             STATE.rawNodeStats        = this.computeStatsFromNetFlows(pairFlows);
-            // These pair-only totals overwrite the cached pre-threshold figures, so
-            // the normal path below must recompute them once the pairs are gone.
+            // Force a recompute of the pre-threshold totals once the pairs are gone.
             this._preThresholdKey     = null;
 
             const finalFlows   = pairFlows.filter(d => STATE.flowFilters.has(d.flowCategory));
@@ -216,15 +200,8 @@ export const DataLoader = {
         }
 
         // 4. Semantic Zoom Thresholding
-        //
-        // How the magnitude threshold and the Top-N line limit (step 4b) combine:
-        //   • explicit threshold + Top-N  → AND. A flow must clear the threshold
-        //     AND rank inside the top N. The user picked both, so both apply.
-        //   • 'auto' threshold + Top-N    → Top-N only (effective threshold 0).
-        //     computeAutoThreshold caps the map at ~40 arcs, which would silently
-        //     override a larger Top-N (choosing 500 would still show 40), so the
-        //     adaptive threshold stands down and the count alone controls the view.
-        //   • either one alone            → behaves exactly as before.
+        // Explicit threshold + Top-N: both apply. 'auto' + Top-N: Top-N only, since
+        // the ~40-arc auto cap would otherwise override a larger N.
         let dynamicThreshold;
         if (STATE.thresholdMode !== 'auto') {
             dynamicThreshold = STATE.thresholdMode;
@@ -241,17 +218,15 @@ export const DataLoader = {
         const preKey = `${STATE.metric}|${STATE.year}|${STATE.region}|${[...STATE.selectedExporters].sort()}|${[...STATE.selectedImporters].sort()}`;
         if (this._preThresholdKey !== preKey) {
             this._preThresholdKey     = preKey;
-            STATE.totalBilateral      = d3.sum(netFlows, d => d.netValue);
+            STATE.totalBilateral      = sum(netFlows, d => d.netValue);
             STATE.totalBilateralCount = netFlows.length;
             STATE.rawNodeStats        = this.computeStatsFromNetFlows(netFlows);
         }
 
         const thresholded = netFlows.filter(d => d.netValue >= dynamicThreshold);
 
-        // 4b. Top-N line limit — the N largest corridors by netValue.
-        // Applied before the flow-category filter (step 5), so hiding a category
-        // subtracts from the N rather than back-filling it with smaller flows:
-        // the N is a slice of the same ranking regardless of which categories are on.
+        // 4b. Top-N line limit, before the category filter so hiding a category
+        // shrinks the N rather than back-filling it with smaller flows.
         const limited = STATE.topNMode
             ? thresholded.slice().sort((a, b) => b.netValue - a.netValue).slice(0, STATE.topNMode)
             : thresholded;
@@ -266,40 +241,35 @@ export const DataLoader = {
         return finalFlows;
     },
 
-    // Arc-count-capped adaptive threshold.
-    // Keeps displayed arcs ≤ TARGET_MAX while applying a minimum floor
-    // that scales with selection breadth to suppress noise.
+    // Adaptive threshold: at most targetMax arcs, above a floor that scales with selection size.
+    // Replaces the Top-20 auto mode; the "Lines" menu adds a manual Top-N.
     computeAutoThreshold(flows, targetMax = 40) {
         const n = STATE.selectedExporters.size + STATE.selectedImporters.size;
         const isRegional = STATE.region && STATE.region !== 'Global';
 
         let floor;
         if (n === 0 && !isRegional) {
-            floor = 10000000;   // global view: $10M
+            floor = 10000000;
         } else if (n <= 3) {
-            floor = 10000;      // 1–3 countries: $10K
+            floor = 10000;
         } else if (n <= 10) {
-            floor = 100000;     // 4–10: $100K
+            floor = 100000;
         } else if (n <= 30) {
-            floor = 500000;     // 11–30: $500K
+            floor = 500000;
         } else {
-            floor = 1000000;    // 31+: $1M
+            floor = 1000000;
         }
         if (isRegional && n === 0) floor = 1000000;
 
         const aboveFloor = flows.filter(d => d.netValue >= floor);
         if (aboveFloor.length <= targetMax) return floor;
 
-        // Raise threshold until arc count ≤ targetMax
         const sorted = aboveFloor.slice().sort((a, b) => b.netValue - a.netValue);
         return sorted[targetMax - 1].netValue;
     },
 
-    // A country's own figures for the year, independent of every display filter
-    // (threshold, Lines limit, flow-direction boxes, region, selection):
-    //   gross = its exports + imports (gross directional flows; = trend_summary)
-    //   net   = exports − imports    (= sum of its signed net bilateral flows)
-    // Returns null when the country has no trade in the active metric that year.
+    // A country's totals for the year, ignoring display filters: gross from trend_summary,
+    // net from its signed net bilateral flows. Null if it has no trade that year.
     countryTotals(iso, year = STATE.year) {
         const gross = STATE.trendSummary?.[iso]?.[String(year)] || 0;
         let net = 0, any = false;

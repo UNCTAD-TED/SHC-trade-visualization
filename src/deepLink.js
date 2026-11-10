@@ -1,49 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Deep linking — the visible view, serialised into the URL hash.
 //
-// Purpose: a screen shown in a meeting can be sent to someone as a link, and a
-// reload returns to the same view instead of the default global 2024 map.
-//
-// Format (order is fixed so the same view always produces the same string):
-//
 //   #m=weight&y=2022&r=Africa&t=1000000&n=100&f=ns,sn&x=USA,DEU&i=KEN,TZA
 //   #m=value&y=2024&p=USA-KEN,GBR-GHA
 //
-//     m  metric              value | weight
-//     y  year                2015–2024
-//     r  region              Global | Africa | Americas | Asia | Europe | Oceania
-//     t  threshold           auto | 10000000 | 1000000 | 500000 | 100000 | 10000
-//     n  top-N line limit    all | 50 | 100 | 200 | 500
-//     f  flow categories     comma list of ns / sn / ss / nn, or `none` when
-//                            every category is switched off
-//     x  exporters           comma list of ISO3
-//     i  importers           comma list of ISO3
-//     p  drawn connections   comma list of EXPORTER-IMPORTER pairs (ISO3-ISO3),
-//                            in the order they were drawn
-//
-// `m` and `y` are always written — they are the context a reader needs most.
-// Everything else is omitted while it holds its default, so an untouched
-// dashboard produces a short link.
-//
-// Drawn connections are written as pairs, never as x / i: the pickers mirror
-// the pairs' endpoints, but x=USA,GBR&i=KEN,GHA would be read back as every
-// exporter × importer combination (4 corridors instead of the 2 drawn). While
-// any pair exists, x / i are therefore left out.
-//
-// Every value is validated against the controls that actually exist in
-// index.html (the region / threshold / top-N buttons, the year <select>), so
-// there is no second copy of the allowed values to drift out of step, and a
-// hand-edited or stale link degrades to the default rather than breaking.
-// Country codes are validated once the economies are known (applyPostLoad):
-// codes that are not a known economy are dropped.
-//
-// NOT carried in the link: the open insight panel, the line-draw mode itself
-// and the map's zoom/pan. Those are transient interaction state rather than a
-// filter setting.
-//
-// Hash changes in the same tab (a new link pasted into the address bar,
-// Back / Forward) re-apply the link by reloading the page; the app's own writes
-// use history.replaceState, which does not fire `hashchange`.
+// m metric, y year, r region, t threshold, n top-N limit, f flow categories
+// (ns,sn,ss,nn or none), x / i exporters / importers, p drawn EXPORTER-IMPORTER pairs.
+// m and y are always written; other keys only when not at their default.
+// With pairs present, x / i are omitted: they would read back as every exporter × importer pair.
+// Values are checked against the controls in index.html; invalid ones fall back to the default.
 // ─────────────────────────────────────────────────────────────────────────────
 import { STATE } from './config.js';
 import { NO_DATA_CODES } from './countrySelector.js';
@@ -58,12 +23,10 @@ const FLOW_BY_CODE = Object.fromEntries(Object.entries(FLOW_CODES).map(([k, v]) 
 const ALL_FLOWS = Object.keys(FLOW_CODES);
 const FLOWS_NONE = 'none';
 
-// Hand-edited links cannot make the app build an unbounded list.
+// Caps for hand-edited links
 const MAX_CODES = 250;
 const MAX_PAIRS = 100;
 
-// Allowed-value sets, read from the DOM so the link can never offer a setting
-// the UI does not have.
 const optionsOf = (selector, attr) =>
     new Set([...document.querySelectorAll(selector)].map(el => el.dataset[attr]));
 const years = () =>
@@ -74,16 +37,12 @@ const rawHash = () => (location.hash || '').replace(/^#/, '');
 const pairKey = (a, b) => [a, b].sort().join('|');
 
 export const DeepLink = {
-    // The hash as the app itself last read or wrote it. A `hashchange` to any
-    // other value came from outside the app (address bar, Back / Forward).
+    // Last hash the app read or wrote; any other value came from outside
     _lastHash: null,
     _watching: false,
 
     // ── Parse ────────────────────────────────────────────────────────────
-    // Returns a plain object holding only the keys that were present AND valid.
-    // Anything unrecognised is dropped silently — a shared link should degrade,
-    // not throw. Country codes are only checked for shape here; whether they
-    // are known economies is checked in applyPostLoad, once the data is in.
+    // Returns only the keys that are present and valid; anything else is dropped.
     read() {
         this._watch();
         const out = {};
@@ -112,12 +71,11 @@ export const DeepLink = {
         if (params.has('f')) {
             const f = get('f');
             if (f === '' || f.toLowerCase() === FLOWS_NONE) {
-                // Every category switched off. `f=none` is what serialize() writes;
-                // a bare `f=` is how earlier versions wrote the same state.
+                // All categories off (a bare f= from older links means the same)
                 out.flowFilters = new Set();
             } else {
                 const cats = f.split(',').map(c => FLOW_BY_CODE[c.trim()]).filter(Boolean);
-                // A fully bogus list falls back to the default (all categories).
+                // An invalid list falls back to all categories
                 if (cats.length) out.flowFilters = new Set(cats);
             }
         }
@@ -147,18 +105,9 @@ export const DeepLink = {
         return out;
     },
 
-    // True when the URL actually carried a usable view (as opposed to no hash,
-    // or a hash that validated down to nothing).
-    isLink(link) {
-        return !!link && Object.keys(link).length > 0;
-    },
-
     // ── Restore, phase 1 ─────────────────────────────────────────────────
-    // Must run BEFORE DataLoader.loadAll(), which reads STATE.metric and
-    // STATE.year to decide which files to fetch. Also syncs the controls that
-    // App.syncMobileFilterState() does not cover (year selects, flow checkboxes);
-    // the region / threshold / top-N / metric buttons are synced from STATE by
-    // syncMobileFilterState() later in App.init().
+    // Runs before DataLoader.loadAll(), which reads STATE.metric and STATE.year.
+    // The buttons are synced later by App.syncMobileFilterState().
     applyPreLoad(link) {
         if (link.metric) STATE.metric = link.metric;
         if (link.year) STATE.year = link.year;
@@ -177,17 +126,10 @@ export const DeepLink = {
     },
 
     // ── Restore, phase 2 ─────────────────────────────────────────────────
-    // Must run AFTER the data (country names) and the country selectors are
-    // ready. STATE.selected* is overwritten from the selectors on every
-    // updateDashboard(), so the selection has to be restored into the
-    // selectors, not into STATE.
+    // Runs after the data and country selectors are ready. The selection goes
+    // into the selectors, since updateDashboard() copies STATE.selected* from them.
     applyPostLoad(link, app) {
-        // Validate country codes now that the economies are known: an economy
-        // on the map (STATE.countryNames, from the TopoJSON + meta.json) or in
-        // the pickers' classification. Economies with no data at all (see
-        // NO_DATA_CODES) are dropped too — they could only show an empty map.
-        // Map-only economies stay accepted for x / i because links written
-        // before `p` existed carried drawn pairs (e.g. USA→NRU) as x / i.
+        // Drop codes that are not a known economy or have no data at all
         const known = (c) => !NO_DATA_CODES.has(c) && (!!STATE.countryNames[c] ||
             !!app.exporterSelector?.hasCountry?.(c) || !!app.importerSelector?.hasCountry?.(c));
 
@@ -197,12 +139,8 @@ export const DeepLink = {
         ['exporters', 'importers', 'bilateralPairs'].forEach(k => { if (link[k] && !link[k].length) delete link[k]; });
 
         if (link.bilateralPairs) {
-            // Drawn connections: the link was made in Connect mode, which shows
-            // only the pairs. App.updateDashboard() then switches to the Connect
-            // tab and turns drawing on.
+            // Drawn pairs: updateDashboard() switches to the Connect tab
             STATE.bilateralPairs = link.bilateralPairs.map(p => ({ ...p }));
-            // The connections panel lists the pairs with their history; it
-            // refreshes itself on every later updateDashboard().
             Promise.resolve(app.openConnectionsPanel?.())
                 .catch(err => console.warn('DeepLink: could not open the connections panel', err));
             return;
@@ -241,13 +179,9 @@ export const DeepLink = {
     },
 
     // ── Write ────────────────────────────────────────────────────────────
-    // replaceState, not pushState: every filter click would otherwise add a
-    // history entry and the browser Back button would walk the user backwards
-    // through their own filtering instead of leaving the page.
+    // replaceState, so filter clicks do not fill the Back button history
     write() {
-        // Animation mode overwrites the filters with its own settings and
-        // restores them on stop — writing those to the URL would hand out a
-        // link to a view the user never chose.
+        // Animation mode uses its own temporary filters; keep them out of the link
         if (document.body.classList.contains('anim-mode')) return;
 
         const hash = this.serialize();
@@ -257,27 +191,20 @@ export const DeepLink = {
         try {
             history.replaceState(null, '', url);
         } catch {
-            // Some embedding contexts (sandboxed iframes) forbid replaceState.
-            // The dashboard works fine without deep links, so this is not fatal.
+            // Sandboxed iframes may forbid replaceState; not fatal
         }
     },
 
     // ── Follow hash changes made outside the app ─────────────────────────
-    // A link pasted into the address bar of an open tab, or Back / Forward
-    // between two links, changes only the hash: the page is not reloaded, so
-    // without this the old view would stay on screen and the next filter click
-    // would overwrite the new link. Re-applying through a reload goes through
-    // exactly the same restore path as opening the link fresh.
+    // A pasted link or Back / Forward changes only the hash; reload to restore it
     _watch() {
         if (this._watching) return;
         this._watching = true;
         window.addEventListener('hashchange', () => {
             const raw = rawHash();
             if (raw === this._lastHash) return;          // the app's own state
-            // Only a view link (key=value…) or a cleared hash is ours to follow.
-            // A hash cleared by the host page (e.g. an href="#" link) is not a view
-            // to load: never reload the page for it.
-            if (!raw || !raw.includes('=')) return;
+            // Only follow view links (key=value), not e.g. an href="#" on the host page
+            if (!raw?.includes('=')) return;
             this._lastHash = raw;
             location.reload();
         });

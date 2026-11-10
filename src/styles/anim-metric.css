@@ -1,0 +1,26 @@
+/* Animation mode: active-metric label
+   Two small labels added so the bar-chart-race panel and the map legend state
+   which metric is on screen (Value (USD) / Weight (tonnes)).
+   
+   The rest of the animation UI is styled in anim-mode.css; these class
+   names are new and do not collide with any selector there, so nothing existing
+   is overridden. Colours come from colors.css, radius/spacing from
+   variables.css — no new tokens.
+   Panel header label, sitting next to #ap-year / .ap-range */
+.ap-metric {
+  color: var(--un-color-grey-dark);
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Map legend label, same wording at legend scale */
+.al-metric {
+  color: var(--ungrey-dark);
+  display: inline-block;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}

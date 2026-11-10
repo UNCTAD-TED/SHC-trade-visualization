@@ -1,10 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Guided Story tour engine
 //
-// A lightweight, dependency-free walkthrough that *drives the real app* (it calls
-// the same App / DataLoader / TradeMap APIs the UI uses) while a moving spotlight
-// and a UNCTAD-styled narration card explain each feature. Every chapter performs
-// its action live; the user advances manually (Next / Back / dots / arrow keys).
+// Drives the real app while a spotlight and a card explain each feature.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { STATE, isCompact } from '../config.js';
@@ -13,7 +10,6 @@ import { TradeMap } from '../map.js';
 import { startAnimation, stopAnimation, isAnimating } from '../sns/animationMode.js';
 import { TOUR_STEPS } from './steps.js';
 
-const SEEN_KEY = 'shc_tour_seen_v1';
 const SPOT_PAD = 8;
 
 export const Tour = {
@@ -26,74 +22,48 @@ export const Tour = {
     _els: null,            // { spot, card, bar }
     _ctx: null,
     _busy: false,
-    // Generation: bumped by start() and end(). Every async step of goTo()/onEnter
-    // re-checks it, so work begun by a tour that has since ended stops there
-    // instead of opening panels or drawing pairs over the restored view.
+    // Bumped by start() and end(); async steps check it so an ended tour's work stops
     _gen: 0,
-    _snapshot: null,       // the user's view when the tour started (App.captureViewState)
-    _ending: null,         // promise of the hand-back in progress, if any
+    _snapshot: null,       // the user's view at tour start
+    _ending: null,         // hand-back in progress, if any
     _starting: false,
 
-    // Wire the header button + first-visit auto-launch. Call once from App.init().
-    // opts.autoLaunch = false suppresses the first-visit auto-open. App passes
-    // false when the URL carries a deep link: the tour resets every filter to its
-    // default, which would silently discard the view the link was meant to show.
-    // The Tour button in the header still works.
-    init(app, opts = {}) {
+    // Wire the header button. Call once from App.init().
+    // The tour only starts from the button, never by itself.
+    init(app) {
         this.app = app;
         this.steps = TOUR_STEPS;
         this._ctx = this._buildContext();
 
         document.getElementById('tour-btn')?.addEventListener('click', () => this.start());
-
-        // First visit → auto-open once (the user then advances manually)
-        let seen = false;
-        try { seen = !!localStorage.getItem(SEEN_KEY); } catch { /* private mode */ }
-        if (!seen && opts.autoLaunch !== false) {
-            // Wait until the monitor is mostly on screen (it may sit lower in a page)
-            const target = document.getElementById('map-container');
-            const launch = () => setTimeout(() => { if (!this.active) this.start(); }, 900);
-            if (target && 'IntersectionObserver' in window) {
-                const io = new IntersectionObserver((entries) => {
-                    if (entries.some(en => en.intersectionRatio >= 0.6)) { io.disconnect(); launch(); }
-                }, { threshold: [0.6] });
-                io.observe(target);
-            } else {
-                launch();
-            }
-        }
     },
 
     _buildContext() {
-        const tour = this;
         return {
             app: this.app,
             STATE, DataLoader, TradeMap, startAnimation, stopAnimation,
             q: (sel) => document.querySelector(sel),
             wait: (ms) => new Promise(r => setTimeout(r, ms)),
-            waitFor: (sel, timeout) => tour._waitFor(sel, timeout),
-            // Pick the largest net importer currently visible (for the deep-dive).
-            topNetImporter: () => tour._extreme('importer'),
-            topNetExporter: () => tour._extreme('exporter'),
-            // Preferred importer to spotlight in the deep-dive: a recognisable East
-            // African used-clothing importer, falling back to the largest net importer.
+            waitFor: (sel, timeout) => this._waitFor(sel, timeout),
+            topNetImporter: () => this._extreme('importer'),
+            topNetExporter: () => this._extreme('exporter'),
+            // Deep-dive importer: an East African SHC importer, else the largest net importer
             pickImporter: () => {
                 const flows = STATE.yearCache?.[STATE.year] || [];
                 const asImporter = (iso) => flows.some(f => f.importer === iso);
                 const present = (iso) => flows.some(f => f.importer === iso || f.exporter === iso);
                 for (const iso of ['TZA', 'UGA']) if (asImporter(iso)) return iso;
                 for (const iso of ['TZA', 'UGA']) if (present(iso)) return iso;
-                return tour._extreme('importer');
+                return this._extreme('importer');
             },
-            // The single biggest net flow this year (for the bilateral demo).
             topFlow: () => {
                 const flows = STATE.yearCache?.[STATE.year] || [];
                 let best = null;
                 for (const f of flows) if (!best || f.netValue > best.netValue) best = f;
                 return best;
             },
-            // alive (optional): the step's "still current?" check — see goTo().
-            resetView: (alive) => tour._resetView(alive),
+            // alive: optional "still current?" check, see goTo()
+            resetView: (alive) => this._resetView(alive),
         };
     },
 
@@ -115,11 +85,9 @@ export const Tour = {
         if (this.active || this._starting) return;
         this._starting = true;
         try {
-            // A previous tour may still be handing the dashboard back; the
-            // snapshot below must be of the user's view, not a half-restored one.
+            // Let a previous hand-back finish so the snapshot is the user's view
             if (this._ending) { try { await this._ending; } catch { /* ignore */ } }
-            // Likewise, a running bar-chart race is not the user's view: end it
-            // (it restores the view it found) before taking the snapshot.
+            // Same for a running bar-chart race, which restores its view on stop
             if (isAnimating()) { try { await stopAnimation(); } catch { /* ignore */ } }
             if (this.active) return;
 
@@ -131,7 +99,6 @@ export const Tour = {
         } finally {
             this._starting = false;
         }
-        try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* ignore */ }
 
         this._mount();
         window.addEventListener('resize', this._onResize);
@@ -139,20 +106,18 @@ export const Tour = {
         await this.goTo(0);
     },
 
-    // Ends the tour (Done, ×, Esc) and hands the dashboard back exactly as the
-    // user left it when the tour started: metric, year, region, filters,
-    // selections, drawn connections, and the country panel if one was open.
+    // Ends the tour and restores the view the user had when it started
     end() {
         if (!this.active) return this._ending || Promise.resolve();
         this.active = false;
-        this._gen++;            // invalidates every goTo()/onEnter still in flight
-        this._busy = false;     // ...so a fresh start() is never blocked by them
+        this._gen++;            // cancels any goTo()/onEnter in flight
+        this._busy = false;     // so a new start() is not blocked by them
         this._clearSettle();
         clearTimeout(this._reposTimer);
         window.removeEventListener('resize', this._onResize);
         document.removeEventListener('keydown', this._onKey, true);
 
-        // Take the card down straight away — the hand-back below may await data.
+        // Remove the card now; the hand-back may await data
         if (this._els) {
             const els = this._els; this._els = null;
             els.card.style.opacity = '0';
@@ -172,8 +137,7 @@ export const Tour = {
 
     async _handBack(step, snap) {
         const app = this.app;
-        // The current chapter's own cleanup first (e.g. the animation chapter
-        // stops the race), then end anything a chapter may have left running.
+        // Chapter cleanup first, then stop anything left running
         try { await step?.onExit?.(this._ctx); } catch (e) { console.warn('tour onExit', e); }
         try { await stopAnimation(); } catch { /* ignore */ }
         try {
@@ -192,7 +156,6 @@ export const Tour = {
                 return;
             } catch (e) { console.warn('tour restore', e); }
         }
-        // No snapshot API (older controller): fall back to the default view.
         await this._resetView();
     },
 
@@ -214,9 +177,7 @@ export const Tour = {
         this._busy = true;
         this._clearSettle();
 
-        // alive(): is this navigation still the current one? False once the
-        // tour has ended (or ended and restarted) — every await re-checks it,
-        // and chapters receive it as onEnter's second argument for theirs.
+        // False once the tour has ended or restarted; also passed to onEnter
         const gen = this._gen;
         const alive = () => this.active && this._gen === gen;
 
@@ -229,7 +190,7 @@ export const Tour = {
             try { await step.onEnter?.(this._ctx, alive); } catch (e) { console.warn('tour onEnter', e); }
             if (!alive()) return;
 
-            // Resolve the target after the action has run (panels may have just opened)
+            // Resolve the target after onEnter (panels may have just opened)
             const sel = typeof step.target === 'function' ? step.target(this._ctx) : step.target;
             let targetEl = null;
             if (sel) targetEl = await this._waitFor(sel, step.targetTimeout ?? 2500);
@@ -238,18 +199,14 @@ export const Tour = {
             this._renderCard(step);
             this._place(targetEl, step.placement || 'auto');
             this._updateProgress();
-
-            // Re-measure shortly after, so spotlights on elements that slide/zoom in
-            // (e.g. the insight side-panel) settle onto their final position.
             this._scheduleSettle();
         } finally {
-            // end() already released the lock for a newer tour; leave it alone.
+            // Leave the lock alone if a newer tour owns it
             if (this._gen === gen) this._busy = false;
         }
     },
 
-    // Re-anchor a few times after a step renders to catch CSS transitions
-    // (panel slide ~300ms, map zoom) without any auto-advance.
+    // Re-anchor a few times to follow CSS transitions (panel slide, map zoom)
     _scheduleSettle() {
         this._clearSettle();
         [140, 360, 680].forEach(d => {
@@ -276,7 +233,7 @@ export const Tour = {
         const total = this.steps.length;
         const isLast = this.index === total - 1;
 
-        // One segment per chapter: done, current, to come. Each jumps to its chapter.
+        // One clickable segment per chapter
         const segs = this.steps.map((_, i) =>
             `<button type="button" class="tour-card__dot ${i === this.index ? 'is-active' : i < this.index ? 'is-done' : ''}" data-i="${i}" aria-label="Chapter ${i + 1} of ${total}"></button>`
         ).join('');
@@ -314,16 +271,16 @@ export const Tour = {
 
     _updateProgress() {
         const pct = ((this.index + 1) / this.steps.length) * 100;
-        if (this._els) this._els.bar.style.width = pct + '%';
+        if (this._els) this._els.bar.style.width = `${pct}%`;
     },
 
-    // Position the spotlight over the target (or full-dim center if none)
+    // Position the spotlight over the target (or dim the whole screen if none)
     _place(targetEl, placement) {
         if (!this._els) return;
         const spot = this._els.spot;
         const card = this._els.card;
         const step = this.steps[this.index];
-        const clear = step?.dim === false;   // e.g. the animation chapter — keep the view visible
+        const clear = step?.dim === false;
 
         if (!targetEl || placement === 'center') {
             spot.classList.toggle('is-clear', clear);
@@ -331,13 +288,19 @@ export const Tour = {
             spot.style.top = '50%'; spot.style.left = '50%';
             spot.style.width = '0px'; spot.style.height = '0px';
 
+            // Phones: tour.css places the card
+            if (isCompact()) {
+                card.style.left = '';
+                card.style.top = '';
+                return;
+            }
             const cw = card.offsetWidth, ch = card.offsetHeight;
             const anchor = step?.cardAnchor || 'center';
             const top = anchor === 'bottom' ? window.innerHeight - ch - 24
                       : anchor === 'top'    ? 24
                       : (window.innerHeight - ch) / 2;
-            card.style.left = Math.round((window.innerWidth - cw) / 2) + 'px';
-            card.style.top = Math.round(top) + 'px';
+            card.style.left = `${Math.round((window.innerWidth - cw) / 2)}px`;
+            card.style.top = `${Math.round(top)}px`;
             return;
         }
 
@@ -349,31 +312,29 @@ export const Tour = {
         }
         const r = targetEl.getBoundingClientRect();
         const pad = SPOT_PAD;
-        spot.style.top = (r.top - pad) + 'px';
-        spot.style.left = (r.left - pad) + 'px';
-        spot.style.width = (r.width + pad * 2) + 'px';
-        spot.style.height = (r.height + pad * 2) + 'px';
+        spot.style.top = `${r.top - pad}px`;
+        spot.style.left = `${r.left - pad}px`;
+        spot.style.width = `${r.width + pad * 2}px`;
+        spot.style.height = `${r.height + pad * 2}px`;
 
-        // Phones: the card is pinned to the bottom (tour.less); move it to the top
-        // when the target sits in the lower half of the screen.
+        // Phones: move the card clear of the target
         if (isCompact()) {
             const landscape = window.innerWidth > window.innerHeight;
             const cx = r.left + r.width / 2;
-            // Landscape: beside the target (left or right half); portrait: above or below it
+            // Landscape: left or right of the target; portrait: top or bottom
             card.classList.toggle('is-left', landscape && cx > window.innerWidth / 2);
             card.classList.toggle('is-right', landscape && cx <= window.innerWidth / 2);
             card.classList.toggle('is-top', !landscape && r.top + r.height / 2 > window.innerHeight / 2);
+            card.style.left = '';
+            card.style.top = '';
             return;
         }
 
-        // Prefer docking the card to a fixed corner (keeps the map visible);
-        // fall back to placing it adjacent to the target.
+        // Dock to a corner if the step asks, else place next to the target
         if (step?.dock) this._dockCard(step.dock);
         else this._placeCard(card, r, placement);
     },
 
-    // Dock the card into a screen corner, clearing the header and KPI bar so it
-    // never floats over the centre of the map.
     _dockCard(dock) {
         if (!this._els) return;
         const card = this._els.card;
@@ -381,9 +342,9 @@ export const Tour = {
         const vw = window.innerWidth, vh = window.innerHeight;
         const cw = card.offsetWidth, ch = card.offsetHeight;
         const headerH = document.querySelector('header')?.getBoundingClientRect().height || 56;
-        // Keep clear of the phone bottom bar when it is shown
+        // Clear the phone bottom bar when shown
         const nav = document.getElementById('mobile-nav');
-        const navH = nav && nav.getClientRects().length ? nav.getBoundingClientRect().height : 0;
+        const navH = nav?.getClientRects().length ? nav.getBoundingClientRect().height : 0;
         const topY = headerH + m;
         const botY = vh - navH - m - ch;
         const leftX = m;
@@ -394,10 +355,10 @@ export const Tour = {
             case 'tl': top = topY; left = leftX; break;
             case 'tr': top = topY; left = rightX; break;
             case 'bl': top = botY; left = leftX; break;
-            case 'br': default: top = botY; left = rightX; break;
+            default:   top = botY; left = rightX; break;
         }
-        card.style.left = Math.round(Math.max(m, Math.min(left, rightX))) + 'px';
-        card.style.top  = Math.round(Math.max(topY, Math.min(top, vh - ch - m))) + 'px';
+        card.style.left = `${Math.round(Math.max(m, Math.min(left, rightX)))}px`;
+        card.style.top  = `${Math.round(Math.max(topY, Math.min(top, vh - ch - m)))}px`;
     },
 
     _placeCard(card, r, placement) {
@@ -417,14 +378,12 @@ export const Tour = {
             case 'top':    top = r.top - ch - gap;  left = cx - cw / 2; break;
             case 'left':   top = cy - ch / 2;       left = r.left - cw - gap; break;
             case 'right':  top = cy - ch / 2;       left = r.right + gap; break;
-            case 'bottom':
             default:       top = r.bottom + gap;    left = cx - cw / 2; break;
         }
-        // Clamp into the viewport
         left = Math.max(12, Math.min(left, vw - cw - 12));
         top  = Math.max(12, Math.min(top,  vh - ch - 12));
-        card.style.left = Math.round(left) + 'px';
-        card.style.top = Math.round(top) + 'px';
+        card.style.left = `${Math.round(left)}px`;
+        card.style.top = `${Math.round(top)}px`;
     },
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -443,47 +402,38 @@ export const Tour = {
         });
     },
 
-    // Return the app to a clean, predictable global/value view.
-    // alive (optional): when it turns false during the metric load, the tour has
-    // ended and its hand-back owns the view — stop instead of overwriting it.
+    // Return the app to the default global/value view.
+    // Stops if alive() turns false during the metric load (the hand-back owns the view).
     async _resetView(alive = () => true) {
         const app = this.app;
         try {
             STATE.bilateralPairs = [];
             TradeMap.cancelLineDraw?.();
-            // Draw mode shows only drawn pairs (none now) — i.e. a blank map.
-            // The hand-back at the end turns it on again if the user had it on.
+            // Draw mode with no pairs is a blank map, so turn it off
             if (TradeMap.lineFilterMode) TradeMap.disableLineFilter?.();
             app.closeConnectionsPanel?.();
             app._setDisplayMenu?.(false);
             app.closeInsightPanel?.();
             TradeMap.clearFocus?.();
 
-            // Flows: all on
             STATE.flowFilters = new Set(['north-south', 'south-north', 'south-south', 'north-north']);
             document.querySelectorAll('.flow-checkbox').forEach(cb => { cb.checked = true; });
 
-            // Threshold: auto
             STATE.thresholdMode = 'auto';
 
-            // Top-N line limit: off
             STATE.topNMode = null;
             app._setActiveTopNButtons?.('all');
 
-            // Region: Global
             STATE.region = 'Global';
             app.syncControlsFromState?.();   // desktop bar + mobile sheet
 
-            // Selections: none
             app.exporterSelector?.setCountries([]);
             app.importerSelector?.setCountries([]);
 
-            // Metric: value
             if (STATE.metric !== 'value') {
                 await DataLoader.switchMetric('value');
                 if (!alive()) return;
-                // Only relabel when the switch actually committed (a later
-                // request may have superseded it while the files loaded).
+                // Relabel only if the switch committed (a later request may have superseded it)
                 if (STATE.metric === 'value') {
                     app._globalRankCache = {};
                     TradeMap._lastLegendKey = null;
@@ -497,7 +447,6 @@ export const Tour = {
         } catch (e) { console.warn('tour resetView', e); }
     },
 
-    // Reposition spotlight/card on resize (debounced)
     _onResize: null,
     _onKey: null,
 
@@ -511,7 +460,7 @@ export const Tour = {
     },
 };
 
-// Bind event handlers (need stable references for add/removeEventListener)
+// Stable handler references for add/removeEventListener
 Tour._onResize = () => {
     clearTimeout(Tour._reposTimer);
     Tour._reposTimer = setTimeout(() => { if (Tour.active) Tour._reanchor(); }, 120);

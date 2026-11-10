@@ -1,15 +1,11 @@
-// countrySelector.js - Hierarchical country selection with collapsible groups
+// Hierarchical country selection with collapsible groups
 import { STATE } from './config.js';
 
 let _classificationCache = null;
 
-// Economies listed in country_classification.json that are NOT offered in the
-// pickers because the dataset holds no trade for them in any year, so picking
-// one could only produce an empty map. This is a data-coverage rule, not a
-// cartographic or political one:
-//   TWN — the source (BACI / UN Comtrade) records this trade under
-//         "Other Asia, nes", which the dataset excludes.
-//   PRI — no flow in any year or metric of the dataset.
+// Economies hidden from the pickers because the dataset has no trade for them
+// (a data-coverage rule, not a political one). TWN: BACI / UN Comtrade record it
+// as "Other Asia, nes", which is excluded. PRI: no flows in any year or metric.
 export const NO_DATA_CODES = new Set(['TWN', 'PRI']);
 
 class CountrySelector {
@@ -20,8 +16,7 @@ class CountrySelector {
         this.classificationData = null;
         this.selectedCountries = new Set();
         this.allCountries = [];
-        // A country can sit in several groups (e.g. Kenya under "Eastern Africa"
-        // AND "Developing economies"), so each code maps to ALL of its checkboxes.
+        // A country can sit in several groups, so each code maps to all its checkboxes.
         this._checkboxesByCode = {};
     }
 
@@ -51,7 +46,6 @@ class CountrySelector {
         return Object.keys(this.classificationData.countries).filter(code => !NO_DATA_CODES.has(code));
     }
 
-    // True when `code` is an economy this picker lists.
     hasCountry(code) {
         return !!this.classificationData?.countries[code] && !NO_DATA_CODES.has(code);
     }
@@ -124,12 +118,8 @@ class CountrySelector {
         });
     }
 
-    // While the search box holds a term, App's search handler (main.js) shows
-    // every matching .country-option — so a country listed in several groups
-    // would appear two or three times. Every occurrence after the first carries
-    // data-dup="1"; this listener sits on the menu (bubble phase, i.e. AFTER the
-    // handler on the input itself) and hides those repeats. The kept row shares
-    // its checked state with the hidden ones, so nothing is lost.
+    // Search shows every matching .country-option, so countries in several groups
+    // repeat. This menu listener runs after the input handler and hides the data-dup copies.
     _installSearchDedup() {
         if (this._searchDedupInstalled) return;
         const menu = document.getElementById(`${this.elementId}-menu`);
@@ -242,8 +232,7 @@ class CountrySelector {
             e.stopPropagation();
             if (e.target.checked) this.selectedCountries.add(code);
             else this.selectedCountries.delete(code);
-            // updateSelection → _syncUI mirrors the new state onto this country's
-            // checkboxes in every other group it appears in.
+            // _syncUI mirrors this onto the country's checkboxes in other groups.
             this.updateSelection();
         });
         if (!this._checkboxesByCode[code]) this._checkboxesByCode[code] = [];
@@ -275,8 +264,7 @@ class CountrySelector {
         } else if (count === 1) {
             const code = Array.from(this.selectedCountries)[0];
             const country = this.classificationData?.countries[code];
-            // Drawn connections can end in economies the classification does
-            // not list (e.g. MAC, NRU): fall back to the map's name for them.
+            // Drawn connections may end in unlisted economies (e.g. MAC, NRU): use the map's name.
             labelEl.textContent = country ? country.name : (STATE.countryNames[code] || code);
         } else {
             labelEl.textContent = `${count} economies`;

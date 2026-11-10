@@ -1,23 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CSV Export — analyst-ready, scope-anchored table extraction.
-//
-// Exports are anchored to whatever the user is already focused on, so they receive
-// the narrowest meaningful slice rather than the whole global matrix:
-//
-//   • Country  — from the country Insight panel: one row per trading partner, both
-//                directions (exports / imports), value + weight + unit value.
-//   • Corridor — from the bilateral (arc) modal: one row per year 2015–2024 with both
-//                directions of a single country pair.
-//   • View     — from the header menu: the current map scope (year · region · selection ·
-//                drawn connections · flow-direction), as flows or a country summary.
-//
-// All tables ignore the on-screen magnitude threshold and the 40-arc auto cap —
-// those declutter the map, whereas a CSV has no visual-overload limit, so analysts
-// get the full data for the chosen scope. The one display control that IS carried
-// through is the explicit "Lines" Top-N limit (STATE.topNMode): it is a deliberate
-// "give me the top N corridors" request rather than a decluttering side effect, so
-// the export matches what is on screen; so are the flow-direction boxes. Value is
-// USD, weight is kilograms, unit value is USD/kg.
+// CSV Export — country (panel), corridor (arc modal) and current view (header menu).
+// Ignores the threshold and auto arc cap; keeps the Top-N limit and flow-direction
+// boxes so the export matches the map. Value is USD, weight kg, unit value USD/kg.
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONFIG, STATE } from './config.js';
 import { RegionConfig } from './regions.js';
@@ -31,8 +15,7 @@ const regionOf = (iso) => { const r = RegionConfig.getRegion(iso); return r === 
 const pairKey  = (a, b) => [a, b].sort().join('|');
 
 // ── Data access helpers ──────────────────────────────────────────────────────
-// Ensure both metrics' year data + bilateral history are loaded (the detailed
-// per-country / per-corridor tables need both directions and both units).
+// Load both metrics' year data and bilateral history (tables need both units).
 async function ensureLoaded() {
     await Promise.all([
         DataLoader.loadYear(STATE.year, 'value'),
@@ -42,15 +25,14 @@ async function ensureLoaded() {
     ]);
 }
 
-// Per-metric net-flow lookup by undirected pair (fallback when no bilateral history).
+// Net-flow lookup by undirected pair (fallback when no bilateral history).
 function netMap(metric, year = STATE.year) {
     const m = new Map();
     ((STATE.metricStore[metric]?.years?.[year]) || []).forEach(d => { m.set(pairKey(d.exporter, d.importer), d); });
     return m;
 }
 
-// Directional flow for a pair in a given metric/year, oriented as { out: iso→partner,
-// in: partner→iso }. Prefers gross bilateral history; falls back to the net dataset.
+// Gross flows { out: iso→partner, in: partner→iso }; falls back to the net dataset.
 function dirFlow(metric, iso, partner, year, fallback) {
     const bh = STATE.metricStore[metric]?.bilateralHistory;
     if (bh) {
@@ -70,7 +52,7 @@ function dirFlow(metric, iso, partner, year, fallback) {
 function csvCell(v) {
     if (v === null || v === undefined) return '';
     const s = String(v);
-    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 const toCSV = (rows) => rows.map(r => r.map(csvCell).join(',')).join('\r\n');
 
@@ -87,7 +69,7 @@ function download(filename, csv) {
 }
 
 const today  = () => new Date().toISOString().slice(0, 10);
-const round  = (v, dp = 0) => (v === '' || v == null || !isFinite(v)) ? '' : +(+v).toFixed(dp);
+const round  = (v, dp = 0) => (v === '' || v == null || !Number.isFinite(+v)) ? '' : +(+v).toFixed(dp);
 const unitVal = (usd, kg) => (usd && kg && kg > 0) ? round(usd / kg, 3) : '';
 
 const CAT_LABEL = {
@@ -110,9 +92,7 @@ function scopedFlows(metric) {
         if (STATE.selectedExporters.size) flows = flows.filter(d => STATE.selectedExporters.has(d.exporter));
         if (STATE.selectedImporters.size) flows = flows.filter(d => STATE.selectedImporters.has(d.importer));
     }
-    // Top-N limit, applied before the flow-category filter — same order as
-    // DataLoader.filterData, so the export and the map agree row-for-arc.
-    // Drawn connections are never cut by it (the map shows them all).
+    // Top-N before the category filter, as in DataLoader.filterData; drawn pairs are exempt.
     if (STATE.topNMode && !(STATE.bilateralPairs && STATE.bilateralPairs.length > 0)) {
         flows = flows.slice().sort((a, b) => b.netValue - a.netValue).slice(0, STATE.topNMode);
     }
@@ -127,7 +107,7 @@ function scopeTag() {
     return parts.join('-');
 }
 
-// Human-readable scope label + corridor count, shown live in the header menu.
+// Scope label and flow count for the header menu.
 export function scopeSummary() {
     if (STATE.bilateralPairs?.length) {
         const n = STATE.bilateralPairs.length;
@@ -146,7 +126,6 @@ export async function exportCountry(iso) {
     if (!iso) return;
     await ensureLoaded();
 
-    // Partner set = every country sharing a flow with `iso` in either metric.
     const partners = new Set();
     ['value', 'weight'].forEach(metric => {
         ((STATE.metricStore[metric]?.years?.[STATE.year]) || []).forEach(d => {
@@ -163,8 +142,8 @@ export async function exportCountry(iso) {
     };
 
     const rows = [...partners].map(p => {
-        const v = dirFlow('value', iso, p, STATE.year, vNet);   // USD
-        const w = dirFlow('weight', iso, p, STATE.year, wNet);  // kg
+        const v = dirFlow('value', iso, p, STATE.year, vNet);
+        const w = dirFlow('weight', iso, p, STATE.year, wNet);
         return {
             grossV: v.out + v.in,
             row: [
@@ -222,15 +201,8 @@ export async function exportCorridor(expIso, impIso) {
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. CURRENT VIEW — flows + country summary for the active map scope
 // ═══════════════════════════════════════════════════════════════════════════
-// One row per net flow of the active metric (the lines of the map, before the
-// display threshold). Each row is oriented exporter → importer of that net flow:
-//   net_value_usd / net_weight_kg  exporter→importer minus importer→exporter, so the
-//                                  inactive metric can be NEGATIVE when its net
-//                                  flow runs the other way (value and weight nets
-//                                  do not always point in the same direction);
-//   exp_to_imp_*                   the gross flow exporter→importer, and the unit
-//                                  value computed from that gross flow (never from
-//                                  two net figures).
+// One row per net flow (pre-threshold), oriented exporter → importer. The other
+// metric's net can be negative; unit value comes from the gross exp→imp flow.
 export async function exportFlows() {
     await ensureLoaded();
 
@@ -244,8 +216,8 @@ export async function exportFlows() {
         'exp_to_imp_value_usd', 'exp_to_imp_weight_kg', 'exp_to_imp_unit_value_usd_per_kg',
     ];
     const rows = spine.map(d => {
-        const v = dirFlow('value', d.exporter, d.importer, STATE.year, vNet);    // USD
-        const w = dirFlow('weight', d.exporter, d.importer, STATE.year, wNet);   // kg
+        const v = dirFlow('value', d.exporter, d.importer, STATE.year, vNet);
+        const w = dirFlow('weight', d.exporter, d.importer, STATE.year, wNet);
         return [
             STATE.year, d.exporter, nameOf(d.exporter), d.importer, nameOf(d.importer),
             regionOf(d.exporter), regionOf(d.importer), statusOf(d.exporter), statusOf(d.importer),
@@ -294,8 +266,7 @@ export function exportSummary() {
         };
     }).sort((a, b) => b.gross - a.gross);
 
-    // All amounts are sums of the NET bilateral flows in this view (the map's lines
-    // before the display threshold), not gross exports / imports — hence the names.
+    // Amounts are sums of net bilateral flows, not gross trade — hence the column names.
     const header = [
         'rank', 'iso3', 'country', 'region', 'development_status', 'role',
         `net_flows_total_${unit}`, `net_flows_out_${unit}`, `net_flows_in_${unit}`, `net_balance_${unit}`,
@@ -317,7 +288,7 @@ export const CsvExport = {
         this._wireFocusButtons();
     },
 
-    // Header "Export view" dropdown — current-view flows / summary, with live scope.
+    // Header export dropdown
     _wireHeaderMenu() {
         const btn  = document.getElementById('export-btn');
         const menu = document.getElementById('export-menu');
@@ -348,7 +319,7 @@ export const CsvExport = {
         });
     },
 
-    // Focus-anchored buttons: country panel + bilateral (arc) modal.
+    // Country panel and arc modal export buttons
     _wireFocusButtons() {
         document.getElementById('panel-export-btn')?.addEventListener('click', () =>
             this._run(() => exportCountry(window.App?._currentPanelIso)));

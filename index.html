@@ -9,7 +9,7 @@
 </head>
 <body class="mode-explore">
 
-    <!-- ── Header: title · view modes · help and download ── -->
+    <!-- Header -->
     <header id="main-header">
         <div class="header-inner">
 
@@ -21,7 +21,7 @@
                 </div>
             </div>
 
-            <!-- View modes: what the map does. Phones get the same buttons in #mobile-nav. -->
+            <!-- View modes -->
             <nav class="mode-tabs" aria-label="View mode">
                 <button id="mode-explore-btn" class="mode-tab js-mode active" data-mode="explore" type="button" aria-pressed="true" title="Explore: filter the trade flows by year, region, country and direction">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
@@ -47,7 +47,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".7" fill="currentColor" stroke="none"/></svg>
                     <span class="util-label">Methodology</span>
                 </button>
-                <!-- CSV export of the current view (country / corridor exports live in the panels) -->
+                <!-- CSV export -->
                 <div class="picker-wrapper" id="export-wrapper">
                     <button id="export-btn" class="util-btn util-btn-primary" type="button" aria-haspopup="true" aria-expanded="false" title="Download the flows of the current view as a CSV table" aria-label="Download">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
@@ -77,10 +77,10 @@
                 <button id="anim-stop-btn" type="button" title="Stop the animation and return to the map"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" fill="currentColor"/></svg>Stop</button>
             </div>
 
-        </div><!-- /.header-inner -->
+        </div>
     </header>
 
-    <!-- ── Filter bar (tablets and computers; phones use #mobile-filter-panel) ── -->
+    <!-- Filter bar -->
     <div id="filter-bar" role="toolbar" aria-label="Filters">
         <div class="filter-inner">
 
@@ -100,7 +100,7 @@
                 </select>
             </div>
 
-            <!-- Metric: trade value (USD) or trade weight (tonnes) -->
+            <!-- Metric: value or weight -->
             <div class="fctl" id="metric-group" title="Trade value (US dollars) or trade weight (tonnes)">
                 <span class="fctl-label fctl-label-opt">Measure</span>
                 <fieldset class="seg" aria-label="Measure">
@@ -111,7 +111,7 @@
 
             <span class="fsep explore-only"></span>
 
-            <!-- Region: only flows with both partners in the region -->
+            <!-- Region filter -->
             <div class="fctl explore-only" id="region-group" title="Show trade within one region (both partners in the region)">
                 <label class="fctl-label fctl-label-opt" for="region-select">Region</label>
                 <select id="region-select" class="fselect">
@@ -170,7 +170,7 @@
 
             <span class="fsep"></span>
 
-            <!-- Flow direction: the chips double as the line-colour key -->
+            <!-- Flow direction filter -->
             <fieldset class="fctl" id="flow-filter-group" aria-label="Flow direction">
                 <span class="fctl-label">Flows</span>
                 <div class="flow-chips">
@@ -193,7 +193,7 @@
                 </div>
             </fieldset>
 
-            <!-- Lines on the map: minimum flow size and number of lines -->
+            <!-- Lines on the map (replaces the "Top 20" threshold button) -->
             <div class="fctl explore-only picker-wrapper" id="display-wrapper">
                 <button id="display-btn" class="fbtn" type="button" aria-haspopup="true" aria-expanded="false" title="Which flows are drawn: minimum flow size and maximum number of lines">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h11M4 17h6"/></svg>
@@ -217,18 +217,18 @@
                     <div class="pop-sec">
                         <div class="pop-title">Maximum number of lines</div>
                         <fieldset id="topn-group" class="seg seg-wrap" aria-label="Maximum number of lines">
-                            <button class="topn-btn seg-btn active" data-topn="all" type="button">All</button>
+                            <button class="topn-btn seg-btn active" data-topn="all" type="button" title="No separate maximum: the minimum flow size decides how many lines are drawn">Auto</button>
                             <button class="topn-btn seg-btn" data-topn="50" type="button">50</button>
                             <button class="topn-btn seg-btn" data-topn="100" type="button">100</button>
                             <button class="topn-btn seg-btn" data-topn="200" type="button">200</button>
                             <button class="topn-btn seg-btn" data-topn="500" type="button">500</button>
                         </fieldset>
-                        <p class="pop-hint">Draws only the N largest net flows. With <b>Auto</b> it replaces both the automatic minimum and the 40-line cap; with a fixed value both limits apply.</p>
+                        <p class="pop-hint"><b>Auto</b> lets the minimum flow size decide: at most 40 lines with an Auto minimum, every net flow at or above a fixed value. A number draws only the N largest net flows; with an Auto minimum it replaces the automatic minimum and the 40-line cap, with a fixed value both limits apply.</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Connect mode: replaces the region / country / line controls -->
+            <!-- Connect mode tools -->
             <div class="connect-tools connect-only" id="connect-tools">
                 <span class="connect-step">
                     <span class="connect-step-icon" aria-hidden="true">
@@ -244,7 +244,7 @@
         </div>
     </div>
 
-    <!-- ── Key figures for the current view ── -->
+    <!-- Key figures (replaces the four-item bar of b701035) -->
     <div id="kpi-bar">
         <div class="kpi-inner">
             <div class="kpi-item kpi-scope" title="What the figures and the map cover">
@@ -292,7 +292,7 @@
 
     <main>
 
-        <!-- ── Map + Overlays ── -->
+        <!-- Map + Overlays -->
         <div class="map-area">
             <div id="map-container"></div>
 
@@ -302,12 +302,12 @@
                 <button id="map-empty-reset" type="button">Reset filters</button>
             </div>
 
-            <!-- Connect mode: live drawing status -->
+            <!-- Connect mode status -->
             <div id="linefilter-status" class="hidden" role="status"></div>
 
             <div id="tooltip"></div>
 
-            <!-- Zoom in / out / reset -->
+            <!-- Zoom controls (replace the .zoom-controls buttons of 71b0b23) -->
             <div id="map-tools">
                 <button id="zoom-in-btn" class="map-tool-btn" type="button" title="Zoom in" aria-label="Zoom in">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -320,7 +320,7 @@
                 </button>
             </div>
 
-            <!-- Legend (collapsible card) -->
+            <!-- Legend -->
             <section id="legend-panel" aria-label="Legend">
                 <button id="legend-toggle" class="legend-head" type="button" aria-expanded="true" aria-controls="legend-content">
                     <span>Legend</span>
@@ -399,11 +399,11 @@
                 <div class="loader-spinner"></div>
                 <p>Loading trade data…</p>
             </div>
-        </div><!-- /.map-area -->
+        </div>
 
     </main>
 
-    <!-- ── Footer: source, notes, logos ── -->
+    <!-- Footer -->
     <footer id="map-footer">
         <div class="footer-row">
             <p><strong>Source:</strong> UN Trade and Development (UNCTAD) and BACI (CEPII), based on UN Comtrade. Data cover HS&nbsp;6309 (worn clothing and other worn articles).
@@ -413,7 +413,7 @@
         </div>
     </footer>
 
-    <!-- ── Methodology Modal ── -->
+    <!-- Methodology modal -->
     <div id="methodology-modal" class="hidden">
         <div class="modal-backdrop" id="methodology-modal-backdrop"></div>
         <div class="modal-card methodology-card" role="dialog" aria-modal="true" aria-label="Methodology and data sources">
@@ -432,7 +432,7 @@
                     <h3 class="method-section-title">Data source</h3>
                     <dl class="method-dl">
                         <dt>Database</dt>
-                        <dd>BACI international trade database (CEPII), which reconciles the exports and imports reported to UN Comtrade into one harmonized value and quantity per bilateral flow, at the HS 6-digit level. The monitor uses an HS&nbsp;6309 extract of BACI for 2015&ndash;2024.</dd>
+                        <dd>BACI international trade database (CEPII), which reconciles the exports and imports reported to UN Comtrade into one harmonized value and quantity per bilateral flow, at the HS 6-digit level. The monitor uses an HS&nbsp;6309 extract of BACI for 2015&ndash;2024, with adjustments for outliers.</dd>
                         <dt>Product coverage</dt>
                         <dd>HS&nbsp;6309 &mdash; <em>Worn clothing and other worn articles</em>: worn clothing, clothing accessories, blankets, household linen, furnishing articles, footwear and headgear showing signs of appreciable wear, presented in bulk, bales, sacks or similar packings. Rags (HS&nbsp;6310) are not included.</dd>
                         <dt>Years available</dt>
@@ -479,14 +479,14 @@
 
                 <section class="method-section">
                     <h3 class="method-section-title">What the map shows</h3>
-                    <p class="method-note">To avoid visual overload, the map draws only the largest net flows. The <strong>Shown</strong> figure in the key-figures bar gives the total of the lines drawn and its share of all net flows in the current region or selection. The minimum flow size and the number of lines are set under <strong>Lines</strong> in the filter bar.</p>
+                    <p class="method-note">To avoid visual overload, the map draws only the largest net flows. The <strong>On map</strong> figure in the key-figures bar gives the total of the lines drawn and its share of all net flows in the current region or selection. The minimum flow size and the number of lines are set under <strong>Lines</strong> in the filter bar.</p>
                     <dl class="method-dl">
                         <dt>Auto (default)</dt>
                         <dd>At most <strong>40</strong> lines, and none below a minimum: $10&thinsp;M in the world view, $1&thinsp;M for a region; with countries picked in From / To (counted together), $10&thinsp;K (1&ndash;3), $100&thinsp;K (4&ndash;10), $500&thinsp;K (11&ndash;30) or $1&thinsp;M (31 or more). If more than 40 flows clear the minimum, the 40 largest are drawn; if fewer do, fewer lines are drawn (a region may show only a few). The flow-direction filters apply afterwards, so hiding a direction also leaves fewer lines. In weight mode the same steps apply in tonnes (10&thinsp;kt, 1&thinsp;kt, 10&thinsp;t, 100&thinsp;t, 500&thinsp;t, 1&thinsp;kt).</dd>
                         <dt>Fixed minimum</dt>
                         <dd>$10&thinsp;M to $10&thinsp;K (10&thinsp;kt to 10&thinsp;t in weight mode): every net flow at or above the chosen value is drawn.</dd>
-                        <dt>Number of lines</dt>
-                        <dd>Draws only the N largest net flows. With Auto, it replaces both the automatic minimum and the 40-line cap, so the N largest flows are drawn however small they are; with a fixed minimum both conditions apply. The N largest are taken before the flow-direction filters, so hiding a direction can leave fewer than N lines.</dd>
+                        <dt>Maximum number of lines</dt>
+                        <dd><strong>Auto</strong> (default) sets no separate maximum: the minimum flow size decides, so an Auto minimum draws at most 40 lines and a fixed minimum draws every net flow at or above it. A number N draws only the N largest net flows. With an Auto minimum, it replaces both the automatic minimum and the 40-line cap, so the N largest flows are drawn however small they are; with a fixed minimum both conditions apply. The N largest are taken before the flow-direction filters, so hiding a direction can leave fewer than N lines.</dd>
                         <dt>Regions</dt>
                         <dd>A region shows only flows between economies of that region (UN M49 regions).</dd>
                         <dt>Connect</dt>
@@ -538,6 +538,7 @@
                 </section>
 
                 <section class="method-section method-section-last">
+                    <!-- Updated citation (the earlier one gave 2025) -->
                     <h3 class="method-section-title">How to cite</h3>
                     <p class="method-cite">UN Trade and Development (UNCTAD) (2026). <em>Global Second-Hand Clothes Trade Monitor.</em> Geneva.</p>
                 </section>
@@ -546,7 +547,7 @@
         </div>
     </div>
 
-    <!-- ── Phones: filter sheet ── -->
+    <!-- Mobile filter sheet -->
     <div id="mobile-filter-panel" role="dialog" aria-label="Filters">
         <div class="sheet-handle"></div>
         <div class="sheet-header">
@@ -658,12 +659,13 @@
                 <div class="sheet-section">
                     <div class="section-label">Maximum number of lines</div>
                     <div class="btn-row">
-                        <button class="topn-btn btn-toggle-lg active" data-topn="all" type="button">All</button>
+                        <button class="topn-btn btn-toggle-lg active" data-topn="all" type="button" title="No separate maximum: the minimum flow size decides how many lines are drawn">Auto</button>
                         <button class="topn-btn btn-toggle-lg" data-topn="50" type="button">50</button>
                         <button class="topn-btn btn-toggle-lg" data-topn="100" type="button">100</button>
                         <button class="topn-btn btn-toggle-lg" data-topn="200" type="button">200</button>
                         <button class="topn-btn btn-toggle-lg" data-topn="500" type="button">500</button>
                     </div>
+                    <p class="section-hint">Auto lets the minimum flow size decide (at most 40 lines with an Auto minimum). A number draws only the N largest flows.</p>
                 </div>
             </details>
 
@@ -679,14 +681,14 @@
                 </div>
             </div>
 
-        </div><!-- /.sheet-body -->
+        </div>
         <div class="sheet-footer">
             <button id="m-filters-reset" class="sheet-reset" type="button" disabled>Reset</button>
             <button id="mobile-filter-done" class="sheet-done" type="button">Show map</button>
         </div>
-    </div><!-- /#mobile-filter-panel -->
+    </div>
 
-    <!-- ── Phones: bottom bar (view modes + filters) ── -->
+    <!-- Mobile bottom bar -->
     <nav id="mobile-nav" aria-label="View mode">
         <button class="mnav-btn js-mode active" data-mode="explore" type="button" aria-pressed="true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>

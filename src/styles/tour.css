@@ -1,0 +1,297 @@
+/* Guided tour ("Guided Story" mode) — spotlight overlay + UNCTAD-styled card.
+   Design follows unctad.org: white surfaces, square corners, UN blue accents,
+   Inter typography, no glows. */
+
+/* The header tour button is a .util-btn (header.css). */
+
+/* Moving spotlight: a transparent rect whose huge box-shadow dims
+   everything around the highlighted element. pointer-events:none keeps the
+   target clickable, so users can try a control themselves. */
+.tour-spot {
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 0 0 9999px rgb(35 31 32 / 55%),
+    0 0 0 2px var(--un-color-blue);
+  height: 0;
+  left: 0;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  transition:
+    top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.4s ease;
+  width: 0;
+  z-index: 100000;
+
+  /* Centered intro/outro: full dim, no ring */
+  &.is-center {
+    box-shadow: 0 0 0 9999px rgb(35 31 32 / 55%);
+  }
+  /* Clear: no dim at all (e.g. the animation chapter, so the race stays visible) */
+  &.is-clear {
+    box-shadow: none;
+  }
+}
+
+/* Thin progress bar pinned to the very top */
+.tour-progressbar {
+  background: var(--un-color-blue-darkest);
+  height: 3px;
+  left: 0;
+  position: fixed;
+  top: 0;
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 0%;
+  z-index: 100002;
+}
+
+/* Narration card — white, square-cornered, chapter progress along the top edge */
+.tour-card {
+  animation: tour-card-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  background: #fff;
+  border: 1px solid var(--un-color-grey-light);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 32px rgb(0 0 0 / 20%);
+  color: var(--ungrey-dark);
+  font-family: var(--font-family);
+  padding: 0 18px 14px;
+  position: fixed;
+  transition:
+    top 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    left 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s;
+  width: min(380px, calc(100vw - 28px));
+  z-index: 100001;
+}
+
+/* Chapter segments (clickable) */
+.tour-card__progress {
+  display: flex;
+  gap: 2px;
+  margin: 0 -18px 12px;
+}
+
+.tour-card__dot {
+  background: var(--un-color-grey-lightest);
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  flex: 1;
+  height: 4px;
+  padding: 0;
+  transition: background 0.2s;
+  &:hover {
+    background: var(--un-color-grey-light);
+  }
+  &.is-done {
+    background: var(--unblue-light);
+  }
+  &.is-active {
+    background: var(--un-color-blue-darkest);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--un-color-blue);
+    outline-offset: 1px;
+  }
+}
+
+.tour-card__top {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tour-card__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.tour-card__chapter {
+  color: var(--un-color-grey-dark);
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.tour-card__title {
+  color: var(--ungrey-dark);
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.tour-card__close {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--un-color-grey-dark);
+  cursor: pointer;
+  display: grid;
+  flex-shrink: 0;
+  font-size: 19px;
+  height: 26px;
+  line-height: 1;
+  place-items: center;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  width: 26px;
+  &:hover {
+    background: var(--un-color-grey-lightest);
+    color: var(--ungrey-dark);
+  }
+}
+
+.tour-card__body {
+  color: var(--ungrey-dark);
+  font-size: var(--fs-label);
+  line-height: 1.55;
+  margin: 0 0 14px;
+  b,
+  strong {
+    font-weight: 600;
+  }
+  /* Keys as in the legend: a short line for a flow direction, a dot for an economy */
+  .tour-key {
+    display: inline-block;
+    height: 3px;
+    margin: 0 4px 0 1px;
+    vertical-align: 0.25em;
+    width: 12px;
+  }
+  .tour-key--node {
+    border-radius: 50%;
+    height: 8px;
+    vertical-align: 0.05em;
+    width: 8px;
+  }
+}
+
+.tour-card__foot {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.tour-card__btn {
+  background: #fff;
+  border: 1px solid var(--un-color-grey-light);
+  border-radius: var(--radius-sm);
+  color: var(--ungrey-dark);
+  cursor: pointer;
+  font: 600 12.5px / 1 var(--font-family);
+  padding: 8px 14px;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+  &:hover {
+    border-color: var(--un-color-blue-darkest);
+    color: var(--un-color-blue-darkest);
+  }
+  &:disabled {
+    cursor: default;
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  &:focus-visible {
+    outline: 2px solid var(--un-color-blue);
+    outline-offset: 1px;
+  }
+}
+
+.tour-card__btn--primary {
+  background: var(--un-color-blue-darkest);
+  border-color: var(--un-color-blue-darkest);
+  color: #fff;
+  min-width: 76px;
+  &:hover {
+    background: var(--unblue-darker);
+    border-color: var(--unblue-darker);
+    color: #fff;
+  }
+}
+
+.tour-card__btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--un-color-grey-dark);
+}
+
+@keyframes tour-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Phones: pin the card near the bottom (above the bottom bar), full width */
+@media (max-width: 767px), (max-height: 500px) and (max-width: 1024px) {
+  .tour-card {
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    left: 50%;
+    max-height: 46dvh;
+    overflow: hidden;
+    top: auto;
+    transform: translateX(-50%);
+    width: calc(100vw - 24px);
+    .tour-card__body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .tour-card__top,
+    .tour-card__foot {
+      flex-shrink: 0;
+    }
+
+    &.is-top {
+      bottom: auto;
+      top: calc(8px + env(safe-area-inset-top));
+    }
+  }
+}
+@media (max-height: 500px) and (max-width: 1024px) {
+  .tour-card {
+    max-height: 62dvh;
+    width: min(520px, calc(100vw - 24px));
+  }
+  .tour-card.is-left,
+  .tour-card.is-right {
+    bottom: calc(54px + env(safe-area-inset-bottom));
+    transform: none;
+    width: min(420px, 48vw);
+  }
+  .tour-card.is-left {
+    left: 12px;
+    right: auto;
+  }
+  .tour-card.is-right {
+    left: auto;
+    right: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot,
+  .tour-card,
+  .tour-progressbar {
+    transition: none;
+  }
+  .tour-card {
+    animation: none;
+  }
+}

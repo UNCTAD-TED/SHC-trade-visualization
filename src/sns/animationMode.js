@@ -1,65 +1,47 @@
-import * as d3 from 'd3';
+import { ascending, easeCubicOut, interpolateHcl, interpolateNumber, max, quantile, scaleLinear, scalePow, select, zoomTransform } from 'd3';
 import { CONFIG, METRIC_FORMAT, STATE } from '../config.js';
 import { DataLoader } from '../dataLoader.js';
 import { TradeMap } from '../map.js';
 import { iso2Lower } from './iso3toIso2.js';
-// md() = motionDuration: collapses every D3 transition to 0 ms under
-// prefers-reduced-motion. The year still advances and the bars still land on
-// the right values and ranks — they just stop sliding.
+// md() sets transition durations to 0 under prefers-reduced-motion
 import { motionDuration as md, prefersReducedMotion } from '../motion.js';
 
 const YEARS   = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
 const YEAR_MS = 3000;
-const ROW_H   = 27;          // px — row height in the bar chart (must match CSS .ap-chart)
+const ROW_H   = 27;          // px, must match .ap-chart CSS
 
 // ── Active metric ─────────────────────────────────────────────────
-// Everything the panel, the map and the legend print goes through these, so the
-// animation always speaks in the units the header metric toggle selected.
-
-// Display formatter for the active metric — bar labels, count-up tween and
-// legend all use it, so the panel never shows '$' while Weight is selected.
 const fmtMetric = (v) => (METRIC_FORMAT[STATE.metric] || METRIC_FORMAT.value).fmt(v);
 
-// Badge copy, matching the header metric toggle's own vocabulary
-// (#metric-group title: "trade value (USD) ... trade weight (tonnes)").
 const METRIC_BADGE = { value: 'Value (USD)', weight: 'Weight (tonnes)' };
 const metricBadge = () => METRIC_BADGE[STATE.metric] || METRIC_BADGE.value;
 
-// Minimum corridor magnitude drawn at all, per metric. Kept in step with
-// App.THRESHOLD_LABELS (src/main.js), which maps the same raw number to '$1M'
-// for value and '1kt' for weight: weight arrives in kilograms, so
-// 1,000,000 kg = 1,000 t = 1 kt is the weight counterpart of the $1M floor.
-// The two are the same number because that is the label table's mapping, not a
-// copy-paste — and it keeps the drawn corridor count in the same band for both
-// metrics (2015–2024: ~320–490 value, ~450–470 weight).
+// Smallest corridor drawn: $1M for value, 1 kt for weight (weight is in kg)
 const MIN_VALUE_BY_METRIC = { value: 1_000_000, weight: 1_000_000 };
 const minValue = () => MIN_VALUE_BY_METRIC[STATE.metric] ?? MIN_VALUE_BY_METRIC.value;
 
 // ── Arc encoding ─────────────────────────────────────────────────
-// WIDTH_EXP > 1 steepens the gradient: small flows stay thin, large flows shoot up.
-const ARC_DUR   = 750;       // arc transition duration (matches map.js)
-const LABEL_N   = 0;         // map text labels (0 = off; set >0 to label the largest corridors)
-const WIDTH_EXP = 1.6;       // power-scale exponent (0.5 = sqrt, 1 = linear, >1 = steeper)
-const MIN_W     = 0.1;       // px — stroke width for the smallest ($1M / 1kt) corridor
-const MAX_W     = 8;         // px — stroke width for the largest corridor
-const MIN_OP    = 0.13;      // opacity for the smallest corridor
-const MAX_OP    = 0.6;       // opacity for the largest corridor
-const ARC_TOP_Q = 0.97;      // quantile used as the upper anchor (prevents one mega-flow blowing out the scale)
+const ARC_DUR   = 750;       // matches map.js
+const LABEL_N   = 0;         // corridor labels on the map (0 = off)
+const WIDTH_EXP = 1.6;       // >1: small flows stay thin, large flows stand out
+const MIN_W     = 0.1;
+const MAX_W     = 8;
+const MIN_OP    = 0.13;
+const MAX_OP    = 0.6;
+const ARC_TOP_Q = 0.97;      // upper anchor quantile, so one huge flow doesn't flatten the scale
 
 // ── Node encoding ─────────────────────────────────────────────────
-const NODE_MIN_R = 1;        // px — radius for the smallest active country
-const NODE_MAX_R = 8;        // px — radius for the largest active country
-const NODE_EXP   = 0.9;      // scale exponent (0.5 = sqrt, like the original dashboard)
-const NODE_TOP_Q = 0.98;     // quantile used as the upper anchor for node radius
+const NODE_MIN_R = 1;
+const NODE_MAX_R = 8;
+const NODE_EXP   = 0.9;
+const NODE_TOP_Q = 0.98;
 
 // ── Bar chart encoding ────────────────────────────────────────────
-const BAR_MAX = 300;         // px — fallback max bar width (used when container width is unknown)
-const BAR_H   = 20;          // px — bar height (overrides .ap-bar CSS height)
+const BAR_MAX = 300;         // px, fallback when container width is unknown
+const BAR_H   = 20;          // px, overrides .ap-bar CSS height
 
 // ── Role colours ──────────────────────────────────────────────────
-// Same semantics as the dashboard's node legend: blue = (net) exporter,
-// red = (net) importer. Green is reserved for South→North arcs
-// (CONFIG.flowColors['south-north']), so it is never used for a role here.
+// Blue = net exporter, red = net importer (green is reserved for S→N arcs)
 const EXPORTER_COLOR = '#009EDB';
 const IMPORTER_COLOR = '#ED1847';
 
@@ -69,39 +51,29 @@ let _interval      = null;
 let _index         = 0;
 let _exportRanks   = {};
 let _importRanks   = {};
-let _startMetric    = 'value';   // metric this run was started with
+let _startMetric    = 'value';
 
-// Run lifecycle
-//   _active    true from the moment Animate is pressed (including the year
-//              preload) until stopAnimation(). isAnimating() reports it.
-//   _onScreen  true while anim-mode is applied (STATE overridden, overlays in
-//              the DOM). Only then does a stop have anything to restore.
-//   _runToken  bumped by every start AND every stop. Each await in
-//              startAnimation re-checks it, so a start that was stopped (or
-//              superseded) while it was loading never enters anim-mode.
+// _active: from pressing Animate (incl. preload) until stop; _onScreen: anim-mode applied.
+// _runToken is bumped on every start and stop so a stale start bails.
 let _active   = false;
 let _onScreen = false;
 let _runToken = 0;
-let _saved    = null;            // the user's view, captured just before anim-mode
-let _timers   = [];              // one-shot timeouts of the current run
+let _saved    = null;            // user's view before anim-mode
+let _timers   = [];
 let _stopDone = Promise.resolve();
 
-// Layer refs (created in TradeMap.g during animation, removed on stop)
+// Animation layers inside TradeMap.g
 let _arcLayer = null, _particleLayer = null, _haloLayer = null, _nodeLayer = null, _labelLayer = null;
 
 const nextFrames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 const loaderEl   = () => document.getElementById('loader');
 
-// Escape ends a run (while the bar race is on screen the header — and with it
-// the Stop button — is the only way out otherwise).
 function _onKey(e) {
   if (e.key !== 'Escape' || !_active) return;
   stopAnimation();
 }
 
-// Everything the animation overrides, so stop can hand the view back as found.
-// App.captureViewState() (main.js) is preferred; the STATE fallback keeps this
-// module usable on pages without the dashboard controller.
+// Snapshot of what the animation overrides (falls back to STATE without App)
 function _captureView() {
   const snap = window.App?.captureViewState?.();
   if (snap) return snap;
@@ -123,8 +95,7 @@ function _restoreView(s) {
   STATE.flowFilters       = new Set(s.flowFilters);
   STATE.thresholdMode     = s.thresholdMode;
   STATE.topNMode          = s.topNMode ?? null;
-  // The pickers were never touched (updateDashboard rebuilds these from them),
-  // but STATE must not keep the run's empty selection in the meantime.
+  // Don't leave the run's empty selection in STATE
   STATE.selectedExporters = new Set(s.exporters || []);
   STATE.selectedImporters = new Set(s.importers || []);
 }
@@ -140,12 +111,11 @@ export async function startAnimation() {
   _startMetric = STATE.metric;
   document.addEventListener('keydown', _onKey);
 
-  // Rank tables are keyed by year only, so a run under a different metric would
-  // otherwise reuse the previous metric's numbers. Rebuild them every start.
+  // Rank tables are keyed by year only, so rebuild them for the current metric
   _exportRanks = {};
   _importRanks = {};
 
-  // A previous run may still be handing the dashboard back (2 frames).
+  // A previous run may still be handing the dashboard back
   await _stopDone;
   if (!live()) return;
 
@@ -161,21 +131,15 @@ export async function startAnimation() {
     }
     return;
   } finally {
-    // A stop during the preload has already hidden the loader — and the loader
-    // may by now belong to whatever replaced this run (e.g. a metric switch).
+    // If stopped meanwhile, the loader may already belong to a newer run
     if (live()) loader?.classList.add('hidden');
   }
   if (!live()) return;
-  // A metric switch that was already in flight when Animate was pressed may
-  // have committed meanwhile: the preloaded years would be in the wrong units.
+  // Metric changed during the preload: the loaded years are in the wrong units
   if (STATE.metric !== _startMetric) { _abortStart(); return; }
 
-  // Rank countries per year from ALL flows (not just those above the drawing
-  // floor). Each record is a NET bilateral flow (one per country pair, from
-  // the net exporter to the net importer), so a country's bar is the sum of
-  // the pairs in which it is the net exporter (resp. importer). That is neither
-  // its gross exports nor its overall net balance — a country can appear in
-  // both lists — and the panel labels say so.
+  // Rank per year from all flows. Records are net bilateral flows, so a bar sums the
+  // pairs where the country is the net exporter (importer); it can appear in both lists.
   YEARS.forEach(year => {
     const flows = STATE.yearCache[year] || [];
     const exp = {}, imp = {};
@@ -191,9 +155,7 @@ export async function startAnimation() {
       .sort((a, b) => b.value - a.value).slice(0, 10);
   });
 
-  // Snapshot the user's view, then modify STATE for animation: metric-
-  // appropriate floor ($1M / 1kt), no country filter, no Top-N cap (the
-  // animation draws every corridor above the floor), global view.
+  // Save the user's view, then set STATE for the animation: floor only, no filters, global
   _saved = _captureView();
   STATE.thresholdMode      = minValue();
   STATE.topNMode           = null;
@@ -211,18 +173,17 @@ export async function startAnimation() {
   if (head && (top < -4 || top > window.innerHeight * 0.5)) head.scrollIntoView({ block: 'start', behavior: 'instant' });
   _injectOverlays();
 
-  // Wait two rAF frames so the browser applies the flex layout (panel takes --anim-panel-w,
-  // map-container gets the remaining width), then recalculate the map projection.
+  // Wait two frames for the panel layout to apply, then recalculate the projection
   await nextFrames();
-  if (!live()) return;            // stopped meanwhile — stopAnimation cleaned up
+  if (!live()) return;
   TradeMap.init();
 
-  // Hide the dashboard's own flow/node/label layers — animation draws its own arcs
+  // Hide the dashboard's own layers; the animation draws its own
   if (TradeMap.g) {
     TradeMap.g.selectAll('.flow-layer, .node-layer, .label-layer')
       .style('display', 'none');
 
-    // Create dedicated animation layers (paint order: arcs → particles → halos → nodes → labels)
+    // Animation layers, in paint order
     _arcLayer      = TradeMap.g.append('g').attr('class', 'anim-arc-layer');
     _particleLayer = TradeMap.g.append('g').attr('class', 'anim-particle-layer');
     _haloLayer     = TradeMap.g.append('g').attr('class', 'anim-halo-layer');
@@ -230,10 +191,9 @@ export async function startAnimation() {
     _labelLayer    = TradeMap.g.append('g').attr('class', 'anim-label-layer');
   }
 
-  // Reset map zoom to global
   _timers.push(setTimeout(() => { if (live()) TradeMap.zoomToRegion('Global'); }, 80));
 
-  // Start at year 2015 (slight delay so the global zoom settles before first draw)
+  // Short delay so the global zoom settles before the first draw
   _index = 0;
   _timers.push(setTimeout(() => { if (live()) _playYear(_index); }, 120));
 
@@ -244,8 +204,7 @@ export async function startAnimation() {
   }, YEAR_MS);
 }
 
-// A start that cannot go ahead (load failure, metric changed under it) before
-// anything was put on screen: release the run without touching STATE.
+// Cancel a start before anything is on screen; STATE is untouched
 function _abortStart() {
   _runToken++;
   _active = false;
@@ -253,12 +212,8 @@ function _abortStart() {
   loaderEl()?.classList.add('hidden');
 }
 
-// Ends the run (or cancels one still loading) and hands the dashboard back:
-// STATE gets the user's pre-animation year, region, flow categories, threshold,
-// Top-N and selection back synchronously, then — once the full-width layout is
-// applied and that year's data is in the cache — `shc:animation-stopped` lets
-// App re-sync every control and re-render. Returns a promise that settles when
-// that hand-back is complete.
+// Ends or cancels the run and restores the user's view. The returned promise
+// settles once `shc:animation-stopped` has been dispatched.
 export function stopAnimation() {
   if (!_active) return _stopDone;
   _active = false;
@@ -280,7 +235,6 @@ export function stopAnimation() {
   document.getElementById('anim-panel')?.remove();
   document.getElementById('anim-legend')?.remove();
 
-  // Remove animation layers and restore the dashboard's own flow layers
   _arcLayer?.remove();      _arcLayer = null;
   _particleLayer?.remove(); _particleLayer = null;
   _haloLayer?.remove();     _haloLayer = null;
@@ -291,20 +245,13 @@ export function stopAnimation() {
       .style('display', null);
   }
 
-  // Restore synchronously, so anything that reads STATE right after stopping
-  // (e.g. the metric toggle, which loads the new metric for STATE.year) already
-  // sees the user's view rather than the race's last frame.
-  // The metric needs no restore: startAnimation never writes STATE.metric, and a
-  // metric change requested mid-run stops the animation first (see
-  // stopAnimationForMetricChange), so whatever metric is active on stop is the
-  // one the user chose.
+  // Restore synchronously so code reading STATE right after stop sees the user's view.
+  // The metric needs no restore: the animation never writes STATE.metric.
   const saved = _saved;
   _saved = null;
   _restoreView(saved);
 
-  // Wait for the browser to restore the full-width map layout and make sure
-  // the restored year is loaded, then recalculate the projection before the
-  // dashboard re-renders flows.
+  // Wait for the full-width layout and the restored year's data, then re-init the map
   const year = STATE.year;
   _stopDone = Promise.all([
     DataLoader.loadYear(year).catch(err => console.error('Animation: could not reload year', year, err)),
@@ -317,16 +264,13 @@ export function stopAnimation() {
   return _stopDone;
 }
 
-// True while a bar-chart-race run is on screen (or loading).
+// True while a run is on screen or loading
 export function isAnimating() {
   return _active;
 }
 
 // Called by the metric toggle before it switches STATE.metric.
-// Policy: a metric change ends the animation and returns to the normal
-// dashboard. Restarting mid-run would have to re-derive every year's rank table
-// and reset the timeline anyway, and a bar race whose units change halfway is
-// easy to misread — stopping makes the unit change unambiguous.
+// A metric change ends the run so the units never change mid-race.
 export function stopAnimationForMetricChange() {
   return stopAnimation();
 }
@@ -335,8 +279,7 @@ export function stopAnimationForMetricChange() {
 
 function _playYear(index) {
   if (!_onScreen) return;
-  // A metric switch committed under the run (it bypassed the toggle) — the
-  // ranks and units no longer match the data: end the run.
+  // Metric changed without the toggle: the ranks no longer match, so stop
   if (STATE.metric !== _startMetric) { stopAnimation(); return; }
   const year = YEARS[index];
   STATE.year = year;
@@ -345,10 +288,8 @@ function _playYear(index) {
   const sel = document.getElementById('year-select');
   if (sel) sel.value = year;
 
-  // Draw the two-tier focus+context arcs
   _drawArcs(year);
 
-  // Update overlays
   _updateOverlays(year, index);
 }
 
@@ -366,15 +307,13 @@ function _arcPath(exp, imp) {
   return `M${p1[0]},${p1[1]}A${dr},${dr} 0 0,1 ${p2[0]},${p2[1]}`;
 }
 
-// ── Single-tier arc rendering: ALL corridors, with a steep width+opacity gradient
-//    so large flows dominate visually while small ones recede (no information loss).
+// ── Arcs: all corridors, with width and opacity scaled so large flows stand out
 function _drawArcs(year) {
   if (!_arcLayer) return;
 
-  // Current zoom scale — keep stroke widths visually constant under the g transform
-  const k = TradeMap.svg ? d3.zoomTransform(TradeMap.svg.node()).k : 1;
+  // Zoom scale, to keep stroke widths constant under the g transform
+  const k = TradeMap.svg ? zoomTransform(TradeMap.svg.node()).k : 1;
 
-  // Flows ≥ the metric's floor ($1M / 1kt) with known coordinates, sorted descending
   const floor = minValue();
   const flows = (STATE.yearCache[year] || [])
     .filter(d => d.netValue >= floor &&
@@ -384,15 +323,12 @@ function _drawArcs(year) {
 
   const key = d => `${d.exporter}|${d.importer}`;
 
-  // Upper anchor = high quantile (not the single max) so one mega-corridor
-  // doesn't compress everything else.
-  const values   = flows.map(d => d.netValue).sort(d3.ascending);
-  const topAnchor = d3.quantile(values, ARC_TOP_Q) || d3.max(values) || floor;
+  const values   = flows.map(d => d.netValue).sort(ascending);
+  const topAnchor = quantile(values, ARC_TOP_Q) || max(values) || floor;
 
-  // Power scale: exponent > 1 → small flows stay thin, large flows shoot up.
-  const widthScale = d3.scalePow().exponent(WIDTH_EXP)
+  const widthScale = scalePow().exponent(WIDTH_EXP)
     .domain([floor, topAnchor]).range([MIN_W, MAX_W]).clamp(true);
-  const opacityScale = d3.scalePow().exponent(WIDTH_EXP)
+  const opacityScale = scalePow().exponent(WIDTH_EXP)
     .domain([floor, topAnchor]).range([MIN_OP, MAX_OP]).clamp(true);
 
   // ── All arcs in one layer (flow colours, thin→thick by value) ──
@@ -409,11 +345,10 @@ function _drawArcs(year) {
       .style('opacity', 0)
       .attr('d', d => _arcPath(d.exporter, d.importer));
 
-  // NOTE: stroke-width must be set via .attr (not .style). With .style, D3 tries to
-  // number-interpolate the current computed value "1px" → +"1px" = NaN, so width never applies.
+  // stroke-width via .attr, not .style: D3 can't interpolate the computed "1px" value
   arcsEnter.merge(arcs)
       .attr('d', d => _arcPath(d.exporter, d.importer))
-      .transition().duration(md(ARC_DUR)).ease(d3.easeCubicOut)
+      .transition().duration(md(ARC_DUR)).ease(easeCubicOut)
       .style('stroke', d => CONFIG.flowColors[d.flowCategory] || '#009EDB')
       .attr('stroke-width', d => widthScale(d.netValue) / k)
       .style('opacity', d => opacityScale(d.netValue));
@@ -455,11 +390,9 @@ function _drawArcs(year) {
 }
 
 // ── Country nodes: size = gross volume, colour = net balance (blue exporter / red importer)
-//    Mirrors the dashboard's node encoding in map.js.
 function _drawNodes(flows, k) {
   if (!_nodeLayer) return;
 
-  // Aggregate per-country gross volume and net balance from the visible flows
   const stats = {};
   flows.forEach(d => {
     if (!stats[d.exporter]) stats[d.exporter] = { gross: 0, net: 0 };
@@ -471,10 +404,7 @@ function _drawNodes(flows, k) {
   const isos = Object.keys(stats).filter(iso => STATE.countryCoords[iso]);
   if (!isos.length) return;
 
-  // Colour = the economy's net balance over ALL its flows that year (the same
-  // basis as the dashboard circles and the country panel), so a net exporter is
-  // never painted red because only its import corridors clear the race's cut-off.
-  // Size stays the total of the corridors drawn.
+  // Colour uses the full-year net balance (as on the dashboard); size only the drawn corridors
   const fullNet = {};
   (STATE.yearCache[STATE.year] || flows).forEach(d => {
     if (d.exporter === d.importer) return;
@@ -483,19 +413,19 @@ function _drawNodes(flows, k) {
   });
   const netOf = iso => (iso in fullNet ? fullNet[iso] : stats[iso].net);
 
-  const grossSorted = isos.map(i => stats[i].gross).sort(d3.ascending);
-  const netSorted   = isos.map(i => Math.abs(netOf(i))).sort(d3.ascending);
-  const p98Gross = d3.quantile(grossSorted, NODE_TOP_Q) || d3.max(grossSorted) || 1;
-  const p98Net   = d3.quantile(netSorted,   NODE_TOP_Q) || d3.max(netSorted)   || 1;
+  const grossSorted = isos.map(i => stats[i].gross).sort(ascending);
+  const netSorted   = isos.map(i => Math.abs(netOf(i))).sort(ascending);
+  const p98Gross = quantile(grossSorted, NODE_TOP_Q) || max(grossSorted) || 1;
+  const p98Net   = quantile(netSorted,   NODE_TOP_Q) || max(netSorted)   || 1;
 
-  const radiusScale = d3.scalePow().exponent(NODE_EXP)
+  const radiusScale = scalePow().exponent(NODE_EXP)
     .domain([0, p98Gross]).range([NODE_MIN_R, NODE_MAX_R]).clamp(true);
 
   const maxT = Math.sqrt(p98Net);
-  const colorFn = d3.scaleLinear()
+  const colorFn = scaleLinear()
     .domain([-maxT, -maxT * 0.15, 0, maxT * 0.15, maxT])
     .range(['#ED1847', '#F9C0C5', '#ffffff', '#C5DFEF', '#009EDB'])
-    .interpolate(d3.interpolateHcl).clamp(true);
+    .interpolate(interpolateHcl).clamp(true);
   const colorOf = v => colorFn(Math.sign(v) * Math.sqrt(Math.abs(v)));
 
   const proj = iso => TradeMap.projection(STATE.countryCoords[iso]) || [-999, -999];
@@ -563,14 +493,11 @@ function _drawHalos(top3expSet, top3impSet, k) {
 // ── White flowing particle overlay on arcs connected to top-3 countries ──
 function _drawParticles(flows, k, topSet, widthScale) {
   if (!_particleLayer) return;
-  // Flowing dashes are decoration on top of arcs that are already drawn;
-  // under reduced motion they are dropped rather than frozen mid-corridor.
+  // Decoration only: dropped under reduced motion
   if (prefersReducedMotion()) { _particleLayer.selectAll('*').remove(); return; }
   const key = d => `${d.exporter}|${d.importer}`;
 
-  // flows is already sorted descending by netValue.
-  // Use a value-based threshold (≥10% of the top flow) rather than a fixed count,
-  // so the selection reflects genuinely major corridors regardless of the year.
+  // Major corridors: at least 10% of the year's largest flow (flows are sorted desc)
   const maxVal = flows[0]?.netValue || 1;
   const topFlows = flows
     .filter(d => (topSet.has(d.exporter) || topSet.has(d.importer))
@@ -604,16 +531,9 @@ function _injectOverlays() {
   const area = document.querySelector('.map-area');
   if (!area) return;
 
-  // Bar chart race panel.
-  // Ranking basis (see startAnimation): each country pair is netted first, and a
-  // bar sums the pairs in which the country is the net exporter (importer). The
-  // sub-labels and tooltips state that, since it is neither gross trade nor the
-  // overall net balance. The small square before each label carries the role colour.
+  // Bar chart race panel (ranking basis: see startAnimation)
   const basisTip = (role) =>
-    `Each country pair is netted first (exports minus imports between the two). ` +
-    `The bar adds up the pairs in which the country is the net ${role}. ` +
-    `This is neither gross ${role === 'exporter' ? 'exports' : 'imports'} nor the overall net trade balance, ` +
-    `so a country can appear in both lists.`;
+    `Each country pair is netted first (exports minus imports between the two). The bar adds up the pairs in which the country is the net ${role}. This is neither gross ${role === 'exporter' ? 'exports' : 'imports'} nor the overall net trade balance, so a country can appear in both lists.`;
   const panel = document.createElement('div');
   panel.id = 'anim-panel';
   panel.innerHTML = `
@@ -640,7 +560,7 @@ function _injectOverlays() {
     </div>`;
   area.appendChild(panel);
 
-  // Map annotation legend — appended to #map-container (position: relative in anim-mode)
+  // Map legend (#map-container is position: relative in anim-mode)
   const mapContainer = document.getElementById('map-container');
   if (mapContainer) {
     const legend = document.createElement('div');
@@ -698,28 +618,23 @@ function _updateOverlays(year, index) {
 }
 
 function _renderRace(containerId, ranks, color) {
-  const g = d3.select(`#${containerId}`);
+  const g = select(`#${containerId}`);
   if (g.empty() || !ranks) return;
 
-  // Compute max bar width from the actual container width at render time so bars
-  // always fill the available space regardless of --anim-panel-w.
-  // Subtract: flag label (66px) + value text (~56px, e.g. "$1.23B" / "1.23 Mt")
-  // + gaps (5px + 4px) + section padding (24px).
+  // Max bar width = container width - flag (66) - value text (56) - gaps and padding (33)
   const containerEl = document.getElementById(containerId);
   const barMax = containerEl?.offsetWidth > 0
     ? Math.max(containerEl.offsetWidth - 66 - 56 - 33, 40)
     : BAR_MAX;
 
-  // Row height follows the space the chart actually has (short screens and the
-  // 600 px embed box): 27 px down to 15 px, and fewer rows (at least 3) when
-  // even that does not fit — rows never spill into the next list.
+  // Rows shrink to fit (27 down to 15 px, at least 3 rows) so they never overflow
   const chartH = containerEl?.clientHeight || 0;
   const nRows  = chartH > 0 ? Math.max(3, Math.min(10, Math.floor(chartH / 15))) : 10;
   const rowH   = chartH > 0 ? Math.max(15, Math.min(ROW_H, Math.floor(chartH / nRows))) : ROW_H;
   const barH   = Math.min(BAR_H, rowH - 5);   // keep a gap between bars when rows shrink
 
   const top     = ranks.slice(0, nRows);
-  const maxVal  = d3.max(top, d => d.value) || 1;
+  const maxVal  = max(top, d => d.value) || 1;
   const bw      = v => Math.max((v / maxVal) * barMax, 2);
   const rankMap = new Map(top.map((d, i) => [d.iso, i]));
 
@@ -752,8 +667,7 @@ function _renderRace(containerId, ranks, color) {
     .property('_prev', d => d.value)
     .text(d => fmtMetric(d.value));
 
-  // UPDATE + ENTER — opacity + rank position animate together.
-  // Single transition on `all` prevents D3 preempting the enter opacity tween.
+  // UPDATE + ENTER — one transition so D3 doesn't cancel the enter opacity tween
   const all = entered.merge(rows);
   all.style('height', `${rowH}px`).select('.ap-flag').style('line-height', `${rowH}px`);
   all.select('.ap-bar').style('height', `${barH}px`);
@@ -767,11 +681,10 @@ function _renderRace(containerId, ranks, color) {
 
   all.select('.ap-val').transition().duration(md(750))
     .tween('text', function(d) {
-      const el  = this;
-      const prev = (el._prev != null) ? el._prev : d.value;
-      el._prev  = d.value;
-      const interp = d3.interpolateNumber(prev, d.value);
-      return t => { el.textContent = fmtMetric(interp(t)); };
+      const prev = (this._prev != null) ? this._prev : d.value;
+      this._prev  = d.value;
+      const interp = interpolateNumber(prev, d.value);
+      return t => { this.textContent = fmtMetric(interp(t)); };
     });
 }
 

@@ -1,0 +1,102 @@
+/* Key figures for the current view */
+#kpi-bar {
+  background: var(--unblue-bg);
+  border-bottom: 1px solid var(--un-color-grey-light);
+  flex-shrink: 0;
+  z-index: 20;
+
+  .kpi-inner {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    justify-content: center;
+    margin: 0 auto;
+    max-width: var(--content-max-width);
+    padding: 6px 16px;
+  }
+
+  .kpi-item {
+    align-items: baseline;
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .kpi-label {
+    color: var(--un-color-grey-dark);
+    font-size: var(--fs-xs);
+    font-weight: 500;
+  }
+
+  .kpi-value {
+    color: var(--ungrey-dark);
+    font-size: var(--fs-label);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    /* A small key in front of the value (circle = economy, line = flow direction) */
+    &.kpi-value-exp::before,
+    &.kpi-value-imp::before,
+    &.kpi-value-ns::before,
+    &.kpi-value-ss::before {
+      content: '';
+      display: inline-block;
+      margin-right: 5px;
+    }
+    &.kpi-value-exp::before,
+    &.kpi-value-imp::before {
+      border-radius: 50%;
+      height: 8px;
+      vertical-align: 0.05em;
+      width: 8px;
+    }
+    &.kpi-value-ns::before,
+    &.kpi-value-ss::before {
+      height: 3px;
+      vertical-align: 0.25em;
+      width: 12px;
+    }
+    &.kpi-value-exp::before {
+      background: var(--un-color-blue);
+    }
+    &.kpi-value-imp::before {
+      background: var(--un-color-red);
+    }
+    &.kpi-value-ns::before {
+      background: var(--flow-north-south);
+    }
+    &.kpi-value-ss::before {
+      background: var(--flow-south-south);
+    }
+  }
+
+  .kpi-sub {
+    color: var(--un-color-grey-dark);
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-scope .kpi-value {
+    color: var(--ungrey-dark);
+    max-width: 260px;
+  }
+
+  .kpi-divider {
+    background: var(--un-color-grey-light);
+    flex-shrink: 0;
+    height: 16px;
+    width: 1px;
+  }
+
+  /* Narrow desktops: the two share figures give way so the bar fits one row */
+  @media (max-width: 1199px) and (min-width: 768px) {
+    .kpi-share,
+    .kpi-share-div {
+      display: none;
+    }
+  }
+}

@@ -1,0 +1,391 @@
+/* Animate mode (bar-chart race)
+   animationMode.js adds body.anim-mode, injects #anim-panel into .map-area and
+   #anim-legend into #map-container, and removes both on stop. */
+
+/* Right-side header controls — only visible while the animation runs */
+#anim-header-right {
+  align-items: center;
+  display: none;
+  flex-shrink: 0;
+  gap: 16px;
+  margin-left: auto;
+}
+#anim-smep-logo {
+  height: 28px;
+  opacity: 0.65;
+  width: auto;
+}
+#anim-stop-btn {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--un-color-blue-darkest);
+  border-radius: var(--radius-sm);
+  color: var(--un-color-blue-darkest);
+  cursor: pointer;
+  display: flex;
+  font-family: var(--font-family);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  white-space: nowrap;
+  &:hover {
+    background: var(--un-color-blue-darkest);
+    color: #fff;
+  }
+  &:focus-visible {
+    outline: 2px solid var(--un-color-blue);
+    outline-offset: 2px;
+  }
+}
+
+/* Everything that belongs to the interactive dashboard steps aside */
+body.anim-mode {
+  /* Panel / map split ratio: 25% = 1:3 | 30% = 3:7 | 35% = 1:2 */
+  --anim-panel-w: 30%;
+  #filter-bar,
+  #kpi-bar,
+  #map-footer,
+  #legend-panel,
+  #insight-panel,
+  #arc-modal,
+  #compare-modal,
+  #map-tools,
+  #mobile-nav,
+  #linefilter-status,
+  #map-empty,
+  .header-utils {
+    display: none;
+  }
+
+  #anim-header-right {
+    display: flex;
+  }
+
+  .map-area {
+    display: flex;
+    flex-direction: row;
+  }
+  #map-container {
+    flex: 1;
+    height: 100%;
+    inset: auto;
+    min-width: 0;
+    order: 1;
+    position: relative;
+    width: auto;
+  }
+  #anim-panel {
+    border-radius: 0;
+    bottom: auto;
+    flex-shrink: 0;
+    height: 100%;
+    left: auto;
+    order: 2;
+    position: relative;
+    top: auto;
+    width: var(--anim-panel-w);
+  }
+
+  @media (max-width: 767px), (max-height: 500px) and (max-width: 1024px), (max-width: 1099px) {
+    #anim-smep-logo {
+      display: none;
+    }
+  }
+
+  /* Portrait phones: map on top, race below, all within one screen */
+  @media (max-width: 767px) and (min-height: 501px) {
+    height: 100dvh;
+    overflow: hidden;
+    main,
+    .map-area {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .map-area {
+      flex-direction: column;
+    }
+    #map-container {
+      flex: 0 0 auto;
+      height: 58vw;
+      width: 100%;
+    }
+    #anim-panel {
+      border-right: none;
+      border-top: 1px solid var(--un-color-grey-light);
+      flex: 1 1 auto;
+      height: auto;
+      min-height: 0;
+      overflow-y: auto;
+      width: 100%;
+    }
+  }
+
+  /* Landscape phones: map and race side by side */
+  @media (max-height: 500px) and (max-width: 1024px) {
+    --anim-panel-w: 46%;
+    #anim-panel {
+      border-left: 1px solid var(--un-color-grey-light);
+      overflow-y: auto;
+    }
+    #anim-legend {
+      display: none;
+    }
+  }
+}
+
+/* Bar chart race panel (base styles) */
+#anim-panel {
+  background: #fff;
+  border-radius: 0;
+  border-right: 1px solid var(--un-color-grey-light);
+  bottom: 0;
+  box-shadow: 2px 0 8px rgb(0 0 0 / 7%);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-family);
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  width: 272px;
+  z-index: 20;
+}
+
+/* Panel header — year display */
+.ap-header {
+  align-items: baseline;
+  border-bottom: 1px solid var(--un-color-grey-lightest);
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 10px 14px 8px;
+}
+#ap-year {
+  color: var(--un-color-blue-darkest);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ap-range {
+  color: var(--un-color-grey-dark);
+  font-size: var(--fs-xs);
+}
+
+/* Each section shares the panel height; the chart inside takes what is left
+   (animationMode.js sizes the rows from it) */
+.ap-section {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  max-height: 312px;
+  min-height: 0;
+  padding: 7px 12px 4px;
+}
+.ap-label {
+  color: var(--ungrey-dark);
+  cursor: help;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 5px;
+
+  .ap-key {
+    display: inline-block;
+    height: 9px;
+    margin-right: 6px;
+    vertical-align: 0;
+    width: 9px;
+  }
+  .ap-basis {
+    color: var(--un-color-grey-dark);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 400;
+    margin-top: 1px;
+  }
+}
+
+/* Chart area: up to 10 rows of 27 px; shrinks with the panel */
+.ap-chart {
+  flex: 1 1 auto;
+  max-height: 270px;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Divider between export and import */
+.ap-sep {
+  background: var(--un-color-grey-lightest);
+  flex-shrink: 0;
+  height: 1px;
+}
+
+/* Timeline at the bottom */
+.ap-timeline-wrap {
+  flex-shrink: 0;
+  padding: 7px 12px 10px;
+}
+.ap-tl-track {
+  background: var(--un-color-grey-lightest);
+  border-radius: 2px;
+  height: 3px;
+  overflow: hidden;
+}
+#ap-tl-fill {
+  background: var(--un-color-blue);
+  border-radius: 2px;
+  height: 100%;
+  transition: width 0.75s ease;
+  width: 0%;
+}
+
+/* Bar chart row elements */
+.ap-row {
+  align-items: center;
+  display: flex;
+  height: 27px;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  will-change: transform, opacity;
+}
+
+/* Flag icon + ISO3 label */
+.ap-flag {
+  align-items: center;
+  color: var(--ungrey-dark);
+  display: flex;
+  flex-shrink: 0;
+  font-size: 11.5px;
+  gap: 4px;
+  line-height: 27px;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 66px;
+  .fi {
+    border-radius: 1px;
+    flex-shrink: 0;
+    height: 12px;
+    width: 16px;
+  }
+}
+
+/* Bar */
+.ap-bar-wrap {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 5px;
+  min-width: 0;
+}
+.ap-bar {
+  border-radius: 0;
+  flex-shrink: 0;
+  height: 7px;
+  min-width: 2px;
+  opacity: 0.82;
+}
+
+/* Value label */
+.ap-val {
+  color: var(--ungrey-dark);
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Map annotation legend (shown during animation mode) */
+#anim-legend {
+  background: rgb(255 255 255 / 95%);
+  border: 1px solid var(--un-color-grey-light);
+  border-radius: var(--radius-sm);
+  bottom: 18px;
+  box-shadow: 0 1px 5px rgb(0 0 0 / 9%);
+  color: #3a3530;
+  font-family: var(--font-family);
+  font-size: var(--fs-xs);
+  left: 12px;
+  padding: 8px 12px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 15;
+
+  /* Phones: only the line colours, so the map stays visible */
+  @media (max-width: 767px), (max-height: 500px) and (max-width: 1024px) {
+    bottom: 6px;
+    font-size: var(--fs-xxs);
+    left: 6px;
+    padding: 5px 8px;
+    right: 6px;
+    .al-section,
+    .al-divider {
+      display: none;
+    }
+    .al-section.al-keep {
+      display: block;
+      margin: 0;
+    }
+  }
+}
+.al-section {
+  margin-bottom: 4px;
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+.al-section-title {
+  color: var(--ungrey-dark);
+  font-size: 10.5px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.al-divider {
+  background: var(--un-color-grey-lightest);
+  height: 1px;
+  margin: 5px 0;
+}
+.al-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.al-item {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+  white-space: nowrap;
+}
+.al-dot {
+  border-radius: 50%;
+  flex-shrink: 0;
+  height: 8px;
+  width: 8px;
+  &.is-ring {
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0 0 3px currentColor;
+    margin: 0 2px;
+  }
+}
+.al-swatch {
+  flex-shrink: 0;
+  height: 3px;
+  width: 14px;
+}
+.al-muted {
+  color: var(--un-color-grey-dark);
+  font-size: var(--fs-xxs);
+  white-space: nowrap;
+}
+.al-dash {
+  border-top: 2px dashed rgb(80 80 80 / 45%);
+  flex-shrink: 0;
+  height: 0;
+  width: 18px;
+}

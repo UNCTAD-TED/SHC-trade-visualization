@@ -1,0 +1,112 @@
+/* "Download" menu (header)
+   The button itself is a .util-btn (header.css); this file styles the menu
+   and the CSV buttons anchored in the country panel and corridor pop-up. */
+#export-wrapper {
+  position: relative;
+}
+
+#export-menu {
+  background: #fff;
+  border: 1px solid var(--un-color-grey-light);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 14%);
+  font-family: var(--font-family);
+  padding: 6px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 280px;
+  z-index: 70;
+  &.hidden {
+    display: none;
+  }
+}
+
+.export-menu-hdr {
+  align-items: baseline;
+  color: var(--un-color-grey-dark);
+  display: flex;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 4px 8px 6px;
+}
+.export-scope {
+  color: var(--ungrey-dark);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-align: right;
+}
+
+.export-opt {
+  align-items: flex-start;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-family);
+  gap: 1px;
+  padding: 8px;
+  text-align: left;
+  transition: background 0.12s;
+  width: 100%;
+  &:hover,
+  &:focus-visible {
+    background: var(--unblue-bg);
+  }
+}
+.export-opt-title {
+  color: var(--un-color-blue-darkest);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.export-opt-sub {
+  color: var(--un-color-grey-dark);
+  font-size: var(--fs-xxs);
+}
+.export-menu-foot {
+  border-top: 1px solid var(--un-color-grey-lightest);
+  color: var(--un-color-grey-dark);
+  font-size: 9.5px;
+  line-height: 1.4;
+  margin-top: 2px;
+  padding: 6px 8px 2px;
+}
+
+/* Focus-anchored CSV buttons (country panel + corridor pop-up) */
+.focus-export-btn {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--un-color-grey-light);
+  border-radius: var(--radius-sm);
+  color: var(--un-color-blue-darkest);
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-family: var(--font-family);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  gap: 4px;
+  margin-right: 8px;
+  padding: 4px 9px;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+  white-space: nowrap;
+  &:hover {
+    background: var(--un-color-blue-darkest);
+    border-color: var(--un-color-blue-darkest);
+    color: #fff;
+  }
+  &:focus-visible {
+    outline: 2px solid var(--un-color-blue);
+    outline-offset: 1px;
+  }
+  svg {
+    flex-shrink: 0;
+  }
+}

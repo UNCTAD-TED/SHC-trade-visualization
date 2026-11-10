@@ -3,7 +3,7 @@ export const RegionConfig = {
     regions: {
         "Global": { center: [0, 20], scale: 1 },
         "Africa": { center: [20, 0], scale: 2.5 },
-        "Americas": { center: [-80, 10], scale: 1.8 }, // centre that shows both North and South America
+        "Americas": { center: [-80, 10], scale: 1.8 }, // shows both North and South America
         "Asia": { center: [100, 30], scale: 2.0 },
         "Europe": { center: [15, 50], scale: 3.5 },
         "Oceania": { center: [140, -25], scale: 3.0 }

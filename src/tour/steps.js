@@ -1,33 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Guided Story — chapter definitions.
 //
-// Each chapter drives the *real* app through its onEnter/onExit hooks (using the
-// same App / DataLoader / TradeMap APIs the UI uses) and explains what just
-// happened in the narration card. The story follows the global second-hand
-// clothing (SHC) trade so every feature appears in a meaningful context.
-//
 // Shape: { id, title, body, target, placement, onEnter?, onExit?, advance?, dwell? }
-//   target   : CSS selector or (ctx) => selector  (resolved AFTER onEnter runs)
+//   target   : CSS selector or (ctx) => selector, resolved after onEnter
 //   placement: 'auto' | 'top' | 'bottom' | 'left' | 'right' | 'center'
-//   body/title may be strings or (ctx) => string
-//   onEnter(ctx, alive): alive() turns false once the user has ended the tour
-//              (or moved on). An async onEnter must check it after every await
-//              and stop, so it never acts on the view the tour handed back.
+//   onEnter(ctx, alive): an async onEnter must stop once alive() is false after an await
 //
-// When the tour ends (Finish, × or Esc) the dashboard is returned to the view the
-// user had when the tour started (Tour._handBack), so chapters may change any
-// setting freely.
+// The tour restores the user's view when it ends, so chapters may change any setting.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const name = (ctx, iso) => (iso && (ctx.STATE.countryNames[iso] || iso)) || '—';
 const always = () => true;
 
-// First of the selectors whose element is on screen. The filter bar is hidden
-// on phones, where the same controls sit behind the Filters button.
+// First selector whose element is on screen (the filter bar is hidden on phones)
 const visible = (...selectors) => () =>
     selectors.find(sel => document.querySelector(sel)?.getClientRects().length) || null;
 
-// Restore all four flow filters (used by several onExit hooks)
+// Turn all four flow filters back on
 function allFlows(ctx) {
     ctx.STATE.flowFilters = new Set(['north-south', 'south-north', 'south-south', 'north-north']);
     document.querySelectorAll('.flow-checkbox').forEach(cb => { cb.checked = true; });
@@ -37,8 +26,7 @@ function allFlows(ctx) {
 async function setMetric(ctx, metric, alive = always) {
     if (ctx.STATE.metric === metric) return;
     await ctx.DataLoader.switchMetric(metric);
-    // Ended meanwhile, or superseded by a later switch (e.g. the hand-back):
-    // the switch did not commit, so the controls must not claim it did.
+    // Ended, or superseded by a later switch: leave the controls alone
     if (!alive() || ctx.STATE.metric !== metric) return;
     ctx.app._setActiveMetricButtons(metric);
     ctx.app.updateThresholdLabels(metric);
@@ -110,7 +98,7 @@ export const TOUR_STEPS = [
         dwell: 8000,
     },
 
-    // 05 ─ Value vs Weight (new feature) ───────────────────────────────────────
+    // 05 ─ Value vs Weight ─────────────────────────────────────────────────────
     {
         id: 'metric',
         title: 'Value or weight?',
@@ -222,8 +210,7 @@ export const TOUR_STEPS = [
         cardAnchor: 'bottom',
         async onEnter(ctx, alive = () => true) {
             if (!alive()) return;
-            // A tour that ends during the year preload stops the animation,
-            // which cancels this start (see animationMode.startAnimation).
+            // Ending the tour during the year preload cancels this start
             try { await ctx.startAnimation(); } catch { /* ignore */ }
         },
         // Awaited, so the next chapter starts from the restored dashboard.
